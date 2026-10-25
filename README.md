@@ -18,38 +18,78 @@ I build AI-powered tools and automations that help small businesses save time an
 
 ## 🚀 Projects
 
-### 🧠 SaaS & AI Products
+Every project below explains, in plain words, **what it does** and **why I built it**.
 
-| Project | What it does | Built with |
-|---|---|---|
-| **🥗 PrepMate** | AI meal-planning SaaS: personalised weekly plans from diet, budget and skill; smart pantry with receipt/photo scanning; auto shopping lists with metric conversions; voice recipe search and multi-language TTS; Stripe subscriptions; autonomous SEO blog engine; email drip campaigns; Capacitor mobile build | React, TypeScript, Express, PostgreSQL, Drizzle, OpenAI, Stripe, Capacitor |
-| **⛽ [Fuel Receipts – Tax Tracker](./petrol-receipts)** · [Live](https://himanshubashambu08-star.github.io/himanshubashambu08/) | Offline-first PWA that scans petrol receipts with Gemini, calculates HST/GST/VAT and business-use %, and produces per-year tax summaries, CSV exports and PDF reports. Syncs across devices with Firebase | JavaScript, Firebase Auth/Firestore, Gemini (Firebase AI Logic), PWA |
-| **🇫🇷 FluentFast B2** | French learning app to reach B2 in 90 days: AI pronunciation & grammar assessment, SM-2 spaced repetition, an animated AI tutor with real lip-sync, daily challenges and achievements | React, Express, PostgreSQL, OpenAI (chat + TTS), Recharts, Framer Motion |
-| **🚚 Trucking POD Manager** | Multi-tenant SaaS for trucking companies: drivers upload Proof-of-Delivery documents from a mobile-first app; admins filter, bulk-download and email PODs to brokers | React, Express, PostgreSQL, Passport, Nodemailer |
-| **🎬 SaaS Video Marketer** | Paste any SaaS URL → screenshots it, analyses it with Claude vision, writes a script and renders a 30-second marketing video in 5 styles with narration and music | React, Express, Puppeteer, Claude, FFmpeg |
-| **📈 AI Crypto Scalping Dashboard** | Real-time BTC/ETH/SOL dashboard with TradingView charts, live WebSocket prices, a backtesting engine and AI trading signals from EMA/RSI/Bollinger indicators | React, Express, WebSockets, Binance API, Lightweight Charts |
-| **💰 FinanceAuthority** | NerdWallet-style personal-finance site built for AdSense: pillar pages, comparison tables, author profiles and full EEAT/SEO structure | React, TypeScript, Tailwind, shadcn/ui |
+### 🧠 Apps & SaaS Products
+
+#### 🥗 PrepMate — AI meal planner
+- **What it does:** You tell it what you like to eat, your budget and how much time you have. It makes a full week of meals for you, gives you the recipes, and builds your grocery list. You can take a photo of your grocery bill and it remembers what food you already have at home.
+- **Why I built it:** Planning meals every week takes time and a lot of food gets wasted. PrepMate does the planning for you so you save time, money and food.
+- **Built with:** React, TypeScript, Express, PostgreSQL, OpenAI, Stripe, Capacitor
+
+#### ⛽ [Fuel Receipts – Tax Tracker](./petrol-receipts) · [Try it live](https://himanshubashambu08-star.github.io/himanshubashambu08/)
+- **What it does:** Take a photo of your petrol/gas receipt and the app reads it for you: date, litres, price and tax. At the end of the year it shows how much you can claim on your taxes and makes a report for your accountant.
+- **Why I built it:** People who drive for work lose paper receipts and miss out on tax money they could claim. This keeps every receipt safe on your phone.
+- **Built with:** JavaScript, Firebase, Google Gemini AI, works offline as a phone app (PWA)
+
+#### 🇫🇷 FluentFast B2 — learn French with AI
+- **What it does:** Teaches you French step by step. An AI teacher with a talking face listens to you speak, checks your pronunciation and grammar, and tells you how to improve. Flashcards come back at the right time so you don't forget words.
+- **Why I built it:** To help English speakers get good at French (B2 level) in about 90 days.
+- **Built with:** React, Express, PostgreSQL, OpenAI
+
+#### 🚚 Trucking POD Manager
+- **What it does:** Truck drivers take a photo of the delivery paper (Proof of Delivery) on their phone and upload it. The office sees all the papers in one place and can email them to the broker in one click.
+- **Why I built it:** Trucking companies waste hours chasing drivers for delivery papers, and they can't get paid without them. This makes it fast and organised.
+- **Built with:** React, Express, PostgreSQL
+
+#### 🎬 SaaS Video Marketer
+- **What it does:** Paste the website link of any software product. The AI looks at the website, writes a short ad script, and makes a ready-to-post 30-second video with voice and music.
+- **Why I built it:** Small software companies can't afford video editors. This gives them a marketing video in minutes.
+- **Built with:** React, Express, Claude AI, Puppeteer, FFmpeg
+
+#### 📈 AI Crypto Dashboard
+- **What it does:** Shows live Bitcoin, Ethereum and Solana prices on charts, tests trading strategies on past data, and gives an AI "buy / sell / wait" signal.
+- **Why I built it:** To practise building real-time apps and to test trading ideas without risking real money.
+- **Built with:** React, Express, WebSockets, Binance API, TradingView charts
+
+#### 💰 FinanceAuthority
+- **What it does:** A money-advice website (like NerdWallet) with simple guides on credit cards, loans, insurance, investing and credit scores, plus product comparison tables.
+- **Why I built it:** To earn income from ads (Google AdSense) while giving people honest, easy-to-read money advice.
+- **Built with:** React, TypeScript, Tailwind
 
 ### 🤖 AI Agents & Automation
 
-| Project | What it does | Built with |
-|---|---|---|
-| **📬 AI Outreach Agent** | Finds small businesses daily, audits their websites for automation opportunities, extracts contact emails and drafts personalised pitches; dashboard to review and send via Gmail/SendGrid with follow-up reminders | Mastra, Inngest, OpenAI, PostgreSQL, Cheerio |
-| **💼 LinkedIn Outreach Automation** | Lead discovery, personalised DM generation and a 4-step follow-up sequence running 3× daily, with a pipeline dashboard | Mastra, Inngest, GPT-4o, PostgreSQL |
-| **📞 Stella – 24/7 AI Receptionist** | Voice agent that answers calls during rush hours and books appointments straight into Google Calendar | Vapi, Make.com, Google Calendar API |
+#### 📬 AI Outreach Agent
+- **What it does:** Every day it finds small businesses online, checks their websites for problems, finds their email, and writes a personal message offering help. I read each message, edit it if needed, and send it with one click.
+- **Why I built it:** Finding new clients by hand takes hours every day. This does the research for me and I just approve.
+- **Built with:** Mastra AI agents, OpenAI, PostgreSQL, Gmail
 
-### 🎨 Portfolios & Websites
+#### 💼 LinkedIn Outreach Automation
+- **What it does:** Finds people on LinkedIn who might need a website or automation, writes a personal message for each one, and reminds me to follow up after 1, 3 and 7 days.
+- **Why I built it:** To get consulting clients from LinkedIn without spending hours writing messages.
+- **Built with:** Mastra AI agents, GPT-4o, PostgreSQL
 
-| Project | What it does | Built with |
-|---|---|---|
-| **🎥 Cinematic Portfolio** | Movie-inspired dark/gold portfolio with animated stats, filterable projects and a contact form | React, Framer Motion, Express, PostgreSQL |
-| **🌆 Immersive 3D Portfolio** | Scroll-driven portfolio with a 3D cityscape, floating orbs and shader effects | React Three Fiber, Three.js, Zustand |
-| **⚡ My Creative Showcase / Automation Architect / Automation Alchemy** | Landing pages for my AI automation consulting services | React, TypeScript, Tailwind (Lovable) |
+#### 📞 Stella — 24/7 AI Receptionist
+- **What it does:** An AI voice that answers a business's phone calls, talks like a real receptionist, and books appointments straight into Google Calendar.
+- **Why I built it:** Small businesses miss calls when they are busy, and every missed call is a lost customer. Stella never misses a call.
+- **Built with:** Vapi voice AI, Make.com, Google Calendar
 
-### 🛒 Ventures
-- **PawfectLife** — e-commerce store for premium pet grooming products (Shopify)
-- **Rice import** — connecting Indian Basmati suppliers with Canadian grocery stores
-- **Skyboo** — an outdoor sports game in development
+### 🎨 Portfolio Websites
+
+#### 🎥 Cinematic Portfolio & 🌆 3D Portfolio
+- **What they do:** Two personal websites that show my work. One looks like a movie (dark and gold); the other has a 3D city you scroll through.
+- **Why I built them:** To show clients my projects in a memorable way, and to practise animation and 3D on the web.
+- **Built with:** React, Framer Motion, Three.js
+
+#### ⚡ My Creative Showcase, Automation Architect, Automation Alchemy
+- **What they do:** Simple one-page websites that explain my AI automation services and let people book a call.
+- **Why I built them:** So businesses can quickly understand what I offer and contact me.
+- **Built with:** React, Tailwind (made with Lovable)
+
+### 🛒 Business Ventures
+- **PawfectLife** — an online store selling pet grooming products.
+- **Rice import** — bringing Basmati rice from Indian suppliers to Canadian grocery stores.
+- **Skyboo** — a new outdoor sports game I'm developing.
 
 ---
 
