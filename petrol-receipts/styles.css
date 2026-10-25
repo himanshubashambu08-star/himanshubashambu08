@@ -110,7 +110,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 10px; }
 label > input, label > select, label > textarea { margin-top: 4px; }
 /* iOS Safari renders date inputs blank and too wide unless reset. */
-input[type=date] { -webkit-appearance: none; appearance: none; display: block; min-width: 0; min-height: 2.6em; }
+input[type=date] { -webkit-appearance: none; appearance: none; display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 2.6em; }
 input[type=date]::-webkit-date-and-time-value { text-align: left; }
 label.check { display: flex; gap: 8px; align-items: flex-start; color: var(--text); font-size: .95rem; }
 label.check input { width: auto; margin-top: 3px; }
