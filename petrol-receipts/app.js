@@ -531,6 +531,7 @@ $('#photoInput').addEventListener('change', (e) => {
   e.target.value = '';
   if (file) usePhotoFile(file);
 });
+$('#scanInput').addEventListener('click', () => scanAvailable() && loadScanModels().catch(() => {}));
 $('#scanInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   e.target.value = '';
@@ -585,12 +586,20 @@ function loadScanModels() {
         // Firebase AI Logic enforces App Check: each request must carry a token proving it comes from this site.
         if (appCheckSiteKey) {
           const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import(`${base}/firebase-app-check.js`);
-          initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
+          const appCheck = initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
+          // Fetch the first token now so the scan itself doesn't wait for reCAPTCHA.
+          import(`${base}/firebase-app-check.js`).then(({ getToken }) => getToken(appCheck)).catch(() => {});
         }
       }
       const ai = getAI(app, { backend: new GoogleAIBackend() });
-      const generationConfig = { responseMimeType: 'application/json', responseJsonSchema: RECEIPT_SCHEMA, temperature: 0 };
-      return SCAN_MODELS.map((name) => ({ name, model: getGenerativeModel(ai, { model: name, generationConfig }) }));
+      const base_ = { responseMimeType: 'application/json', responseJsonSchema: RECEIPT_SCHEMA, temperature: 0 };
+      // Reading a receipt needs no reasoning; thinking adds seconds of latency.
+      const thinkingConfig = (name) => (/^gemini-2\./.test(name) ? { thinkingBudget: 0 } : { thinkingLevel: 'MINIMAL' });
+      return SCAN_MODELS.map((name) => ({
+        name,
+        fast: getGenerativeModel(ai, { model: name, generationConfig: { ...base_, thinkingConfig: thinkingConfig(name) } }),
+        plain: getGenerativeModel(ai, { model: name, generationConfig: base_ }),
+      }));
     })();
     scanModelsPromise.catch(() => (scanModelsPromise = null));
   }
@@ -616,24 +625,66 @@ const httpStatus = (err) => err.customErrorData?.status;
 const isMissingModel = (err) =>
   httpStatus(err) === 404 || err.code === 'no-model' || /model.*(not found|not supported|does not exist)/i.test(err.message || '');
 
-let workingModel = null; // name of the last model that answered, tried first next time
+// The model (and thinking mode) that last answered is remembered on this device and tried first.
+const WORKING_MODEL_KEY = 'fuel-receipts:scan-model';
+let workingModel = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(WORKING_MODEL_KEY)) || null;
+  } catch {
+    return null;
+  }
+})();
+
+function rememberModel(name, fast) {
+  workingModel = { name, fast };
+  try {
+    localStorage.setItem(WORKING_MODEL_KEY, JSON.stringify(workingModel));
+  } catch {}
+}
+
+const isThinkingRejected = (err) => httpStatus(err) === 400 && /think/i.test(err.message || '');
+
+/** A smaller copy for reading: enough pixels for receipt text, much less to upload. */
+async function scanImage(dataUrl) {
+  try {
+    return drawScaled(await loadImage(dataUrl), 1280, 0.7);
+  } catch {
+    return dataUrl;
+  }
+}
 
 async function scanPhoto(dataUrl) {
-  const models = await loadScanModels();
-  const ordered = [...models].sort((a, b) => (b.name === workingModel) - (a.name === workingModel));
-  const image = { inlineData: { data: dataUrl.split(',')[1], mimeType: dataUrl.slice(5, dataUrl.indexOf(';')) } };
+  const [models, small] = await Promise.all([loadScanModels(), scanImage(dataUrl)]);
+  const ordered = [...models].sort((a, b) => (b.name === workingModel?.name) - (a.name === workingModel?.name));
+  const image = { inlineData: { data: small.split(',')[1], mimeType: 'image/jpeg' } };
   let lastErr;
-  for (const { name, model } of ordered) {
-    try {
-      const result = await model.generateContent([scanPrompt(), image]);
-      workingModel = name;
-      return JSON.parse(result.response.text());
-    } catch (err) {
-      lastErr = err;
-      if (!isMissingModel(err)) break;
+  for (const entry of ordered) {
+    let fast = !(entry.name === workingModel?.name && workingModel.fast === false);
+    for (;;) {
+      try {
+        const result = await (fast ? entry.fast : entry.plain).generateContent([scanPrompt(), image]);
+        rememberModel(entry.name, fast);
+        return JSON.parse(result.response.text());
+      } catch (err) {
+        lastErr = err;
+        if (fast && isThinkingRejected(err)) {
+          fast = false; // this model doesn't accept the thinking setting; retry without it
+          continue;
+        }
+        break;
+      }
     }
+    if (!isMissingModel(lastErr)) break;
   }
   throw lastErr;
+}
+
+/** Load the AI SDK and App Check token in the background so the first scan starts immediately. */
+function warmUpScanning() {
+  if (!scanAvailable()) return;
+  const start = () => loadScanModels().catch(() => {});
+  if ('requestIdleCallback' in window) requestIdleCallback(start, { timeout: 3000 });
+  else setTimeout(start, 1000);
 }
 
 function scanErrorMessage(err) {
@@ -707,7 +758,11 @@ async function runScan() {
   const status = $('#scanStatus');
   const btn = $('#scanBtn');
   status.classList.remove('error');
+  const started = Date.now();
   status.textContent = 'Reading receipt…';
+  const timer = setInterval(() => {
+    if (token === scanToken) status.textContent = `Reading receipt… ${Math.round((Date.now() - started) / 1000)}s`;
+  }, 1000);
   btn.disabled = true;
   try {
     const data = await scanPhoto(pendingPhoto);
@@ -726,6 +781,7 @@ async function runScan() {
     status.textContent = `${scanErrorMessage(err)} [${APP_VERSION}]`;
     status.classList.add('error');
   } finally {
+    clearInterval(timer);
     if (token === scanToken) btn.disabled = false;
   }
 }
@@ -1028,7 +1084,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
 
 /* ---------- Accounts (Firebase) ---------- */
 
-const APP_VERSION = '2026.10.25-scan6';
+const APP_VERSION = '2026.10.25-fast1';
 const FIREBASE_VERSION = '10.12.2';
 const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
 let signUpMode = false;
@@ -1209,6 +1265,7 @@ async function init() {
       }
       backend = cloudBackend(user);
       showApp(user);
+      warmUpScanning();
       await loadData();
       offerLocalUpload(user);
     });
