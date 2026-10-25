@@ -839,7 +839,12 @@ async function loadFirebase() {
     await loadScript(`${base}/firebase-app-compat.js`);
     await Promise.all([loadScript(`${base}/firebase-auth-compat.js`), loadScript(`${base}/firebase-firestore-compat.js`)]);
   }
-  if (!firebase.apps.length) firebase.initializeApp(cloudConfig);
+  const config = { ...cloudConfig };
+  // On Firebase Hosting, sign in through this same site so browsers that partition
+  // storage between sites (Safari, in-app browsers) keep the sign-in state.
+  const host = location.hostname;
+  if (host === `${config.projectId}.web.app` || host === `${config.projectId}.firebaseapp.com`) config.authDomain = host;
+  if (!firebase.apps.length) firebase.initializeApp(config);
   // Keep a local copy so the app works offline; changes sync when back online.
   await firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(() => {});
 }
@@ -852,6 +857,9 @@ const AUTH_ERRORS = {
   'auth/email-already-in-use': 'An account with this email already exists. Sign in instead.',
   'auth/weak-password': 'Use a password with at least 6 characters.',
   'auth/too-many-requests': 'Too many attempts. Wait a minute and try again.',
+  'auth/popup-blocked': 'This browser blocked the Google sign-in window. Open the app in Safari or Chrome, or sign in with email below.',
+  'auth/operation-not-supported-in-this-environment': 'Google sign-in doesn’t work in this browser. Open the app in Safari or Chrome, or sign in with email below.',
+  'auth/web-storage-unsupported': 'Google sign-in doesn’t work in this browser. Open the app in Safari or Chrome, or sign in with email below.',
   'auth/network-request-failed': 'No internet connection. Connect and try again.',
   'auth/operation-not-allowed': 'This sign-in method is not turned on in Firebase (Authentication → Sign-in method).',
   'auth/unauthorized-domain': 'This website is not allowed to sign in yet. Add its domain in Firebase → Authentication → Settings → Authorized domains.',
@@ -877,13 +885,8 @@ function wireAuthUi() {
   $('#googleBtn').onclick = async () => {
     $('#authError').hidden = true;
     const provider = new firebase.auth.GoogleAuthProvider();
-    try {
-      await auth.signInWithPopup(provider);
-    } catch (err) {
-      if (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment') {
-        auth.signInWithRedirect(provider).catch(authError);
-      } else authError(err);
-    }
+    // Popup only: the redirect flow fails in browsers that partition storage between sites.
+    auth.signInWithPopup(provider).catch(authError);
   };
   $('#toggleMode').onclick = () => setAuthMode(!signUpMode);
   $('#accountInitial').onclick = () => document.querySelector('.tab[data-view=settings]').click();
@@ -981,7 +984,6 @@ async function init() {
     await loadFirebase();
     wireAuthUi();
     setAuthMode(false);
-    firebase.auth().getRedirectResult().catch(authError);
     firebase.auth().onAuthStateChanged(async (user) => {
       if (!user) {
         $('#appShell').hidden = true;

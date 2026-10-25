@@ -1,0 +1,6 @@
+{
+  "hosting": {
+    "public": "petrol-receipts",
+    "ignore": ["README.md", "firestore.rules", "**/.*"]
+  }
+}

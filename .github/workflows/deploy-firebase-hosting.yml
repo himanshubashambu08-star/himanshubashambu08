@@ -1,0 +1,25 @@
+name: Deploy Fuel Receipts to Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+    paths: ['petrol-receipts/**', 'firebase.json', '.github/workflows/deploy-firebase-hosting.yml']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Missing secret
+        if: env.HAS_SERVICE_ACCOUNT != 'true'
+        run: echo "::warning::Add the FIREBASE_SERVICE_ACCOUNT repository secret to deploy to Firebase Hosting (see petrol-receipts/README.md)."
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        if: env.HAS_SERVICE_ACCOUNT == 'true'
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: recite-66f60
