@@ -842,8 +842,7 @@ async function loadFirebase() {
   const config = { ...cloudConfig };
   // On Firebase Hosting, sign in through this same site so browsers that partition
   // storage between sites (Safari, in-app browsers) keep the sign-in state.
-  const host = location.hostname;
-  if (host === `${config.projectId}.web.app` || host === `${config.projectId}.firebaseapp.com`) config.authDomain = host;
+  if (location.hostname === `${config.projectId}.firebaseapp.com`) config.authDomain = location.hostname;
   if (!firebase.apps.length) firebase.initializeApp(config);
   // Keep a local copy so the app works offline; changes sync when back online.
   await firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(() => {});
@@ -980,6 +979,12 @@ async function offerLocalUpload(user) {
 }
 
 async function init() {
+  // Google only accepts sign-in returns on the firebaseapp.com domain, so send
+  // visitors of the web.app alias there.
+  if (cloudConfig && location.hostname === `${cloudConfig.projectId}.web.app`) {
+    location.replace(`https://${cloudConfig.projectId}.firebaseapp.com${location.pathname}${location.search}${location.hash}`);
+    return;
+  }
   if (cloudConfig && !embedded) {
     await loadFirebase();
     wireAuthUi();
