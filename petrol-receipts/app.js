@@ -545,7 +545,7 @@ $('#scanBtn').onclick = () => runScan();
 
 const AI_SDK_VERSION = '12.19.0';
 // Newest first; later models are fallbacks in case a name is unavailable to this project.
-const SCAN_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+const SCAN_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 const SCANNABLE = ['date', 'station', 'litres', 'pricePerLitre', 'total', 'tax', 'fuelType', 'payment', 'receiptNo', 'odometer'];
 const RECEIPT_SCHEMA = {
   type: 'object',
@@ -642,6 +642,11 @@ function rememberModel(name, fast) {
   } catch {}
 }
 
+// Overloaded or temporarily failing on Google's side: another model usually has capacity.
+const isBusy = (err) =>
+  [500, 502, 503, 504].includes(httpStatus(err)) || /high demand|overloaded|UNAVAILABLE|try again later/i.test(err.message || '');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const isThinkingRejected = (err) => httpStatus(err) === 400 && /think/i.test(err.message || '');
 
 /** A smaller copy for reading: enough pixels for receipt text, much less to upload. */
@@ -657,7 +662,18 @@ async function scanPhoto(dataUrl) {
   const [models, small] = await Promise.all([loadScanModels(), scanImage(dataUrl)]);
   const ordered = [...models].sort((a, b) => (b.name === workingModel?.name) - (a.name === workingModel?.name));
   const image = { inlineData: { data: small.split(',')[1], mimeType: 'image/jpeg' } };
+  try {
+    return await tryModels(ordered, image);
+  } catch (err) {
+    if (!isBusy(err)) throw err;
+    await sleep(1500); // every model was busy; give Google a moment and go round once more
+    return tryModels(ordered, image);
+  }
+}
+
+async function tryModels(ordered, image) {
   let lastErr;
+  let busyErr = null;
   for (const entry of ordered) {
     let fast = !(entry.name === workingModel?.name && workingModel.fast === false);
     for (;;) {
@@ -674,9 +690,10 @@ async function scanPhoto(dataUrl) {
         break;
       }
     }
-    if (!isMissingModel(lastErr)) break;
+    if (isBusy(lastErr)) busyErr = lastErr;
+    else if (!isMissingModel(lastErr)) throw lastErr;
   }
-  throw lastErr;
+  throw busyErr || lastErr;
 }
 
 /** Load the AI SDK and App Check token in the background so the first scan starts immediately. */
@@ -701,6 +718,7 @@ function scanErrorMessage(err) {
       : 'Receipt reading needs App Check set up first (a reCAPTCHA key). See “Turn on receipt reading” in the README.';
   }
   if (/appCheck\//i.test(text)) return 'App Check couldn’t verify this device. Try again in a minute. (' + detail + ')';
+  if (isBusy(err)) return 'Google’s Gemini is very busy right now. Tap “Read details from photo” again in a minute, or enter the details by hand.';
   if (status === 429 || /RESOURCE_EXHAUSTED/i.test(text)) return 'Too many receipts read in a short time. Wait a minute and try again.';
   if (/API_KEY_SERVICE_BLOCKED|are blocked|API key not valid/i.test(text)) {
     return 'The app’s Firebase key isn’t allowed to use AI Logic. In Google Cloud → APIs & Services → Credentials, edit the Browser key and add “Firebase AI Logic API” to its allowed APIs. (' + detail + ')';
@@ -1084,7 +1102,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
 
 /* ---------- Accounts (Firebase) ---------- */
 
-const APP_VERSION = '2026.10.25-fast1';
+const APP_VERSION = '2026.10.25-fast2';
 const FIREBASE_VERSION = '10.12.2';
 const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
 let signUpMode = false;
