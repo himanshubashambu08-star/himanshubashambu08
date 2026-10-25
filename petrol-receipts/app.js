@@ -86,6 +86,38 @@ function money(n) {
 const fmtNum = (n, d = 2) => (n == null ? '' : (+n).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }));
 const fmtDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 const todayIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+// Embedded viewers (iframes) block alert/confirm, downloads, printing and service workers.
+const embedded = window.self !== window.top;
+
+let toastTimer;
+function notify(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), 4000);
+}
+
+/** In-page replacement for confirm(); resolves true when the user confirms. */
+function ask(msg, { okText = 'OK', danger = false, typeToConfirm = '' } = {}) {
+  const d = $('#askDialog');
+  const ok = $('#askOk');
+  const input = $('#askInput');
+  $('#askMsg').textContent = msg;
+  ok.textContent = okText;
+  ok.className = 'btn ' + (danger ? 'danger' : 'primary');
+  input.hidden = !typeToConfirm;
+  input.value = '';
+  input.placeholder = typeToConfirm ? `Type ${typeToConfirm}` : '';
+  ok.disabled = !!typeToConfirm;
+  input.oninput = () => (ok.disabled = input.value.trim() !== typeToConfirm);
+  d.returnValue = '';
+  d.showModal();
+  return new Promise((resolve) => {
+    d.onclose = () => resolve(d.returnValue === 'ok');
+  });
+}
+
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 
 /** Start year of the tax year that contains the given ISO date. */
@@ -382,7 +414,7 @@ $('#photoInput').addEventListener('change', async (e) => {
   try {
     setPhoto(await compressImage(file));
   } catch (err) {
-    alert(err.message);
+    notify(err.message);
   }
 });
 $('#removePhoto').onclick = () => setPhoto(null);
@@ -390,7 +422,7 @@ $('#photoPreview').onclick = () => showPhoto(pendingPhoto);
 $('#cancelBtn').onclick = () => editor.close();
 
 $('#deleteBtn').onclick = async () => {
-  if (!editingId || !confirm('Delete this receipt? This cannot be undone.')) return;
+  if (!editingId || !(await ask('Delete this receipt? This cannot be undone.', { okText: 'Delete', danger: true }))) return;
   await store.del(editingId);
   receipts = receipts.filter((r) => r.id !== editingId);
   editor.close();
@@ -402,7 +434,7 @@ form.addEventListener('submit', async (e) => {
   const total = num(form.total.value);
   const tax = num(form.tax.value);
   if (tax != null && total != null && tax > total) {
-    alert('Tax cannot be more than the total.');
+    notify('Tax cannot be more than the total.');
     return;
   }
   const existing = receipts.find((r) => r.id === editingId);
@@ -428,7 +460,7 @@ form.addEventListener('submit', async (e) => {
   try {
     await store.put(r);
   } catch (err) {
-    alert('Could not save — device storage may be full. Export a backup and remove old photos.\n\n' + err.message);
+    notify('Could not save. Device storage may be full: download a backup and remove old photos. (' + err.message + ')');
     return;
   }
   receipts = receipts.filter((x) => x.id !== r.id).concat(r);
@@ -447,6 +479,10 @@ $('#viewerClose').onclick = () => $('#viewer').close();
 /* ---------- Export / print ---------- */
 
 function download(name, content, type) {
+  if (embedded) {
+    showExport(name, content);
+    return;
+  }
   const blob = content instanceof Blob ? content : new Blob([content], { type });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -458,6 +494,24 @@ function download(name, content, type) {
     a.remove();
   }, 1000);
 }
+
+function showExport(name, text) {
+  $('#exportTitle').textContent = name;
+  $('#exportText').value = text.replace(/^\ufeff/, '');
+  $('#exportDialog').showModal();
+}
+$('#exportCopy').onclick = async () => {
+  const ta = $('#exportText');
+  try {
+    await navigator.clipboard.writeText(ta.value);
+    notify('Copied. Paste it into a spreadsheet, email or notes app.');
+  } catch {
+    ta.focus();
+    ta.select();
+    notify('Text selected. Use your device’s Copy command.');
+  }
+};
+$('#exportClose').onclick = () => $('#exportDialog').close();
 
 function csvCell(v) {
   const s = String(v ?? '');
@@ -510,19 +564,19 @@ async function exportBackup() {
   await store.setMeta('lastBackup', Date.now());
 }
 
-async function restoreBackup(file) {
+async function restoreBackup(text) {
   let data;
   try {
-    data = JSON.parse(await file.text());
+    data = JSON.parse(text);
   } catch {
-    alert('That file is not a valid backup.');
+    notify('That is not a valid backup.');
     return;
   }
   if (data.app !== 'fuel-receipts' || !Array.isArray(data.receipts)) {
-    alert('That file is not a Fuel Receipts backup.');
+    notify('That is not a Fuel Receipts backup.');
     return;
   }
-  if (!confirm(`Restore ${data.receipts.length} receipts? Receipts with the same ID will be overwritten; others are kept.`)) return;
+  if (!(await ask(`Restore ${data.receipts.length} receipts? Receipts with the same ID will be overwritten; others are kept.`, { okText: 'Restore' }))) return;
   for (const r of data.receipts) if (r && r.id && r.date && typeof r.total === 'number') await store.put(r);
   if (data.settings) {
     settings = { ...DEFAULT_SETTINGS, ...data.settings, km: { ...settings.km, ...(data.settings.km || {}) } };
@@ -531,7 +585,7 @@ async function restoreBackup(file) {
   receipts = await store.all();
   renderSettings();
   renderAll();
-  alert('Backup restored.');
+  notify('Backup restored.');
 }
 
 /* ---------- Wiring ---------- */
@@ -572,15 +626,28 @@ $('#kmBusiness').onchange = saveKm;
 
 $('#csvBtn').onclick = exportCsv;
 $('#printBtn').onclick = printReport;
+$('#printBtn').hidden = embedded;
+$('#backupBtn').textContent = embedded ? 'Show backup to copy' : 'Download backup (.json)';
+$('#csvBtn').textContent = embedded ? 'Copy CSV' : 'Export CSV';
+$('#pasteBtn').onclick = () => {
+  $('#pasteText').value = '';
+  $('#pasteDialog').showModal();
+};
+$('#pasteCancel').onclick = () => $('#pasteDialog').close();
+$('#pasteRestore').onclick = () => {
+  const text = $('#pasteText').value.trim();
+  $('#pasteDialog').close();
+  if (text) restoreBackup(text);
+};
 $('#backupBtn').onclick = exportBackup;
 $('#restoreInput').onchange = (e) => {
   const f = e.target.files[0];
   e.target.value = '';
-  if (f) restoreBackup(f);
+  if (f) f.text().then(restoreBackup);
 };
 $('#wipeBtn').onclick = async () => {
-  if (!confirm('Delete ALL receipts, photos and settings from this device? Download a backup first!')) return;
-  if (prompt('Type DELETE to confirm') !== 'DELETE') return;
+  const msg = 'Delete ALL receipts, photos and settings from this device? Make a backup first.';
+  if (!(await ask(msg, { okText: 'Delete everything', danger: true, typeToConfirm: 'DELETE' }))) return;
   await store.clear();
   await store.clearMeta();
   receipts = [];
@@ -608,7 +675,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
   try {
     new Intl.NumberFormat(undefined, { style: 'currency', currency });
   } catch {
-    alert('Unknown currency code. Use a 3-letter code like CAD, INR, USD, GBP.');
+    notify('Unknown currency code. Use a 3-letter code like CAD, INR, USD or GBP.');
     return;
   }
   settings = {
@@ -638,7 +705,7 @@ async function init() {
   renderSettings();
   renderAll();
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!embedded && 'serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
 init().catch((err) => {

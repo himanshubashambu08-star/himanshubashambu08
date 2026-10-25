@@ -106,7 +106,8 @@
         <p class="muted">All data (including photos) stays on this device. Export a backup regularly — tax records generally need to be kept for 6+ years.</p>
         <div class="btn-row">
           <button id="backupBtn" class="btn">Download backup (.json)</button>
-          <label class="btn">Restore backup<input id="restoreInput" type="file" accept="application/json" hidden></label>
+          <label class="btn">Restore from file<input id="restoreInput" type="file" accept="application/json,.json" hidden></label>
+          <button id="pasteBtn" class="btn">Paste backup</button>
           <button id="wipeBtn" class="btn danger">Delete all data</button>
         </div>
       </div>
@@ -156,6 +157,38 @@
   </dialog>
 
   <dialog id="viewer"><img id="viewerImg" alt="Receipt photo"><button class="btn" id="viewerClose">Close</button></dialog>
+
+  <dialog id="askDialog">
+    <form method="dialog">
+      <p id="askMsg"></p>
+      <input id="askInput" autocomplete="off" hidden>
+      <div class="btn-row end">
+        <button value="cancel" class="btn">Cancel</button>
+        <button value="ok" id="askOk" class="btn primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="exportDialog">
+    <h2 id="exportTitle">Export</h2>
+    <p class="muted small">Copy this and paste it into a spreadsheet, email or notes app.</p>
+    <textarea id="exportText" rows="10" readonly></textarea>
+    <div class="btn-row end">
+      <button type="button" id="exportClose" class="btn">Close</button>
+      <button type="button" id="exportCopy" class="btn primary">Copy</button>
+    </div>
+  </dialog>
+
+  <dialog id="pasteDialog">
+    <h2>Paste backup</h2>
+    <textarea id="pasteText" rows="10" placeholder="Paste the backup text here"></textarea>
+    <div class="btn-row end">
+      <button type="button" id="pasteCancel" class="btn">Cancel</button>
+      <button type="button" id="pasteRestore" class="btn primary">Restore</button>
+    </div>
+  </dialog>
+
+  <div id="toast" role="status" hidden></div>
 
   <datalist id="stationList"></datalist>
   <datalist id="vehicleList"></datalist>
