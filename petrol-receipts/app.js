@@ -998,6 +998,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
 
 /* ---------- Accounts (Firebase) ---------- */
 
+const APP_VERSION = '2026.10.25-scan2';
 const FIREBASE_VERSION = '10.12.2';
 const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
 let signUpMode = false;
@@ -1108,6 +1109,7 @@ function wireAuthUi() {
 }
 
 function showApp(signedInUser) {
+  $('#appVersion').textContent = `App version ${APP_VERSION}`;
   $('#scanBtn').hidden = !signedInUser;
   $('#authScreen').hidden = true;
   $('#appShell').hidden = false;
