@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <title>Fuel Receipts</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section id="authScreen" hidden>
+    <div class="auth-card">
+      <h1>⛽ Fuel Receipts</h1>
+      <p class="muted">Sign in to save your fuel receipts to your account and see them on any device.</p>
+      <button type="button" id="googleBtn" class="btn google">
+        <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        Continue with Google
+      </button>
+      <div class="divider"><span>or use your email</span></div>
+      <form id="emailForm">
+        <label>Email<input id="authEmail" type="email" autocomplete="email" required></label>
+        <label>Password<input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></label>
+        <button id="emailSubmit" class="btn primary wide" type="submit">Sign in</button>
+      </form>
+      <div class="auth-links">
+        <button type="button" id="toggleMode" class="link">New here? Create an account</button>
+        <button type="button" id="forgotBtn" class="link">Forgot password?</button>
+      </div>
+      <p id="authError" class="error" role="alert" hidden></p>
+    </div>
+  </section>
+
+  <div id="appShell" hidden>
+  <header class="topbar">
+    <h1>⛽ Fuel Receipts</h1>
+    <div class="topbar-right">
+      <select id="yearSelect" aria-label="Tax year"></select>
+      <button type="button" id="accountInitial" class="avatar" title="Account" hidden></button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-view="receipts">Receipts</button>
+    <button class="tab" data-view="summary">Tax summary</button>
+    <button class="tab" data-view="settings">Settings</button>
+  </nav>
+
+  <main>
+    <!-- RECEIPTS -->
+    <section id="view-receipts" class="view active">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search station, vehicle, notes…">
+        <button id="addBtn" class="btn primary">+ Add receipt</button>
+      </div>
+      <div id="quickStats" class="stats"></div>
+      <ul id="receiptList" class="list"></ul>
+      <p id="emptyMsg" class="empty" hidden>No receipts for this tax year yet. Tap <b>+ Add receipt</b> and snap a photo of your fuel receipt.</p>
+    </section>
+
+    <!-- SUMMARY -->
+    <section id="view-summary" class="view">
+      <div class="toolbar">
+        <h2 id="summaryTitle">Tax summary</h2>
+        <div class="btn-row">
+          <button id="csvBtn" class="btn">Export CSV</button>
+          <button id="printBtn" class="btn">Print / PDF</button>
+        </div>
+      </div>
+      <div id="summaryCards" class="stats"></div>
+      <div class="card">
+        <h3>Business-use (logbook) method</h3>
+        <p class="muted">Tax authorities (e.g. CRA, ATO, HMRC, ITD) usually let you claim only the business share of fuel. Enter your logbook kilometres for this year to apply one business-use % to all receipts instead of the per-receipt %.</p>
+        <div class="grid2">
+          <label>Total km driven this year<input id="kmTotal" type="number" min="0" step="1" inputmode="numeric"></label>
+          <label>Business km this year<input id="kmBusiness" type="number" min="0" step="1" inputmode="numeric"></label>
+        </div>
+        <p id="kmNote" class="muted"></p>
+      </div>
+      <div class="card">
+        <h3>By month</h3>
+        <div class="table-wrap"><table id="monthTable"></table></div>
+      </div>
+      <div class="card">
+        <h3>By vehicle</h3>
+        <div class="table-wrap"><table id="vehicleTable"></table></div>
+      </div>
+      <p class="muted small">This app helps you organise records; it is not tax advice. Keep original receipts as required by your tax authority and confirm claim rules with your accountant.</p>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view">
+      <div id="accountCard" class="card" hidden>
+        <h3>Account</h3>
+        <p>Signed in as <b id="accountEmail"></b></p>
+        <button type="button" id="signOutBtn" class="btn">Sign out</button>
+      </div>
+
+      <form id="settingsForm" class="card">
+        <h3>Tax settings</h3>
+        <div class="grid2">
+          <label>Region preset
+            <select id="preset">
+              <option value="">— choose —</option>
+              <option value="CA-ON">Canada – Ontario (HST 13%)</option>
+              <option value="CA-BC">Canada – BC (GST 5%)</option>
+              <option value="CA-AB">Canada – Alberta (GST 5%)</option>
+              <option value="CA-QC">Canada – Quebec (GST+QST 14.975%)</option>
+              <option value="IN">India (fuel outside GST)</option>
+              <option value="AU">Australia (GST 10%)</option>
+              <option value="UK">United Kingdom (VAT 20%)</option>
+              <option value="NZ">New Zealand (GST 15%)</option>
+            </select>
+          </label>
+          <label>Currency code<input name="currency" required maxlength="3"></label>
+          <label>Sales tax name<input name="taxName" required></label>
+          <label>Sales tax rate (%)<input name="taxRate" type="number" step="0.001" min="0" required></label>
+          <label>Tax year starts in
+            <select name="fyStartMonth"></select>
+          </label>
+          <label>Default business use (%)<input name="defaultBizPct" type="number" min="0" max="100" step="1" required></label>
+          <label>Volume unit
+            <select name="unit"><option value="L">Litres</option><option value="gal">Gallons</option></select>
+          </label>
+          <label>Your name / business (for reports)<input name="ownerName"></label>
+        </div>
+        <label class="check"><input name="taxRegistered" type="checkbox"> I'm registered for sales tax and can claim it back (input tax credits / VAT reclaim)</label>
+        <p class="muted small">If registered, the claimable expense excludes the tax (you recover it as a credit instead). If not, the tax is part of your expense.</p>
+        <label>Vehicles (one per line)<textarea name="vehicles" rows="3" placeholder="e.g. 2019 Honda Civic"></textarea></label>
+        <button class="btn primary" type="submit">Save settings</button>
+        <span id="savedMsg" class="muted" hidden>Saved ✓</span>
+      </form>
+
+      <div class="card">
+        <h3>Backup</h3>
+        <p id="storageNote" class="muted"></p>
+        <div class="btn-row">
+          <button id="backupBtn" class="btn">Download backup (.json)</button>
+          <label class="btn">Restore from file<input id="restoreInput" type="file" accept="application/json,.json" hidden></label>
+          <button id="pasteBtn" class="btn">Paste backup</button>
+          <button id="wipeBtn" class="btn danger">Delete all data</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  </div>
+
+  <!-- RECEIPT EDITOR -->
+  <dialog id="editor">
+    <form id="receiptForm" method="dialog">
+      <h2 id="editorTitle">Add receipt</h2>
+
+      <div class="photo-box">
+        <img id="photoPreview" alt="Receipt photo" hidden>
+        <div class="btn-row">
+          <label class="btn">📷 Take / choose photo<input id="photoInput" type="file" accept="image/*" capture="environment" hidden></label>
+          <button type="button" id="removePhoto" class="btn" hidden>Remove photo</button>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <label>Date<input name="date" type="date" required></label>
+        <label>Station / vendor<input name="station" list="stationList" required placeholder="e.g. Petro-Canada"></label>
+        <label>Vehicle<input name="vehicle" list="vehicleList"></label>
+        <label>Fuel type
+          <select name="fuelType"><option>Regular</option><option>Mid-grade</option><option>Premium</option><option>Diesel</option><option>Other</option></select>
+        </label>
+        <label>Volume (<span class="unit">L</span>)<input name="litres" type="number" step="0.001" min="0" inputmode="decimal"></label>
+        <label>Price per <span class="unit">L</span><input name="pricePerLitre" type="number" step="0.001" min="0" inputmode="decimal"></label>
+        <label>Total paid (incl. tax)<input name="total" type="number" step="0.01" min="0" required inputmode="decimal"></label>
+        <label><span id="taxLabel">Tax</span> included<input name="tax" type="number" step="0.01" min="0" inputmode="decimal"></label>
+        <label>Business use (%)<input name="bizPct" type="number" min="0" max="100" step="1" required></label>
+        <label>Odometer<input name="odometer" type="number" min="0" step="1" inputmode="numeric"></label>
+        <label>Payment method
+          <select name="payment"><option>Card</option><option>Cash</option><option>Company card</option><option>Other</option></select>
+        </label>
+        <label>Receipt / invoice #<input name="receiptNo"></label>
+      </div>
+      <label>Business purpose / notes<textarea name="notes" rows="2" placeholder="e.g. Client visit – Toronto"></textarea></label>
+      <p id="calcHint" class="muted small"></p>
+
+      <div class="btn-row end">
+        <button type="button" id="deleteBtn" class="btn danger" hidden>Delete</button>
+        <button type="button" id="cancelBtn" class="btn">Cancel</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="viewer"><img id="viewerImg" alt="Receipt photo"><button class="btn" id="viewerClose">Close</button></dialog>
+
+  <dialog id="askDialog">
+    <form method="dialog">
+      <p id="askMsg"></p>
+      <input id="askInput" autocomplete="off" hidden>
+      <div class="btn-row end">
+        <button value="cancel" class="btn">Cancel</button>
+        <button value="ok" id="askOk" class="btn primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="exportDialog">
+    <h2 id="exportTitle">Export</h2>
+    <p class="muted small">Copy this and paste it into a spreadsheet, email or notes app.</p>
+    <textarea id="exportText" rows="10" readonly></textarea>
+    <div class="btn-row end">
+      <button type="button" id="exportClose" class="btn">Close</button>
+      <button type="button" id="exportCopy" class="btn primary">Copy</button>
+    </div>
+  </dialog>
+
+  <dialog id="pasteDialog">
+    <h2>Paste backup</h2>
+    <textarea id="pasteText" rows="10" placeholder="Paste the backup text here"></textarea>
+    <div class="btn-row end">
+      <button type="button" id="pasteCancel" class="btn">Cancel</button>
+      <button type="button" id="pasteRestore" class="btn primary">Restore</button>
+    </div>
+  </dialog>
+
+  <div id="toast" role="status" hidden></div>
+
+  <datalist id="stationList"></datalist>
+  <datalist id="vehicleList"></datalist>
+
+  <div id="printArea"></div>
+
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
