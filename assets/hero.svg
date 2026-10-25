@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="440" viewBox="0 0 1000 440" role="img" aria-label="Himanshu's little world — a soft dawn over green hills with a floating island">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C9D8E3"/>
+      <stop offset=".55" stop-color="#F3DFCF"/>
+      <stop offset="1" stop-color="#FBEFE3"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#FFF3DF" stop-opacity="1"/>
+      <stop offset=".35" stop-color="#F9DDBF" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#F9DDBF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D9C3AE"/>
+      <stop offset="1" stop-color="#C4A992" stop-opacity=".2"/>
+    </linearGradient>
+    <clipPath id="frame"><rect width="1000" height="440" rx="28"/></clipPath>
+    <g id="cloud">
+      <ellipse cx="0" cy="0" rx="46" ry="16"/>
+      <ellipse cx="-26" cy="4" rx="30" ry="12"/>
+      <ellipse cx="22" cy="-8" rx="28" ry="16"/>
+      <ellipse cx="34" cy="5" rx="30" ry="11"/>
+    </g>
+    <path id="bird" d="M-7 0 Q-3.5 -4 0 0 Q3.5 -4 7 0" fill="none" stroke="#8C8279" stroke-width="1.6" stroke-linecap="round"/>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="1000" height="440" fill="url(#sky)"/>
+
+    <!-- sun -->
+    <circle cx="730" cy="232" r="190" fill="url(#glow)">
+      <animate attributeName="r" values="185;200;185" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="730" cy="232" r="52" fill="#FBE3C6"/>
+
+    <!-- clouds drifting -->
+    <g fill="#FFFFFF" opacity=".85">
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="120 70;1100 70;-100 70;120 70" keyTimes="0;.8;.8001;1" dur="110s" repeatCount="indefinite"/>
+        <use href="#cloud"/>
+      </g>
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="440 118;1100 118;-100 118;440 118" keyTimes="0;.55;.5501;1" dur="140s" repeatCount="indefinite"/>
+        <use href="#cloud" transform="scale(.75)"/>
+      </g>
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="300 40;1100 40;-100 40;300 40" keyTimes="0;.67;.6701;1" dur="120s" repeatCount="indefinite"/>
+        <use href="#cloud" transform="scale(.55)"/>
+      </g>
+    </g>
+
+    <!-- far mountains -->
+    <path d="M0 292 Q60 250 120 262 Q200 222 280 248 Q350 270 420 244 Q500 214 580 256 Q640 280 700 262 Q790 232 860 244 Q930 256 1000 238 L1000 440 L0 440Z" fill="#CBD5D0" opacity=".75"/>
+
+    <!-- birds -->
+    <g>
+      <animateTransform attributeName="transform" type="translate" values="0 0;160 -18;320 0" dur="26s" repeatCount="indefinite"/>
+      <use href="#bird" x="600" y="226"/>
+      <use href="#bird" x="618" y="216" transform="scale(1)"/>
+      <use href="#bird" x="634" y="232"/>
+    </g>
+
+    <!-- floating island with a little house -->
+    <g>
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 -7;0 0" dur="6s" repeatCount="indefinite"/>
+      <path d="M95 205 Q150 300 160 330 Q170 300 230 205 Z" fill="url(#rock)"/>
+      <ellipse cx="162" cy="205" rx="70" ry="14" fill="#AFC5A5"/>
+      <rect x="140" y="170" width="34" height="30" rx="2" fill="#F7EDE2"/>
+      <path d="M134 172 L157 150 L180 172 Z" fill="#E3A99A"/>
+      <rect x="152" y="184" width="10" height="16" rx="1.5" fill="#B59A86"/>
+      <rect x="166" y="178" width="6" height="6" fill="#F4D58D" opacity=".9">
+        <animate attributeName="opacity" values=".6;1;.6" dur="3s" repeatCount="indefinite"/>
+      </rect>
+      <circle cx="202" cy="186" r="14" fill="#9DB895"/>
+      <rect x="200" y="196" width="4" height="10" fill="#A88B75"/>
+      <circle cx="117" cy="192" r="9" fill="#B3C9A9"/>
+    </g>
+
+    <!-- tiny second island -->
+    <g opacity=".85">
+      <animateTransform attributeName="transform" type="translate" values="0 0;0 5;0 0" dur="7s" repeatCount="indefinite"/>
+      <path d="M865 130 Q890 170 895 182 Q902 170 925 130 Z" fill="url(#rock)"/>
+      <ellipse cx="895" cy="130" rx="32" ry="7" fill="#B6CBAC"/>
+      <circle cx="888" cy="120" r="8" fill="#9DB895"/>
+      <circle cx="903" cy="123" r="6" fill="#A9C2A0"/>
+    </g>
+
+    <!-- hills -->
+    <path d="M0 330 Q140 280 300 318 T620 312 T1000 300 L1000 440 L0 440Z" fill="#B9CCB1"/>
+    <path d="M0 370 Q180 330 380 360 T760 350 T1000 352 L1000 440 L0 440Z" fill="#A6BF9E"/>
+    <path d="M0 405 Q220 375 470 398 T1000 392 L1000 440 L0 440Z" fill="#94B28C"/>
+
+    <!-- winding path and signpost -->
+    <path d="M505 440 Q520 418 498 402 Q478 388 506 372" fill="none" stroke="#EADBC8" stroke-width="9" stroke-linecap="round" opacity=".9"/>
+    <rect x="528" y="352" width="4" height="34" fill="#A88B75"/>
+    <rect x="502" y="350" width="62" height="18" rx="3" fill="#F3E6D6" stroke="#C9B39E"/>
+    <text x="533" y="363" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="10.5" fill="#7A6A5C" font-style="italic">welcome ↓</text>
+
+    <!-- tiny trees on hills -->
+    <g fill="#86A57F">
+      <circle cx="70" cy="356" r="10"/><circle cx="88" cy="360" r="7"/>
+      <circle cx="840" cy="338" r="11"/><circle cx="858" cy="344" r="7"/>
+      <circle cx="300" cy="380" r="8"/>
+    </g>
+
+    <!-- fireflies -->
+    <g fill="#FFF3C4">
+      <circle cx="210" cy="390" r="2.2"><animate attributeName="opacity" values="0;1;0" dur="4s" repeatCount="indefinite"/></circle>
+      <circle cx="660" cy="380" r="2"><animate attributeName="opacity" values="0;1;0" dur="5s" begin="1s" repeatCount="indefinite"/></circle>
+      <circle cx="420" cy="415" r="1.8"><animate attributeName="opacity" values="0;1;0" dur="3.5s" begin="2s" repeatCount="indefinite"/></circle>
+      <circle cx="900" cy="395" r="2.2"><animate attributeName="opacity" values="0;1;0" dur="4.5s" begin=".5s" repeatCount="indefinite"/></circle>
+      <circle cx="770" cy="420" r="1.6"><animate attributeName="opacity" values="0;1;0" dur="3s" begin="1.5s" repeatCount="indefinite"/></circle>
+    </g>
+
+    <!-- title -->
+    <g font-family="Georgia, 'Times New Roman', serif" text-anchor="middle">
+      <text x="520" y="92" font-size="15" letter-spacing="5" fill="#8C7F73">YOU HAVE WANDERED INTO</text>
+      <text x="520" y="148" font-size="50" font-style="italic" fill="#5E544B">Himanshu's little world</text>
+      <text x="520" y="184" font-size="17" fill="#7E7268">where everyday problems quietly turn into useful apps</text>
+    </g>
+  </g>
+</svg>
