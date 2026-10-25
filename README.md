@@ -1,270 +1,215 @@
 <p align="center">
-  <img src="./assets/header.svg" alt="Himanshu Bashambu — AI Automation Consultant and Full-Stack Developer" width="100%"/>
+  <img src="./assets/hero.svg" alt="Himanshu's little world — a soft dawn over green hills with a floating island" width="100%"/>
 </p>
+
+<p align="center"><i>
+Hello, traveller. Take your shoes off, the grass is soft here.<br/>
+I'm <b>Himanshu</b> — I spent six years keeping other people's books balanced,<br/>
+and now I build small, quiet apps that do the boring work so people don't have to.
+</i></p>
 
 <p align="center">
-  <a href="mailto:himanshubashambu08@gmail.com"><img src="https://img.shields.io/badge/Say_hi-himanshubashambu08@gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email"/></a>
-  <a href="https://www.instagram.com/himanshubashmbu"><img src="https://img.shields.io/badge/Instagram-@himanshubashmbu-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram"/></a>
+  <sub>✉️ <a href="mailto:himanshubashambu08@gmail.com">write me a letter</a> &nbsp;·&nbsp; 📷 <a href="https://www.instagram.com/himanshubashmbu">say hi on instagram</a> &nbsp;·&nbsp; 📍 London, Ontario</sub>
 </p>
 
-```bash
-$ whoami
-> Himanshu — I build AI apps & robots-in-the-cloud for small businesses 🤖
+<br/>
 
-$ cat superpowers.txt
-> 6+ years of bookkeeping 📒  +  AI 🤖  =  apps that actually save money 💰
+<p align="center">
+  <img src="./assets/map.svg" alt="A hand-drawn map of the little world: each place is an app" width="100%"/>
+</p>
 
-$ cat languages.txt
-> English · हिंदी · ਪੰਜਾਬੀ · TypeScript · Python
+<br/>
 
-$ status
-> 🟢 Open to work, collabs, and cool ideas
-```
+## 🧺 The places, one by one
 
-## 🎬 The Plot Twist
-
-```mermaid
-flowchart LR
-    A["📒 Bookkeeper<br/>6+ years of numbers"] --> B["😩 Saw businesses<br/>wasting hours on<br/>boring tasks"]
-    B --> C["💡 Learned to code<br/>+ AI"]
-    C --> D["🤖 Now I build apps<br/>that do the boring<br/>work for them"]
-    style A fill:#2b2b45,stroke:#ffb347,color:#fff
-    style B fill:#2b2b45,stroke:#ff5f9e,color:#fff
-    style C fill:#2b2b45,stroke:#7c5cff,color:#fff
-    style D fill:#7c5cff,stroke:#fff,color:#fff
-```
-
----
-
-## 🌌 The App Universe
-
-> Every app here started with a real problem. Here's each one in plain words: **the problem 😩 → the magic ✨ → why it matters 🏆**
+<sub><i>Each place on the map is an app. Here's what happens inside, in plain words.</i></sub>
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-### 🥗 PrepMate
-**Your personal AI chef & grocery planner**
+#### 🏡 The Kitchen Garden
+<sub><b>PrepMate</b></sub>
 
-😩 *"What do I cook this week?"* — every week, plus wasted food and money.
+Every week the same question: *"what do we cook?"* Here, you just say what you like, how much you want to spend and how busy you are. The garden plans your whole week, hands you the recipes and writes your grocery list. Show it a photo of your shopping bill and it remembers what's already in your kitchen.
 
-✨ Tell it what you like, your budget and your time. It plans your whole week, gives you recipes and writes your grocery list. Snap a photo of your bill and it remembers what's in your kitchen.
+*Why it exists:* less wasted food, less wasted money, more quiet evenings.
 
-🏆 Saves time, money **and** food.
-
-`React` `OpenAI` `Stripe` `PostgreSQL` `Mobile app`
+<sub>made with React · OpenAI · Stripe</sub>
 
 </td>
 <td width="50%" valign="top">
 
-### ⛽ Fuel Receipts
-**Never lose a gas receipt (or tax money) again**
+#### ⛽ The Old Fuel Stop
+<sub><b>Fuel Receipts</b> · <a href="https://himanshubashambu08-star.github.io/himanshubashambu08/">step inside →</a></sub>
 
-😩 People who drive for work lose paper receipts and miss tax refunds.
+Paper receipts fade and get lost in car doors. Here, you take a photo and the app reads the date, litres, price and tax for you. When tax season comes, it tells you what you can claim and makes a neat report for your accountant.
 
-✨ Take a photo of the receipt. AI reads the date, litres, price and tax for you. At year end it tells you how much you can claim and makes a report for your accountant.
+*Why it exists:* people who drive for work deserve every dollar they're owed.
 
-🏆 Every receipt safe on your phone, even offline.
-
-[**👉 Try it live**](https://himanshubashambu08-star.github.io/himanshubashambu08/) · [Code](./petrol-receipts)
-
-`Firebase` `Gemini AI` `Works offline`
+<sub>made with Firebase · Gemini · works offline · <a href="./petrol-receipts">see the code</a></sub>
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### 🇫🇷 FluentFast B2
-**A French teacher with a face, a voice and endless patience**
+#### 🥐 Little Paris Café
+<sub><b>FluentFast B2</b></sub>
 
-😩 Learning French is slow, and apps don't tell you *why* you sound wrong.
+A small café where a kind French teacher with a drawn face listens to you speak. It gently tells you which sounds and words need a little work, and brings old words back right before you forget them.
 
-✨ An animated AI teacher listens to you speak, checks your pronunciation and grammar, and tells you how to fix it. Smart flashcards come back right before you forget.
+*Why it exists:* to help English speakers reach confident French in about 90 days.
 
-🏆 From zero to confident French (B2) in about 90 days.
-
-`React` `OpenAI voice` `PostgreSQL`
+<sub>made with React · OpenAI voice</sub>
 
 </td>
 <td width="50%" valign="top">
 
-### 🚚 Trucking POD Manager
-**No more chasing drivers for paperwork**
+#### 🚚 The Truck Yard
+<sub><b>Trucking POD Manager</b></sub>
 
-😩 Trucking companies can't get paid without delivery papers — and the papers go missing.
+Drivers come back from long roads with delivery papers in their pockets. Here, they snap a photo on their phone, and the office finds every paper in one tidy place, ready to send to the broker in one click.
 
-✨ Drivers snap a photo of the delivery paper on their phone. The office sees every paper in one place and emails it to the broker in one click.
+*Why it exists:* no paper, no payment — so the paper should never get lost.
 
-🏆 Faster paperwork = faster payment.
-
-`React` `Express` `PostgreSQL` `Multi-company`
+<sub>made with React · Express · PostgreSQL</sub>
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### 🎬 SaaS Video Marketer
-**Paste a link, get an ad video**
+#### 💡 The Lighthouse
+<sub><b>Stella · AI receptionist</b></sub>
 
-😩 Small software companies can't afford video editors.
+The light that never goes out. When a small shop is too busy to pick up the phone, Stella answers, talks kindly like a real person, and books the appointment straight into the calendar — day or night.
 
-✨ Paste any website link. AI looks at the site, writes a short ad script, and creates a ready-to-post 30-second video with voice and music — in 5 different styles.
+*Why it exists:* every missed call is a customer who walked away.
 
-🏆 A marketing video in minutes, not weeks.
-
-`Claude AI` `Puppeteer` `FFmpeg`
+<sub>made with Vapi voice · Make.com · Google Calendar</sub>
 
 </td>
 <td width="50%" valign="top">
 
-### 📈 AI Crypto Dashboard
-**A trading desk without the risk**
+#### 📮 The Post Office
+<sub><b>AI Outreach Agent</b></sub>
 
-😩 Testing trading ideas with real money is scary.
+Every morning, the postman goes out and finds small businesses that might need help, looks at their websites, and drafts a warm, personal letter for each one. I read every letter before it leaves.
 
-✨ Live Bitcoin, Ethereum and Solana prices on pro charts. Test a strategy on past prices and get an AI *buy / sell / wait* signal.
+*Why it exists:* finding new people to help shouldn't take the whole day.
 
-🏆 Learn and test before you risk a single dollar.
-
-`WebSockets` `Binance API` `TradingView charts`
+<sub>made with Mastra · OpenAI · Gmail</sub>
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### 📬 AI Outreach Agent
-**A sales assistant that never sleeps**
+#### ⛲ The Town Square
+<sub><b>LinkedIn Outreach</b></sub>
 
-😩 Finding new clients by hand takes hours every day.
+Where new friendships begin. It finds people who might need a website or a little automation, helps write a thoughtful first hello, and reminds me to check in on day 1, 3 and 7.
 
-✨ Every day it finds small businesses, checks their websites for problems, finds their email and writes a personal message. I just read, tweak and click send.
+*Why it exists:* good conversations, without hours of typing.
 
-🏆 Hours of research → 5 minutes of approving.
-
-`Mastra AI agents` `OpenAI` `Gmail`
+<sub>made with Mastra · GPT-4o · PostgreSQL</sub>
 
 </td>
 <td width="50%" valign="top">
 
-### 💼 LinkedIn Outreach Bot
-**Networking on autopilot (the polite kind)**
+#### 🎞️ The Little Cinema
+<sub><b>SaaS Video Marketer</b></sub>
 
-😩 Writing personal LinkedIn messages one by one is exhausting.
+Hand it the address of any website. It looks around, writes a short story about it, and plays a 30-second film with a voice and soft music — ready to share.
 
-✨ Finds people who might need a website or automation, writes a personal message for each, and reminds me to follow up on day 1, 3 and 7.
+*Why it exists:* small teams can't always afford a video maker.
 
-🏆 More conversations, less typing.
-
-`Mastra AI agents` `GPT-4o` `PostgreSQL`
+<sub>made with Claude · Puppeteer · FFmpeg</sub>
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### 📞 Stella — AI Receptionist
-**The receptionist who never takes a break**
+#### 🗼 The Market Tower
+<sub><b>Crypto Dashboard</b></sub>
 
-😩 Busy shops miss calls — and every missed call is a lost customer.
+From the top of the tower you can watch Bitcoin, Ethereum and Solana prices move in real time, test an idea on yesterday's prices, and get a calm *buy, sell or wait* suggestion.
 
-✨ An AI voice answers the phone, chats like a real person, and books the appointment straight into Google Calendar. 24/7.
+*Why it exists:* to learn and practise without risking real money.
 
-🏆 Zero missed calls. Zero extra staff.
-
-`Vapi voice AI` `Make.com` `Google Calendar`
+<sub>made with WebSockets · TradingView charts</sub>
 
 </td>
 <td width="50%" valign="top">
 
-### 💰 FinanceAuthority
-**Money advice without the confusing words**
+#### 📚 The Quiet Library
+<sub><b>FinanceAuthority</b></sub>
 
-😩 Finance websites are full of jargon.
+Shelves of simple, honest guides about credit cards, loans, insurance, investing and credit scores — written without the confusing words.
 
-✨ Simple guides on credit cards, loans, insurance, investing and credit scores, with easy comparison tables.
+*Why it exists:* money advice should feel like a friend explaining, not a bank talking.
 
-🏆 Honest money tips for people — earns from ads for me.
-
-`React` `TypeScript` `SEO`
+<sub>made with React · TypeScript</sub>
 
 </td>
 </tr>
 </table>
 
-<details>
-<summary><b>🎨 Bonus: my portfolio websites (click to open)</b></summary>
 <br/>
 
-| Website | What it is |
-|---|---|
-| 🎥 **Cinematic Portfolio** | My work shown like a movie trailer — dark, gold and dramatic |
-| 🌆 **3D Portfolio** | Scroll through a glowing 3D city to see my projects |
-| ⚡ **My Creative Showcase · Automation Architect · Automation Alchemy** | One-page sites that explain my AI services and let you book a call |
+## 📖 The traveller who built it
+
+For six years I was a bookkeeper. I kept the numbers tidy for more than fifty clients, and I watched good, hardworking people lose hours every week to the same small, boring tasks.
+
+So I learned to build. Slowly at first, then every day.
+
+Now I make little helpers for small businesses — voices that answer the phone, gardens that plan your meals, post offices that write your letters. Nothing loud. Just things that quietly make the day lighter.
+
+<sub><i>I speak English, हिंदी and ਪੰਜਾਬੀ, and I'm always happy to talk about an idea over chai.</i></sub>
+
+<br/>
+
+## 🎒 In my backpack
+
+<sub>
+<b>for building</b> — TypeScript · JavaScript · Python · React · Node.js · Express · Next.js · Tailwind · Three.js<br/>
+<b>for thinking</b> — OpenAI · Claude · Gemini · Mastra agents<br/>
+<b>for talking & connecting</b> — Vapi voice · Make.com · Google Calendar · Gmail<br/>
+<b>for keeping things safe</b> — PostgreSQL · Supabase · Firebase<br/>
+<b>for the shop</b> — Stripe · Shopify · QuickBooks · Xero
+</sub>
+
+<br/><br/>
+
+<details>
+<summary><b>🌙 Beyond the edge of the map</b> <sub>(click to unfold)</sub></summary>
+<br/>
+
+**Houses where I keep my portfolio**
+- 🎥 *The Cinematic House* — my work, shown like an old movie: dark, golden and slow
+- 🌆 *The Glowing City* — a little 3D town you scroll through
+- 🕯️ *Three small cottages* (My Creative Showcase · Automation Architect · Automation Alchemy) — where you can read about my work and book a call
+
+**Roads I'm still walking**
+- 🐶 **PawfectLife** — a small shop for gentle pet-grooming products
+- 🍚 **Rice import** — carrying Basmati from Indian farms to Canadian kitchens
+- 🏸 **Skyboo** — a new outdoor game, still being invented
 
 </details>
 
-<details>
-<summary><b>🛒 Bonus: my business side-quests (click to open)</b></summary>
 <br/>
 
-- 🐶 **PawfectLife** — an online store for pet grooming products
-- 🍚 **Rice import** — bringing Basmati rice from Indian farms to Canadian grocery shelves
-- 🏸 **Skyboo** — a brand-new outdoor sports game I'm inventing
-
-</details>
-
----
-
-## 🧭 Which app is for you?
-
-| If you... | Try this |
-|---|---|
-| 🍳 never know what to cook | **PrepMate** |
-| ⛽ drive for work and pay taxes | **Fuel Receipts** |
-| 🥐 want to speak French | **FluentFast B2** |
-| 🚛 run a trucking company | **Trucking POD Manager** |
-| 📞 miss phone calls at your business | **Stella** |
-| 🎥 need a promo video for your software | **SaaS Video Marketer** |
-
----
-
-## 🧰 My Toolbox
+## 👣 Footprints
 
 <p align="center">
-  <img src="https://skillicons.dev/icons?i=ts,js,py,react,nodejs,express,nextjs,tailwind,vite,threejs,postgres,supabase,firebase,vercel,git&perline=15" alt="Tech stack icons"/>
+  <img src="https://github-readme-stats.vercel.app/api?username=himanshubashambu08-star&show_icons=true&hide_border=true&count_private=true&bg_color=FAF3E8&title_color=8A6F5A&text_color=6B635B&icon_color=94B28C&ring_color=E3A99A" alt="GitHub stats" height="160"/>
+  <img src="https://streak-stats.demolab.com/?user=himanshubashambu08-star&hide_border=true&background=FAF3E8&ring=94B28C&fire=E3A99A&currStreakLabel=8A6F5A&sideLabels=8A6F5A&currStreakNum=6B635B&sideNums=6B635B&dates=9A8D80&stroke=E8DCCB" alt="GitHub streak" height="160"/>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI"/>
-  <img src="https://img.shields.io/badge/Claude-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Claude"/>
-  <img src="https://img.shields.io/badge/Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white" alt="Gemini"/>
-  <img src="https://img.shields.io/badge/Vapi_Voice_AI-000000?style=flat-square" alt="Vapi"/>
-  <img src="https://img.shields.io/badge/Make.com-6D00CC?style=flat-square&logo=make&logoColor=white" alt="Make.com"/>
-  <img src="https://img.shields.io/badge/Stripe-626CD9?style=flat-square&logo=stripe&logoColor=white" alt="Stripe"/>
-  <img src="https://img.shields.io/badge/Shopify-7AB55C?style=flat-square&logo=shopify&logoColor=white" alt="Shopify"/>
-  <img src="https://img.shields.io/badge/QuickBooks-2CA01C?style=flat-square&logo=quickbooks&logoColor=white" alt="QuickBooks"/>
-  <img src="https://img.shields.io/badge/Xero-13B5EA?style=flat-square&logo=xero&logoColor=white" alt="Xero"/>
-</p>
-
----
-
-## 📊 GitHub Stats
+<br/>
 
 <p align="center">
-  <img src="https://github-readme-stats.vercel.app/api?username=himanshubashambu08-star&show_icons=true&theme=tokyonight&hide_border=true&count_private=true" alt="GitHub stats" height="165"/>
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=himanshubashambu08-star&layout=compact&theme=tokyonight&hide_border=true" alt="Top languages" height="165"/>
-</p>
-<p align="center">
-  <img src="https://streak-stats.demolab.com/?user=himanshubashambu08-star&theme=tokyonight&hide_border=true" alt="GitHub streak"/>
-</p>
-
----
-
-<p align="center">
-  <b>💬 Got a boring task that eats your day? Let's turn it into an app.</b><br/>
-  <sub>Made with ☕, chai and a lot of AI · London, Ontario 🇨🇦</sub>
+  <img src="./assets/footer.svg" alt="Evening over the hills — thank you for wandering by" width="100%"/>
 </p>
