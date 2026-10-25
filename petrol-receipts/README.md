@@ -3,7 +3,8 @@
 A mobile-friendly, offline-first web app (PWA) for capturing petrol/gas receipts and working out what you can claim at tax time.
 
 ## Features
-- **Snap a receipt photo** (camera on phones) – images are compressed and stored on-device.
+- **Scan a receipt** – take or upload a photo and Gemini (via Firebase AI Logic) reads the date, station, litres, price, total, tax, fuel grade, payment method and receipt number into the form for you to check.
+- **Receipt photos** are compressed and kept with each receipt.
 - **Auto-calculations** – volume × price fills the total; the sales tax (HST/GST/VAT) inside the total is worked out from your rate (editable).
 - **Business-use %** per receipt, or a **logbook override** (business km ÷ total km) for the whole tax year – the method CRA, ATO, HMRC etc. expect.
 - **Input tax credits** – if you're registered for HST/GST/VAT, the claimable expense excludes tax and the recoverable credit is shown separately.
@@ -27,6 +28,8 @@ A mobile-friendly, offline-first web app (PWA) for capturing petrol/gas receipts
 5. **Database**: *Build → Firestore Database → Create database*. Pick a location near you (e.g. `northamerica-northeast2` Toronto), start in **production mode**.
 6. **Security rules**: in Firestore open the **Rules** tab, replace everything with the contents of [`firestore.rules`](firestore.rules), and click **Publish**. This makes each person's receipts visible only to them.
 7. **Allow your website**: *Authentication → Settings → Authorized domains → Add domain* and add where you host the app (e.g. `himanshubashambu08-star.github.io`). `localhost` is already allowed for testing.
+
+8. **Receipt reading**: *Build → AI Logic → Get started*, choose **Gemini Developer API** (free tier, no billing needed). Optional but recommended: turn on **App Check** so only your site can use it.
 
 Photos are compressed and stored in Firestore itself, so the free **Spark** plan is enough (1 GB ≈ several thousand receipts); no billing account needed.
 

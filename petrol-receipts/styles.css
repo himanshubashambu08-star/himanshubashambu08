@@ -168,6 +168,10 @@ dialog {
 dialog::backdrop { background: rgb(0 0 0 / .5); }
 dialog h2 { margin-bottom: 12px; }
 .photo-box { margin-bottom: 12px; }
+#scanStatus { margin: 8px 0 0; }
+#scanStatus:empty { display: none; }
+#scanStatus.error { color: var(--danger); }
+input.scanned, select.scanned { background: color-mix(in srgb, var(--accent) 12%, var(--card)); border-color: var(--accent); }
 .photo-box img { display: block; max-width: 100%; max-height: 240px; border-radius: 8px; margin-bottom: 8px; cursor: zoom-in; }
 #viewer { text-align: center; }
 #viewer img { max-width: 100%; max-height: 80vh; display: block; margin: 0 auto 12px; }
