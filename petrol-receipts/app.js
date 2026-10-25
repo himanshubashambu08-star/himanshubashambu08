@@ -1028,7 +1028,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
 
 /* ---------- Accounts (Firebase) ---------- */
 
-const APP_VERSION = '2026.10.25-scan5';
+const APP_VERSION = '2026.10.25-scan6';
 const FIREBASE_VERSION = '10.12.2';
 const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
 let signUpMode = false;
