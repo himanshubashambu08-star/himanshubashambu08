@@ -405,6 +405,7 @@ function openEditor(r) {
   form.reset();
   delete form.total.dataset.manual;
   delete form.tax.dataset.manual;
+  clearScanMarks();
   $('#editorTitle').textContent = r ? 'Edit receipt' : 'Add receipt';
   $('#deleteBtn').hidden = !r;
 
@@ -496,6 +497,10 @@ function updateHint() {
 
 form.addEventListener('input', (e) => {
   const n = e.target.name;
+  if (e.target.dataset.scanned) {
+    delete e.target.dataset.scanned;
+    e.target.classList.remove('scanned');
+  }
   if (n === 'total') form.total.dataset.manual = form.total.value ? '1' : '';
   if (n === 'tax') form.tax.dataset.manual = form.tax.value ? '1' : '';
   if ((n === 'litres' || n === 'pricePerLitre') && !form.total.dataset.manual) {
@@ -510,23 +515,197 @@ form.addEventListener('input', (e) => {
   updateHint();
 });
 
-$('#photoInput').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
+async function usePhotoFile(file) {
   try {
     setPhoto(await compressImage(file));
     photoChanged = true;
   } catch (err) {
     notify(err.message);
+    return;
   }
+  if (scanAvailable()) runScan();
+}
+
+$('#photoInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (file) usePhotoFile(file);
 });
+$('#scanInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  openEditor(null);
+  usePhotoFile(file);
+});
+$('#scanBtn').onclick = () => runScan();
+
+/* ---------- Receipt scanning (Gemini via Firebase AI Logic) ---------- */
+
+const AI_SDK_VERSION = '12.19.0';
+// Newest first; later models are fallbacks in case a name is unavailable.
+const SCAN_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash'];
+const SCANNABLE = ['date', 'station', 'litres', 'pricePerLitre', 'total', 'tax', 'fuelType', 'payment', 'receiptNo', 'odometer'];
+const RECEIPT_SCHEMA = {
+  type: 'object',
+  properties: {
+    isReceipt: { type: 'boolean', description: 'False if the image is not a purchase receipt.' },
+    date: { type: 'string', description: 'Purchase date, YYYY-MM-DD.' },
+    station: { type: 'string', description: 'Gas station brand or business name.' },
+    litres: { type: 'number', description: 'Fuel volume purchased.' },
+    pricePerLitre: { type: 'number', description: 'Fuel price per unit of volume.' },
+    total: { type: 'number', description: 'Final amount paid, including tax.' },
+    tax: { type: 'number', description: 'Sales tax amount included in the total.' },
+    fuelType: { type: 'string', enum: ['Regular', 'Mid-grade', 'Premium', 'Diesel', 'Other'] },
+    payment: { type: 'string', enum: ['Card', 'Cash', 'Other'] },
+    receiptNo: { type: 'string', description: 'Receipt, invoice, transaction or authorization number.' },
+    odometer: { type: 'number', description: 'Odometer reading, only if printed or handwritten on the receipt.' },
+  },
+  required: ['isReceipt'],
+};
+
+let scanModelsPromise;
+let scanToken = 0;
+
+const scanAvailable = () => backend.kind === 'cloud';
+
+function loadScanModels() {
+  if (!scanModelsPromise) {
+    scanModelsPromise = (async () => {
+      const base = `https://www.gstatic.com/firebasejs/${AI_SDK_VERSION}`;
+      const [{ initializeApp, getApps }, { getAI, getGenerativeModel, GoogleAIBackend }] = await Promise.all([
+        import(`${base}/firebase-app.js`),
+        import(`${base}/firebase-ai.js`),
+      ]);
+      // A separate named app keeps this modular SDK apart from the compat SDK used for auth and data.
+      const app = getApps().find((a) => a.name === 'scan') || initializeApp(cloudConfig, 'scan');
+      const ai = getAI(app, { backend: new GoogleAIBackend() });
+      const generationConfig = { responseMimeType: 'application/json', responseJsonSchema: RECEIPT_SCHEMA, temperature: 0 };
+      return SCAN_MODELS.map((model) => getGenerativeModel(ai, { model, generationConfig }));
+    })();
+    scanModelsPromise.catch(() => (scanModelsPromise = null));
+  }
+  return scanModelsPromise;
+}
+
+function scanPrompt() {
+  const unit = settings.unit === 'gal' ? 'US gallons' : 'litres';
+  return [
+    'Read this fuel (petrol/gas) station receipt and extract the purchase details.',
+    `- litres: the fuel volume in ${unit}; convert if the receipt uses another unit. pricePerLitre is per ${unit === 'litres' ? 'litre' : 'gallon'}.`,
+    '- total: the final amount paid, including tax.',
+    `- tax: the ${settings.taxName} (sales tax) amount printed on the receipt. If several taxes are listed, add them up. Omit it if no tax amount is printed.`,
+    '- date: the purchase date as YYYY-MM-DD. Receipts in Canada and the US often print MM/DD/YY.',
+    '- station: the brand or business name, e.g. "Petro-Canada", "Esso", "Shell", "Costco".',
+    '- fuelType: map the grade (e.g. "Regular 87", "Unleaded", "Plus 89", "Supreme 91", "Diesel") to one of the allowed values.',
+    '- payment: "Card" for any debit/credit/fleet card, "Cash", or "Other".',
+    '- Omit any field you cannot read with confidence. Do not guess. Set isReceipt to false if this is not a purchase receipt.',
+  ].join('\n');
+}
+
+const isMissingModel = (err) => /not.?found|404|no-model|is not supported/i.test(`${err.code || ''} ${err.message || ''}`);
+
+async function scanPhoto(dataUrl) {
+  const models = await loadScanModels();
+  const image = { inlineData: { data: dataUrl.split(',')[1], mimeType: dataUrl.slice(5, dataUrl.indexOf(';')) } };
+  let lastErr;
+  for (const model of models) {
+    try {
+      const result = await model.generateContent([scanPrompt(), image]);
+      return JSON.parse(result.response.text());
+    } catch (err) {
+      lastErr = err;
+      if (!isMissingModel(err)) break;
+    }
+  }
+  throw lastErr;
+}
+
+function scanErrorMessage(err) {
+  const text = `${err.code || ''} ${err.message || ''}`;
+  if (/api-not-enabled|not been used|is disabled|SERVICE_DISABLED/i.test(text)) {
+    return 'Receipt reading is not turned on yet. In Firebase, open AI Logic → Get started and choose the Gemini Developer API.';
+  }
+  if (/quota|429|RESOURCE_EXHAUSTED/i.test(text)) return 'Too many receipts read in a short time. Wait a minute and try again.';
+  if (/Failed to fetch|NetworkError|fetch-error|offline/i.test(text)) return 'No internet connection. Enter the details by hand or try again later.';
+  return 'Couldn’t read this receipt. Enter the details by hand. (' + (err.message || err) + ')';
+}
+
+function clearScanMarks() {
+  for (const k of SCANNABLE) {
+    form[k].classList.remove('scanned');
+    delete form[k].dataset.scanned;
+  }
+  $('#scanStatus').textContent = '';
+  $('#scanStatus').classList.remove('error');
+}
+
+/** Fill form fields from a scan, without overwriting anything the user typed. */
+function applyScan(data) {
+  const values = { ...data };
+  if (values.date && !/^\d{4}-\d{2}-\d{2}$/.test(values.date)) delete values.date;
+  if (values.date && values.date > todayIso()) delete values.date;
+  for (const k of ['litres', 'pricePerLitre', 'total', 'tax', 'odometer']) {
+    if (!(typeof values[k] === 'number' && values[k] >= 0)) delete values[k];
+  }
+  if (values.tax != null && values.total != null && values.tax > values.total) delete values.tax;
+  let filled = 0;
+  for (const k of SCANNABLE) {
+    const v = values[k];
+    if (v == null || v === '') continue;
+    const el = form[k];
+    if (el.value !== '' && !el.dataset.scanned && !(k === 'date' || k === 'fuelType' || k === 'payment')) continue;
+    if (el.tagName === 'SELECT' && ![...el.options].some((o) => o.value === v)) continue;
+    el.value = k === 'total' || k === 'tax' ? (+v).toFixed(2) : v;
+    el.dataset.scanned = '1';
+    el.classList.add('scanned');
+    filled++;
+  }
+  if (values.total != null) form.total.dataset.manual = '1';
+  if (values.tax != null) form.tax.dataset.manual = '1';
+  else autoTax();
+  updateHint();
+  return filled;
+}
+
+async function runScan() {
+  if (!pendingPhoto) {
+    notify('Add a photo of the receipt first.');
+    return;
+  }
+  const token = ++scanToken;
+  const status = $('#scanStatus');
+  const btn = $('#scanBtn');
+  status.classList.remove('error');
+  status.textContent = 'Reading receipt…';
+  btn.disabled = true;
+  try {
+    const data = await scanPhoto(pendingPhoto);
+    if (token !== scanToken || !editor.open) return;
+    if (data.isReceipt === false) {
+      status.textContent = 'This photo doesn’t look like a receipt. Enter the details by hand.';
+      status.classList.add('error');
+      return;
+    }
+    const filled = applyScan(data);
+    status.textContent = filled
+      ? `Filled ${filled} field${filled === 1 ? '' : 's'} from the photo (highlighted). Check them before saving.`
+      : 'Couldn’t find details on this receipt. Enter them by hand.';
+  } catch (err) {
+    if (token !== scanToken) return;
+    status.textContent = scanErrorMessage(err);
+    status.classList.add('error');
+  } finally {
+    if (token === scanToken) btn.disabled = false;
+  }
+}
 $('#removePhoto').onclick = () => {
   setPhoto(null);
   photoChanged = true;
 };
 $('#photoPreview').onclick = () => showPhoto(pendingPhoto);
 $('#cancelBtn').onclick = () => editor.close();
+editor.addEventListener('close', () => scanToken++);
 
 $('#deleteBtn').onclick = async () => {
   if (!editingId || !(await ask('Delete this receipt? This cannot be undone.', { okText: 'Delete', danger: true }))) return;
@@ -929,6 +1108,7 @@ function wireAuthUi() {
 }
 
 function showApp(signedInUser) {
+  $('#scanBtn').hidden = !signedInUser;
   $('#authScreen').hidden = true;
   $('#appShell').hidden = false;
   $('#accountCard').hidden = !signedInUser;

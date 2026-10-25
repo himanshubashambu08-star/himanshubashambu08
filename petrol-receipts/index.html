@@ -53,11 +53,14 @@
     <section id="view-receipts" class="view active">
       <div class="toolbar">
         <input id="search" type="search" placeholder="Search station, vehicle, notes…">
-        <button id="addBtn" class="btn primary">+ Add receipt</button>
+        <div class="btn-row">
+          <label class="btn primary">📷 Scan receipt<input id="scanInput" type="file" accept="image/*" hidden></label>
+          <button id="addBtn" class="btn">+ Add manually</button>
+        </div>
       </div>
       <div id="quickStats" class="stats"></div>
       <ul id="receiptList" class="list"></ul>
-      <p id="emptyMsg" class="empty" hidden>No receipts for this tax year yet. Tap <b>+ Add receipt</b> and snap a photo of your fuel receipt.</p>
+      <p id="emptyMsg" class="empty" hidden>No receipts for this tax year yet. Tap <b>📷 Scan receipt</b> and take a photo of your fuel receipt.</p>
     </section>
 
     <!-- SUMMARY -->
@@ -155,9 +158,11 @@
       <div class="photo-box">
         <img id="photoPreview" alt="Receipt photo" hidden>
         <div class="btn-row">
-          <label class="btn">📷 Take / choose photo<input id="photoInput" type="file" accept="image/*" capture="environment" hidden></label>
+          <label class="btn">📷 Take / choose photo<input id="photoInput" type="file" accept="image/*" hidden></label>
+          <button type="button" id="scanBtn" class="btn" hidden>✨ Read details from photo</button>
           <button type="button" id="removePhoto" class="btn" hidden>Remove photo</button>
         </div>
+        <p id="scanStatus" class="small muted" role="status"></p>
       </div>
 
       <div class="grid2">
