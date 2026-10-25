@@ -29,7 +29,11 @@ A mobile-friendly, offline-first web app (PWA) for capturing petrol/gas receipts
 6. **Security rules**: in Firestore open the **Rules** tab, replace everything with the contents of [`firestore.rules`](firestore.rules), and click **Publish**. This makes each person's receipts visible only to them.
 7. **Allow your website**: *Authentication → Settings → Authorized domains → Add domain* and add where you host the app (e.g. `himanshubashambu08-star.github.io`). `localhost` is already allowed for testing.
 
-8. **Receipt reading**: *Build → AI Logic → Get started*, choose **Gemini Developer API** (free tier, no billing needed). Optional but recommended: turn on **App Check** so only your site can use it.
+8. **Turn on receipt reading**:
+   1. *Build → AI Logic → Get started*, choose **Gemini Developer API** (free tier, no billing needed). Firebase enforces App Check on it automatically.
+   2. Google Cloud console → **Security → reCAPTCHA** → **Create key**: platform **Website**, add the domains the app runs on (`recite-66f60.firebaseapp.com`, `recite-66f60.web.app`, `himanshubashambu08-star.github.io`), leave the checkbox challenge off. Copy the key ID.
+   3. Firebase → **App Check → Apps** → your web app → **reCAPTCHA Enterprise** → paste the key ID → **Save**.
+   4. Put the same key ID in `appCheckSiteKey` in [`firebase-config.js`](firebase-config.js). It is a public site key, safe to commit.
 
 Photos are compressed and stored in Firestore itself, so the free **Spark** plan is enough (1 GB ≈ several thousand receipts); no billing account needed.
 

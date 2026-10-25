@@ -9,4 +9,6 @@ window.FIREBASE_CONFIG = {
   storageBucket: 'recite-66f60.firebasestorage.app',
   messagingSenderId: '421421640017',
   appId: '1:421421640017:web:a98bfdecd19ebd5400cb70',
+  // reCAPTCHA Enterprise site key registered in Firebase App Check (needed for receipt scanning).
+  appCheckSiteKey: '',
 };

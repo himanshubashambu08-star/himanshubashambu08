@@ -577,8 +577,17 @@ function loadScanModels() {
         import(`${base}/firebase-app.js`),
         import(`${base}/firebase-ai.js`),
       ]);
+      const { appCheckSiteKey, ...options } = cloudConfig;
       // A separate named app keeps this modular SDK apart from the compat SDK used for auth and data.
-      const app = getApps().find((a) => a.name === 'scan') || initializeApp(cloudConfig, 'scan');
+      let app = getApps().find((a) => a.name === 'scan');
+      if (!app) {
+        app = initializeApp(options, 'scan');
+        // Firebase AI Logic enforces App Check: each request must carry a token proving it comes from this site.
+        if (appCheckSiteKey) {
+          const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import(`${base}/firebase-app-check.js`);
+          initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
+        }
+      }
       const ai = getAI(app, { backend: new GoogleAIBackend() });
       const generationConfig = { responseMimeType: 'application/json', responseJsonSchema: RECEIPT_SCHEMA, temperature: 0 };
       return SCAN_MODELS.map((name) => ({ name, model: getGenerativeModel(ai, { model: name, generationConfig }) }));
@@ -635,6 +644,12 @@ function scanErrorMessage(err) {
   if (err.code === 'api-not-enabled' || /SERVICE_DISABLED|has not been used/i.test(text)) {
     return 'Receipt reading is not turned on yet. In Firebase, open AI Logic → Get started and choose the Gemini Developer API. If you just did, wait a few minutes.';
   }
+  if (status === 401 && /App Check/i.test(text)) {
+    return cloudConfig.appCheckSiteKey
+      ? 'App Check couldn’t verify this device. Check that this website’s domain is listed on the reCAPTCHA key, then try again.'
+      : 'Receipt reading needs App Check set up first (a reCAPTCHA key). See “Turn on receipt reading” in the README.';
+  }
+  if (/appCheck\//i.test(text)) return 'App Check couldn’t verify this device. Try again in a minute. (' + detail + ')';
   if (status === 429 || /RESOURCE_EXHAUSTED/i.test(text)) return 'Too many receipts read in a short time. Wait a minute and try again.';
   if (/API_KEY_SERVICE_BLOCKED|are blocked|API key not valid/i.test(text)) {
     return 'The app’s Firebase key isn’t allowed to use AI Logic. In Google Cloud → APIs & Services → Credentials, edit the Browser key and add “Firebase AI Logic API” to its allowed APIs. (' + detail + ')';
@@ -1013,7 +1028,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
 
 /* ---------- Accounts (Firebase) ---------- */
 
-const APP_VERSION = '2026.10.25-scan4';
+const APP_VERSION = '2026.10.25-scan5';
 const FIREBASE_VERSION = '10.12.2';
 const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
 let signUpMode = false;
@@ -1034,7 +1049,7 @@ async function loadFirebase() {
     await loadScript(`${base}/firebase-app-compat.js`);
     await Promise.all([loadScript(`${base}/firebase-auth-compat.js`), loadScript(`${base}/firebase-firestore-compat.js`)]);
   }
-  const config = { ...cloudConfig };
+  const { appCheckSiteKey, ...config } = cloudConfig;
   // On Firebase Hosting, sign in through this same site so browsers that partition
   // storage between sites (Safari, in-app browsers) keep the sign-in state.
   if (location.hostname === `${config.projectId}.firebaseapp.com`) config.authDomain = location.hostname;
