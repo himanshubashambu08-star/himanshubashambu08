@@ -1,134 +1,270 @@
-<h1 align="center">Hi, I'm Himanshu Bashambu 👋</h1>
-<h3 align="center">AI Automation Consultant & Full-Stack Developer · London, Ontario 🇨🇦</h3>
-
 <p align="center">
-  <a href="mailto:himanshubashambu08@gmail.com"><img src="https://img.shields.io/badge/Email-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email"/></a>
-  <a href="https://www.instagram.com/himanshubashmbu"><img src="https://img.shields.io/badge/Instagram-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram"/></a>
+  <img src="./assets/header.svg" alt="Himanshu Bashambu — AI Automation Consultant and Full-Stack Developer" width="100%"/>
 </p>
 
-I build AI-powered tools and automations that help small businesses save time and make money. Before tech I spent **6+ years in bookkeeping and financial management**, so I think about every build in terms of ROI — what it saves, what it earns, and whether it actually gets used.
+<p align="center">
+  <a href="mailto:himanshubashambu08@gmail.com"><img src="https://img.shields.io/badge/Say_hi-himanshubashambu08@gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email"/></a>
+  <a href="https://www.instagram.com/himanshubashmbu"><img src="https://img.shields.io/badge/Instagram-@himanshubashmbu-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram"/></a>
+</p>
 
-- 🔭 Currently building **PrepMate** — an AI meal-planning SaaS — and AI voice agents for small businesses
-- 🤖 Specialising in **Vapi voice agents**, **Make.com** workflows, AI agents (Mastra, OpenAI, Claude, Gemini) and full-stack web apps
-- 🌱 Learning advanced AI agent architectures, SEO/content marketing and mobile apps with Capacitor
-- 🗣️ Fluent in English, Hindi and Punjabi
-- 🤝 Open to collaborating on AI automation, SaaS and voice-agent projects
+```bash
+$ whoami
+> Himanshu — I build AI apps & robots-in-the-cloud for small businesses 🤖
 
----
+$ cat superpowers.txt
+> 6+ years of bookkeeping 📒  +  AI 🤖  =  apps that actually save money 💰
 
-## 🚀 Projects
+$ cat languages.txt
+> English · हिंदी · ਪੰਜਾਬੀ · TypeScript · Python
 
-Every project below explains, in plain words, **what it does** and **why I built it**.
+$ status
+> 🟢 Open to work, collabs, and cool ideas
+```
 
-### 🧠 Apps & SaaS Products
+## 🎬 The Plot Twist
 
-#### 🥗 PrepMate — AI meal planner
-- **What it does:** You tell it what you like to eat, your budget and how much time you have. It makes a full week of meals for you, gives you the recipes, and builds your grocery list. You can take a photo of your grocery bill and it remembers what food you already have at home.
-- **Why I built it:** Planning meals every week takes time and a lot of food gets wasted. PrepMate does the planning for you so you save time, money and food.
-- **Built with:** React, TypeScript, Express, PostgreSQL, OpenAI, Stripe, Capacitor
-
-#### ⛽ [Fuel Receipts – Tax Tracker](./petrol-receipts) · [Try it live](https://himanshubashambu08-star.github.io/himanshubashambu08/)
-- **What it does:** Take a photo of your petrol/gas receipt and the app reads it for you: date, litres, price and tax. At the end of the year it shows how much you can claim on your taxes and makes a report for your accountant.
-- **Why I built it:** People who drive for work lose paper receipts and miss out on tax money they could claim. This keeps every receipt safe on your phone.
-- **Built with:** JavaScript, Firebase, Google Gemini AI, works offline as a phone app (PWA)
-
-#### 🇫🇷 FluentFast B2 — learn French with AI
-- **What it does:** Teaches you French step by step. An AI teacher with a talking face listens to you speak, checks your pronunciation and grammar, and tells you how to improve. Flashcards come back at the right time so you don't forget words.
-- **Why I built it:** To help English speakers get good at French (B2 level) in about 90 days.
-- **Built with:** React, Express, PostgreSQL, OpenAI
-
-#### 🚚 Trucking POD Manager
-- **What it does:** Truck drivers take a photo of the delivery paper (Proof of Delivery) on their phone and upload it. The office sees all the papers in one place and can email them to the broker in one click.
-- **Why I built it:** Trucking companies waste hours chasing drivers for delivery papers, and they can't get paid without them. This makes it fast and organised.
-- **Built with:** React, Express, PostgreSQL
-
-#### 🎬 SaaS Video Marketer
-- **What it does:** Paste the website link of any software product. The AI looks at the website, writes a short ad script, and makes a ready-to-post 30-second video with voice and music.
-- **Why I built it:** Small software companies can't afford video editors. This gives them a marketing video in minutes.
-- **Built with:** React, Express, Claude AI, Puppeteer, FFmpeg
-
-#### 📈 AI Crypto Dashboard
-- **What it does:** Shows live Bitcoin, Ethereum and Solana prices on charts, tests trading strategies on past data, and gives an AI "buy / sell / wait" signal.
-- **Why I built it:** To practise building real-time apps and to test trading ideas without risking real money.
-- **Built with:** React, Express, WebSockets, Binance API, TradingView charts
-
-#### 💰 FinanceAuthority
-- **What it does:** A money-advice website (like NerdWallet) with simple guides on credit cards, loans, insurance, investing and credit scores, plus product comparison tables.
-- **Why I built it:** To earn income from ads (Google AdSense) while giving people honest, easy-to-read money advice.
-- **Built with:** React, TypeScript, Tailwind
-
-### 🤖 AI Agents & Automation
-
-#### 📬 AI Outreach Agent
-- **What it does:** Every day it finds small businesses online, checks their websites for problems, finds their email, and writes a personal message offering help. I read each message, edit it if needed, and send it with one click.
-- **Why I built it:** Finding new clients by hand takes hours every day. This does the research for me and I just approve.
-- **Built with:** Mastra AI agents, OpenAI, PostgreSQL, Gmail
-
-#### 💼 LinkedIn Outreach Automation
-- **What it does:** Finds people on LinkedIn who might need a website or automation, writes a personal message for each one, and reminds me to follow up after 1, 3 and 7 days.
-- **Why I built it:** To get consulting clients from LinkedIn without spending hours writing messages.
-- **Built with:** Mastra AI agents, GPT-4o, PostgreSQL
-
-#### 📞 Stella — 24/7 AI Receptionist
-- **What it does:** An AI voice that answers a business's phone calls, talks like a real receptionist, and books appointments straight into Google Calendar.
-- **Why I built it:** Small businesses miss calls when they are busy, and every missed call is a lost customer. Stella never misses a call.
-- **Built with:** Vapi voice AI, Make.com, Google Calendar
-
-### 🎨 Portfolio Websites
-
-#### 🎥 Cinematic Portfolio & 🌆 3D Portfolio
-- **What they do:** Two personal websites that show my work. One looks like a movie (dark and gold); the other has a 3D city you scroll through.
-- **Why I built them:** To show clients my projects in a memorable way, and to practise animation and 3D on the web.
-- **Built with:** React, Framer Motion, Three.js
-
-#### ⚡ My Creative Showcase, Automation Architect, Automation Alchemy
-- **What they do:** Simple one-page websites that explain my AI automation services and let people book a call.
-- **Why I built them:** So businesses can quickly understand what I offer and contact me.
-- **Built with:** React, Tailwind (made with Lovable)
-
-### 🛒 Business Ventures
-- **PawfectLife** — an online store selling pet grooming products.
-- **Rice import** — bringing Basmati rice from Indian suppliers to Canadian grocery stores.
-- **Skyboo** — a new outdoor sports game I'm developing.
+```mermaid
+flowchart LR
+    A["📒 Bookkeeper<br/>6+ years of numbers"] --> B["😩 Saw businesses<br/>wasting hours on<br/>boring tasks"]
+    B --> C["💡 Learned to code<br/>+ AI"]
+    C --> D["🤖 Now I build apps<br/>that do the boring<br/>work for them"]
+    style A fill:#2b2b45,stroke:#ffb347,color:#fff
+    style B fill:#2b2b45,stroke:#ff5f9e,color:#fff
+    style C fill:#2b2b45,stroke:#7c5cff,color:#fff
+    style D fill:#7c5cff,stroke:#fff,color:#fff
+```
 
 ---
 
-## 🛠️ Tech Stack
+## 🌌 The App Universe
 
-**Languages & Frameworks**<br/>
-![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white) ![JavaScript](https://img.shields.io/badge/javascript-%23323330.svg?style=for-the-badge&logo=javascript&logoColor=%23F7DF1E) ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54) ![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB) ![Node.js](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white) ![Express.js](https://img.shields.io/badge/express.js-%23404d59.svg?style=for-the-badge&logo=express&logoColor=%2361DAFB) ![Next JS](https://img.shields.io/badge/Next-black?style=for-the-badge&logo=next.js&logoColor=white) ![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white) ![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white) ![Three.js](https://img.shields.io/badge/three.js-000000?style=for-the-badge&logo=three.js&logoColor=white)
+> Every app here started with a real problem. Here's each one in plain words: **the problem 😩 → the magic ✨ → why it matters 🏆**
 
-**AI & Automation**<br/>
-![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white) ![Claude](https://img.shields.io/badge/Claude-D97757?style=for-the-badge&logo=anthropic&logoColor=white) ![Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white) ![Make](https://img.shields.io/badge/Make.com-6D00CC?style=for-the-badge&logo=make&logoColor=white) ![Vapi](https://img.shields.io/badge/Vapi-000000?style=for-the-badge&logoColor=white) ![Mastra](https://img.shields.io/badge/Mastra-000000?style=for-the-badge&logoColor=white)
+<table>
+<tr>
+<td width="50%" valign="top">
 
-**Data, Payments & Hosting**<br/>
-![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white) ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white) ![Firebase](https://img.shields.io/badge/firebase-a08021?style=for-the-badge&logo=firebase&logoColor=ffcd34) ![Stripe](https://img.shields.io/badge/Stripe-626CD9?style=for-the-badge&logo=stripe&logoColor=white) ![Shopify](https://img.shields.io/badge/Shopify-7AB55C?style=for-the-badge&logo=shopify&logoColor=white) ![Vercel](https://img.shields.io/badge/vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white) ![Replit](https://img.shields.io/badge/Replit-DD1200?style=for-the-badge&logo=replit&logoColor=white) ![Capacitor](https://img.shields.io/badge/Capacitor-119EFF?style=for-the-badge&logo=capacitor&logoColor=white)
+### 🥗 PrepMate
+**Your personal AI chef & grocery planner**
 
-**Business Tools**<br/>
-![QuickBooks](https://img.shields.io/badge/QuickBooks-2CA01C?style=for-the-badge&logo=quickbooks&logoColor=white) ![Xero](https://img.shields.io/badge/Xero-13B5EA?style=for-the-badge&logo=xero&logoColor=white) ![Canva](https://img.shields.io/badge/Canva-%2300C4CC.svg?style=for-the-badge&logo=Canva&logoColor=white) ![Notion](https://img.shields.io/badge/Notion-%23000000.svg?style=for-the-badge&logo=notion&logoColor=white) ![Git](https://img.shields.io/badge/git-%23F05033.svg?style=for-the-badge&logo=git&logoColor=white)
+😩 *"What do I cook this week?"* — every week, plus wasted food and money.
+
+✨ Tell it what you like, your budget and your time. It plans your whole week, gives you recipes and writes your grocery list. Snap a photo of your bill and it remembers what's in your kitchen.
+
+🏆 Saves time, money **and** food.
+
+`React` `OpenAI` `Stripe` `PostgreSQL` `Mobile app`
+
+</td>
+<td width="50%" valign="top">
+
+### ⛽ Fuel Receipts
+**Never lose a gas receipt (or tax money) again**
+
+😩 People who drive for work lose paper receipts and miss tax refunds.
+
+✨ Take a photo of the receipt. AI reads the date, litres, price and tax for you. At year end it tells you how much you can claim and makes a report for your accountant.
+
+🏆 Every receipt safe on your phone, even offline.
+
+[**👉 Try it live**](https://himanshubashambu08-star.github.io/himanshubashambu08/) · [Code](./petrol-receipts)
+
+`Firebase` `Gemini AI` `Works offline`
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🇫🇷 FluentFast B2
+**A French teacher with a face, a voice and endless patience**
+
+😩 Learning French is slow, and apps don't tell you *why* you sound wrong.
+
+✨ An animated AI teacher listens to you speak, checks your pronunciation and grammar, and tells you how to fix it. Smart flashcards come back right before you forget.
+
+🏆 From zero to confident French (B2) in about 90 days.
+
+`React` `OpenAI voice` `PostgreSQL`
+
+</td>
+<td width="50%" valign="top">
+
+### 🚚 Trucking POD Manager
+**No more chasing drivers for paperwork**
+
+😩 Trucking companies can't get paid without delivery papers — and the papers go missing.
+
+✨ Drivers snap a photo of the delivery paper on their phone. The office sees every paper in one place and emails it to the broker in one click.
+
+🏆 Faster paperwork = faster payment.
+
+`React` `Express` `PostgreSQL` `Multi-company`
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🎬 SaaS Video Marketer
+**Paste a link, get an ad video**
+
+😩 Small software companies can't afford video editors.
+
+✨ Paste any website link. AI looks at the site, writes a short ad script, and creates a ready-to-post 30-second video with voice and music — in 5 different styles.
+
+🏆 A marketing video in minutes, not weeks.
+
+`Claude AI` `Puppeteer` `FFmpeg`
+
+</td>
+<td width="50%" valign="top">
+
+### 📈 AI Crypto Dashboard
+**A trading desk without the risk**
+
+😩 Testing trading ideas with real money is scary.
+
+✨ Live Bitcoin, Ethereum and Solana prices on pro charts. Test a strategy on past prices and get an AI *buy / sell / wait* signal.
+
+🏆 Learn and test before you risk a single dollar.
+
+`WebSockets` `Binance API` `TradingView charts`
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 📬 AI Outreach Agent
+**A sales assistant that never sleeps**
+
+😩 Finding new clients by hand takes hours every day.
+
+✨ Every day it finds small businesses, checks their websites for problems, finds their email and writes a personal message. I just read, tweak and click send.
+
+🏆 Hours of research → 5 minutes of approving.
+
+`Mastra AI agents` `OpenAI` `Gmail`
+
+</td>
+<td width="50%" valign="top">
+
+### 💼 LinkedIn Outreach Bot
+**Networking on autopilot (the polite kind)**
+
+😩 Writing personal LinkedIn messages one by one is exhausting.
+
+✨ Finds people who might need a website or automation, writes a personal message for each, and reminds me to follow up on day 1, 3 and 7.
+
+🏆 More conversations, less typing.
+
+`Mastra AI agents` `GPT-4o` `PostgreSQL`
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 📞 Stella — AI Receptionist
+**The receptionist who never takes a break**
+
+😩 Busy shops miss calls — and every missed call is a lost customer.
+
+✨ An AI voice answers the phone, chats like a real person, and books the appointment straight into Google Calendar. 24/7.
+
+🏆 Zero missed calls. Zero extra staff.
+
+`Vapi voice AI` `Make.com` `Google Calendar`
+
+</td>
+<td width="50%" valign="top">
+
+### 💰 FinanceAuthority
+**Money advice without the confusing words**
+
+😩 Finance websites are full of jargon.
+
+✨ Simple guides on credit cards, loans, insurance, investing and credit scores, with easy comparison tables.
+
+🏆 Honest money tips for people — earns from ads for me.
+
+`React` `TypeScript` `SEO`
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>🎨 Bonus: my portfolio websites (click to open)</b></summary>
+<br/>
+
+| Website | What it is |
+|---|---|
+| 🎥 **Cinematic Portfolio** | My work shown like a movie trailer — dark, gold and dramatic |
+| 🌆 **3D Portfolio** | Scroll through a glowing 3D city to see my projects |
+| ⚡ **My Creative Showcase · Automation Architect · Automation Alchemy** | One-page sites that explain my AI services and let you book a call |
+
+</details>
+
+<details>
+<summary><b>🛒 Bonus: my business side-quests (click to open)</b></summary>
+<br/>
+
+- 🐶 **PawfectLife** — an online store for pet grooming products
+- 🍚 **Rice import** — bringing Basmati rice from Indian farms to Canadian grocery shelves
+- 🏸 **Skyboo** — a brand-new outdoor sports game I'm inventing
+
+</details>
 
 ---
 
-## 💼 Experience
+## 🧭 Which app is for you?
 
-**AI Automation Consultant** · Self-employed<br/>
-Custom AI voice agents, Make.com workflows and webhook automations that cut operating costs for small businesses.
+| If you... | Try this |
+|---|---|
+| 🍳 never know what to cook | **PrepMate** |
+| ⛽ drive for work and pay taxes | **Fuel Receipts** |
+| 🥐 want to speak French | **FluentFast B2** |
+| 🚛 run a trucking company | **Trucking POD Manager** |
+| 📞 miss phone calls at your business | **Stella** |
+| 🎥 need a promo video for your software | **SaaS Video Marketer** |
 
-**Financial Manager** · Brother Finance Corporation<br/>
-Managed 50+ clients' books and monthly transactions in QuickBooks and Xero — the analytical background I now bring to automation.
+---
+
+## 🧰 My Toolbox
+
+<p align="center">
+  <img src="https://skillicons.dev/icons?i=ts,js,py,react,nodejs,express,nextjs,tailwind,vite,threejs,postgres,supabase,firebase,vercel,git&perline=15" alt="Tech stack icons"/>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI"/>
+  <img src="https://img.shields.io/badge/Claude-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Claude"/>
+  <img src="https://img.shields.io/badge/Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white" alt="Gemini"/>
+  <img src="https://img.shields.io/badge/Vapi_Voice_AI-000000?style=flat-square" alt="Vapi"/>
+  <img src="https://img.shields.io/badge/Make.com-6D00CC?style=flat-square&logo=make&logoColor=white" alt="Make.com"/>
+  <img src="https://img.shields.io/badge/Stripe-626CD9?style=flat-square&logo=stripe&logoColor=white" alt="Stripe"/>
+  <img src="https://img.shields.io/badge/Shopify-7AB55C?style=flat-square&logo=shopify&logoColor=white" alt="Shopify"/>
+  <img src="https://img.shields.io/badge/QuickBooks-2CA01C?style=flat-square&logo=quickbooks&logoColor=white" alt="QuickBooks"/>
+  <img src="https://img.shields.io/badge/Xero-13B5EA?style=flat-square&logo=xero&logoColor=white" alt="Xero"/>
+</p>
 
 ---
 
 ## 📊 GitHub Stats
 
 <p align="center">
-  <img src="https://github-readme-stats.vercel.app/api?username=himanshubashambu08-star&show_icons=true&theme=dark&count_private=true" alt="GitHub stats" height="165"/>
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=himanshubashambu08-star&layout=compact&theme=dark" alt="Top languages" height="165"/>
+  <img src="https://github-readme-stats.vercel.app/api?username=himanshubashambu08-star&show_icons=true&theme=tokyonight&hide_border=true&count_private=true" alt="GitHub stats" height="165"/>
+  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=himanshubashambu08-star&layout=compact&theme=tokyonight&hide_border=true" alt="Top languages" height="165"/>
 </p>
 <p align="center">
-  <img src="https://streak-stats.demolab.com/?user=himanshubashambu08-star&theme=dark" alt="GitHub streak"/>
+  <img src="https://streak-stats.demolab.com/?user=himanshubashambu08-star&theme=tokyonight&hide_border=true" alt="GitHub streak"/>
 </p>
 
 ---
 
-<p align="center"><i>Always open to new projects and collaborations — feel free to reach out!</i></p>
+<p align="center">
+  <b>💬 Got a boring task that eats your day? Let's turn it into an app.</b><br/>
+  <sub>Made with ☕, chai and a lot of AI · London, Ontario 🇨🇦</sub>
+</p>
