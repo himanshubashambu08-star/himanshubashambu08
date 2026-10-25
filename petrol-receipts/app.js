@@ -41,6 +41,87 @@ const store = {
   clearMeta: () => tx('meta', 'readwrite', (s) => s.clear()),
 };
 
+/*
+ * Backends share one interface. Receipts in memory never carry the full photo,
+ * only a small `thumb` and `hasPhoto`; the full image is fetched on demand.
+ * save(rec, photo): photo is undefined when unchanged, null when removed.
+ */
+const localBackend = {
+  kind: 'local',
+  async list() {
+    return (await store.all()).map(({ photo, ...r }) => ({ ...r, thumb: r.thumb || photo || null, hasPhoto: !!photo }));
+  },
+  async save(rec, photo) {
+    const old = photo === undefined ? await tx('receipts', 'readonly', (s) => s.get(rec.id)) : null;
+    await store.put({ ...rec, photo: photo === undefined ? old?.photo ?? null : photo });
+  },
+  remove: (id) => store.del(id),
+  async getPhoto(id) {
+    return (await tx('receipts', 'readonly', (s) => s.get(id)))?.photo || null;
+  },
+  async allPhotos() {
+    return new Map((await store.all()).filter((r) => r.photo).map((r) => [r.id, r.photo]));
+  },
+  loadSettings: () => store.getMeta('settings'),
+  saveSettings: (s) => store.setMeta('settings', s),
+  async wipe() {
+    await store.clear();
+    await store.clearMeta();
+  },
+};
+
+/** Firestore layout: users/{uid}/receipts/{id}, users/{uid}/photos/{id}, users/{uid}/meta/settings. */
+function cloudBackend(user) {
+  const userDoc = firebase.firestore().collection('users').doc(user.uid);
+  const receiptsCol = userDoc.collection('receipts');
+  const photosCol = userDoc.collection('photos');
+  const settingsDoc = userDoc.collection('meta').doc('settings');
+  // Writes resolve only once the server confirms, which never happens offline.
+  // Firestore queues them locally, so don't block the UI on them.
+  const background = (p) => p.catch((err) => notify('Sync failed: ' + err.message));
+  return {
+    kind: 'cloud',
+    user,
+    async list() {
+      return (await receiptsCol.get()).docs.map((d) => d.data());
+    },
+    async save(rec, photo) {
+      background(receiptsCol.doc(rec.id).set(rec));
+      if (photo) background(photosCol.doc(rec.id).set({ data: photo }));
+      else if (photo === null) background(photosCol.doc(rec.id).delete());
+    },
+    async remove(id) {
+      background(receiptsCol.doc(id).delete());
+      background(photosCol.doc(id).delete());
+    },
+    async getPhoto(id) {
+      return (await photosCol.doc(id).get()).data()?.data || null;
+    },
+    async allPhotos() {
+      return new Map((await photosCol.get()).docs.map((d) => [d.id, d.data().data]));
+    },
+    async loadSettings() {
+      return (await settingsDoc.get()).data();
+    },
+    async saveSettings(s) {
+      background(settingsDoc.set(JSON.parse(JSON.stringify(s))));
+    },
+    async wipe() {
+      for (const col of [receiptsCol, photosCol]) {
+        const docs = (await col.get()).docs;
+        for (let i = 0; i < docs.length; i += 400) {
+          const batch = firebase.firestore().batch();
+          docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+      }
+      await settingsDoc.delete();
+    },
+  };
+}
+
+let backend = localBackend;
+
 /* ---------- Settings ---------- */
 
 const PRESETS = {
@@ -164,7 +245,7 @@ function totals(list) {
       a.claimable += c.claimable;
       a.credit += c.credit;
       a.litres += r.litres || 0;
-      if (!r.photo) a.missingPhoto++;
+      if (!r.hasPhoto) a.missingPhoto++;
       return a;
     },
     { count: 0, total: 0, tax: 0, net: 0, claimable: 0, credit: 0, litres: 0, missingPhoto: 0 }
@@ -208,13 +289,13 @@ function renderReceipts() {
   $('#receiptList').innerHTML = list
     .map((r) => {
       const c = calc(r);
-      const thumb = r.photo ? `<img class="thumb" src="${r.photo}" alt="">` : `<div class="thumb" title="No photo">🧾</div>`;
+      const thumb = r.thumb ? `<img class="thumb" src="${r.thumb}" alt="">` : `<div class="thumb" title="No photo">🧾</div>`;
       const vol = r.litres ? `${fmtNum(r.litres, 2)} ${settings.unit}` : '';
       const sub = [fmtDate(r.date), r.vehicle, vol, r.notes].filter(Boolean).map(esc).join(' · ');
       return `<li class="item" data-id="${r.id}">
         ${thumb}
         <div class="main">
-          <div class="title">${esc(r.station)} ${r.photo ? '' : '<span class="badge warn">no photo</span>'}</div>
+          <div class="title">${esc(r.station)} ${r.hasPhoto ? '' : '<span class="badge warn">no photo</span>'}</div>
           <div class="sub">${sub}</div>
         </div>
         <div class="amt"><b>${money(r.total)}</b><span class="badge">${Math.round(c.frac * 100)}% biz</span></div>
@@ -316,7 +397,8 @@ function renderAll() {
 const editor = $('#editor');
 const form = $('#receiptForm');
 let editingId = null;
-let pendingPhoto = null;
+let pendingPhoto = null; // full image shown in the editor
+let photoChanged = false;
 
 function openEditor(r) {
   editingId = r ? r.id : null;
@@ -335,9 +417,15 @@ function openEditor(r) {
     form.total.dataset.manual = '1';
     form.tax.dataset.manual = '1';
   }
-  setPhoto(r?.photo || null);
+  setPhoto(r?.thumb || null);
+  photoChanged = false;
   updateHint();
   editor.showModal();
+  if (r?.hasPhoto) {
+    backend.getPhoto(r.id).then((p) => {
+      if (editingId === r.id && !photoChanged && p) setPhoto(p);
+    }).catch(() => {});
+  }
 }
 
 function setPhoto(dataUrl) {
@@ -349,26 +437,41 @@ function setPhoto(dataUrl) {
   $('#removePhoto').hidden = !dataUrl;
 }
 
-/** Downscale a photo so years of receipts fit comfortably in browser storage. */
-function compressImage(file, maxDim = 1600, quality = 0.75) {
+function loadImage(src) {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Could not read image'));
-    };
-    img.src = url;
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not read image'));
+    img.src = src;
   });
+}
+
+function drawScaled(img, maxDim, quality) {
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * scale);
+  c.height = Math.round(img.height * scale);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', quality);
+}
+
+/** Downscale a photo; it must stay under Firestore's 1 MB document limit. */
+async function compressImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    for (const [dim, q] of [[1600, 0.75], [1300, 0.65], [1000, 0.6], [800, 0.5]]) {
+      const data = drawScaled(img, dim, q);
+      if (data.length < 900000) return data;
+    }
+    throw new Error('Photo is too large. Try a closer shot of the receipt.');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function makeThumb(dataUrl) {
+  return drawScaled(await loadImage(dataUrl), 160, 0.6);
 }
 
 function autoTax() {
@@ -413,17 +516,21 @@ $('#photoInput').addEventListener('change', async (e) => {
   if (!file) return;
   try {
     setPhoto(await compressImage(file));
+    photoChanged = true;
   } catch (err) {
     notify(err.message);
   }
 });
-$('#removePhoto').onclick = () => setPhoto(null);
+$('#removePhoto').onclick = () => {
+  setPhoto(null);
+  photoChanged = true;
+};
 $('#photoPreview').onclick = () => showPhoto(pendingPhoto);
 $('#cancelBtn').onclick = () => editor.close();
 
 $('#deleteBtn').onclick = async () => {
   if (!editingId || !(await ask('Delete this receipt? This cannot be undone.', { okText: 'Delete', danger: true }))) return;
-  await store.del(editingId);
+  await backend.remove(editingId);
   receipts = receipts.filter((r) => r.id !== editingId);
   editor.close();
   renderAll();
@@ -455,10 +562,11 @@ form.addEventListener('submit', async (e) => {
     payment: form.payment.value,
     receiptNo: form.receiptNo.value.trim(),
     notes: form.notes.value.trim(),
-    photo: pendingPhoto,
+    thumb: photoChanged ? (pendingPhoto ? await makeThumb(pendingPhoto) : null) : existing?.thumb ?? null,
+    hasPhoto: photoChanged ? !!pendingPhoto : !!existing?.hasPhoto,
   };
   try {
-    await store.put(r);
+    await backend.save(r, photoChanged ? pendingPhoto : undefined);
   } catch (err) {
     notify('Could not save. Device storage may be full: download a backup and remove old photos. (' + err.message + ')');
     return;
@@ -524,7 +632,7 @@ function exportCsv() {
   const header = ['Date', 'Station', 'Vehicle', 'Fuel type', `Volume (${settings.unit})`, `Price/${settings.unit}`, 'Total', `${tn} included`, 'Pre-tax amount', 'Business use %', 'Claimable expense', `${tn} credit`, 'Odometer', 'Payment', 'Receipt #', 'Notes', 'Photo attached'];
   const rows = list.map((r) => {
     const c = calc(r);
-    return [r.date, r.station, r.vehicle, r.fuelType, r.litres ?? '', r.pricePerLitre ?? '', r.total.toFixed(2), c.tax.toFixed(2), c.net.toFixed(2), (c.frac * 100).toFixed(1), c.claimable.toFixed(2), c.credit.toFixed(2), r.odometer ?? '', r.payment, r.receiptNo, r.notes, r.photo ? 'Yes' : 'No'];
+    return [r.date, r.station, r.vehicle, r.fuelType, r.litres ?? '', r.pricePerLitre ?? '', r.total.toFixed(2), c.tax.toFixed(2), c.net.toFixed(2), (c.frac * 100).toFixed(1), c.claimable.toFixed(2), c.credit.toFixed(2), r.odometer ?? '', r.payment, r.receiptNo, r.notes, r.hasPhoto ? 'Yes' : 'No'];
   });
   const t = totals(list);
   rows.push(['TOTAL', '', '', '', t.litres.toFixed(2), '', t.total.toFixed(2), t.tax.toFixed(2), t.net.toFixed(2), '', t.claimable.toFixed(2), t.credit.toFixed(2), '', '', '', '', '']);
@@ -532,7 +640,8 @@ function exportCsv() {
   download(`fuel-receipts-${fyLabel(selectedFy)}.csv`, '﻿' + csv, 'text/csv;charset=utf-8');
 }
 
-function printReport() {
+async function printReport() {
+  const allPhotos = await backend.allPhotos();
   const list = yearReceipts().reverse();
   const t = totals(list);
   const reg = settings.taxRegistered;
@@ -545,8 +654,8 @@ function printReport() {
     })
     .join('');
   const photos = list
-    .filter((r) => r.photo)
-    .map((r) => `<div class="photo"><img src="${r.photo}"><div>${esc(r.date)} · ${esc(r.station)} · ${money(r.total)}</div></div>`)
+    .filter((r) => allPhotos.has(r.id))
+    .map((r) => `<div class="photo"><img src="${allPhotos.get(r.id)}"><div>${esc(r.date)} · ${esc(r.station)} · ${money(r.total)}</div></div>`)
     .join('');
   $('#printArea').innerHTML = `
     <h1>Fuel expense report – tax year ${esc(fyLabel(selectedFy))}</h1>
@@ -559,9 +668,10 @@ function printReport() {
 }
 
 async function exportBackup() {
-  const data = { app: 'fuel-receipts', version: 1, exportedAt: new Date().toISOString(), settings, receipts };
+  const photos = await backend.allPhotos();
+  const withPhotos = receipts.map(({ thumb, hasPhoto, ...r }) => ({ ...r, photo: photos.get(r.id) || null }));
+  const data = { app: 'fuel-receipts', version: 1, exportedAt: new Date().toISOString(), settings, receipts: withPhotos };
   download(`fuel-receipts-backup-${todayIso()}.json`, JSON.stringify(data), 'application/json');
-  await store.setMeta('lastBackup', Date.now());
 }
 
 async function restoreBackup(text) {
@@ -577,15 +687,24 @@ async function restoreBackup(text) {
     return;
   }
   if (!(await ask(`Restore ${data.receipts.length} receipts? Receipts with the same ID will be overwritten; others are kept.`, { okText: 'Restore' }))) return;
-  for (const r of data.receipts) if (r && r.id && r.date && typeof r.total === 'number') await store.put(r);
+  await importReceipts(data.receipts.filter((r) => r && r.id && r.date && typeof r.total === 'number'));
   if (data.settings) {
     settings = { ...DEFAULT_SETTINGS, ...data.settings, km: { ...settings.km, ...(data.settings.km || {}) } };
-    await store.setMeta('settings', settings);
+    await backend.saveSettings(settings);
   }
-  receipts = await store.all();
+  receipts = await backend.list();
   renderSettings();
   renderAll();
   notify('Backup restored.');
+}
+
+/** Save full receipts (with `photo`) from a backup or this device into the current backend. */
+async function importReceipts(list) {
+  for (const { photo, ...r } of list) {
+    const rec = { ...r, thumb: photo ? await makeThumb(photo).catch(() => null) : null, hasPhoto: !!photo };
+    for (const k of Object.keys(rec)) if (rec[k] === undefined) rec[k] = null;
+    await backend.save(rec, photo || null);
+  }
 }
 
 /* ---------- Wiring ---------- */
@@ -608,7 +727,7 @@ $('#receiptList').onclick = (e) => {
   const li = e.target.closest('.item');
   if (!li) return;
   const r = receipts.find((x) => x.id === li.dataset.id);
-  if (e.target.matches('img.thumb')) showPhoto(r.photo);
+  if (e.target.matches('img.thumb')) backend.getPhoto(r.id).then((p) => showPhoto(p || r.thumb));
   else openEditor(r);
 };
 
@@ -617,7 +736,7 @@ async function saveKm() {
   const business = num($('#kmBusiness').value);
   if (total == null && business == null) delete settings.km[selectedFy];
   else settings.km[selectedFy] = { total, business };
-  await store.setMeta('settings', settings);
+  await backend.saveSettings(settings);
   renderReceipts();
   renderSummary();
 }
@@ -646,10 +765,10 @@ $('#restoreInput').onchange = (e) => {
   if (f) f.text().then(restoreBackup);
 };
 $('#wipeBtn').onclick = async () => {
-  const msg = 'Delete ALL receipts, photos and settings from this device? Make a backup first.';
+  const where = backend.kind === 'cloud' ? 'your account' : 'this device';
+  const msg = `Delete ALL receipts, photos and settings from ${where}? Make a backup first.`;
   if (!(await ask(msg, { okText: 'Delete everything', danger: true, typeToConfirm: 'DELETE' }))) return;
-  await store.clear();
-  await store.clearMeta();
+  await backend.wipe();
   receipts = [];
   settings = { ...DEFAULT_SETTINGS, km: {} };
   renderSettings();
@@ -690,7 +809,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
     taxRegistered: f.taxRegistered.checked,
     vehicles: f.vehicles.value.split('\n').map((s) => s.trim()).filter(Boolean),
   };
-  await store.setMeta('settings', settings);
+  await backend.saveSettings(settings);
   const msg = $('#savedMsg');
   msg.hidden = false;
   setTimeout(() => (msg.hidden = true), 1500);
@@ -698,16 +817,190 @@ $('#settingsForm').addEventListener('submit', async (e) => {
   renderAll();
 });
 
-async function init() {
-  const saved = await store.getMeta('settings');
-  if (saved) settings = { ...DEFAULT_SETTINGS, ...saved, km: saved.km || {} };
-  receipts = await store.all();
+/* ---------- Accounts (Firebase) ---------- */
+
+const FIREBASE_VERSION = '10.12.2';
+const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
+let signUpMode = false;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = resolve;
+    el.onerror = () => reject(new Error('Could not load ' + src));
+    document.head.appendChild(el);
+  });
+}
+
+async function loadFirebase() {
+  if (!window.firebase) {
+    const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
+    await loadScript(`${base}/firebase-app-compat.js`);
+    await Promise.all([loadScript(`${base}/firebase-auth-compat.js`), loadScript(`${base}/firebase-firestore-compat.js`)]);
+  }
+  if (!firebase.apps.length) firebase.initializeApp(cloudConfig);
+  // Keep a local copy so the app works offline; changes sync when back online.
+  await firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(() => {});
+}
+
+const AUTH_ERRORS = {
+  'auth/invalid-credential': 'Wrong email or password.',
+  'auth/wrong-password': 'Wrong email or password.',
+  'auth/user-not-found': 'No account with that email. Create one below.',
+  'auth/invalid-email': 'That email address doesn’t look right.',
+  'auth/email-already-in-use': 'An account with this email already exists. Sign in instead.',
+  'auth/weak-password': 'Use a password with at least 6 characters.',
+  'auth/too-many-requests': 'Too many attempts. Wait a minute and try again.',
+  'auth/network-request-failed': 'No internet connection. Connect and try again.',
+  'auth/operation-not-allowed': 'This sign-in method is not turned on in Firebase (Authentication → Sign-in method).',
+  'auth/unauthorized-domain': 'This website is not allowed to sign in yet. Add its domain in Firebase → Authentication → Settings → Authorized domains.',
+};
+
+function authError(err) {
+  if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+  const el = $('#authError');
+  el.textContent = AUTH_ERRORS[err.code] || err.message;
+  el.hidden = false;
+}
+
+function setAuthMode(signUp) {
+  signUpMode = signUp;
+  $('#emailSubmit').textContent = signUp ? 'Create account' : 'Sign in';
+  $('#toggleMode').textContent = signUp ? 'Have an account? Sign in' : 'New here? Create an account';
+  $('#authPassword').autocomplete = signUp ? 'new-password' : 'current-password';
+  $('#authError').hidden = true;
+}
+
+function wireAuthUi() {
+  const auth = firebase.auth();
+  $('#googleBtn').onclick = async () => {
+    $('#authError').hidden = true;
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+      await auth.signInWithPopup(provider);
+    } catch (err) {
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment') {
+        auth.signInWithRedirect(provider).catch(authError);
+      } else authError(err);
+    }
+  };
+  $('#toggleMode').onclick = () => setAuthMode(!signUpMode);
+  $('#accountInitial').onclick = () => document.querySelector('.tab[data-view=settings]').click();
+  $('#emailForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('#authError').hidden = true;
+    const email = $('#authEmail').value.trim();
+    const password = $('#authPassword').value;
+    const btn = $('#emailSubmit');
+    btn.disabled = true;
+    try {
+      if (signUpMode) {
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        cred.user.sendEmailVerification().catch(() => {});
+      } else {
+        await auth.signInWithEmailAndPassword(email, password);
+      }
+    } catch (err) {
+      authError(err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  $('#forgotBtn').onclick = async () => {
+    const email = $('#authEmail').value.trim();
+    if (!email) {
+      authError({ message: 'Enter your email above, then tap “Forgot password?” again.' });
+      return;
+    }
+    try {
+      await auth.sendPasswordResetEmail(email);
+      notify(`Password reset email sent to ${email}.`);
+    } catch (err) {
+      authError(err);
+    }
+  };
+  $('#signOutBtn').onclick = async () => {
+    await auth.signOut();
+    location.reload();
+  };
+}
+
+function showApp(signedInUser) {
+  $('#authScreen').hidden = true;
+  $('#appShell').hidden = false;
+  $('#accountCard').hidden = !signedInUser;
+  if (signedInUser) {
+    $('#accountEmail').textContent = signedInUser.email || signedInUser.displayName || 'your account';
+    $('#accountInitial').textContent = (signedInUser.displayName || signedInUser.email || '?').trim()[0].toUpperCase();
+    $('#accountInitial').hidden = false;
+  }
+  $('#wipeBtn').textContent = signedInUser ? 'Delete all data in my account' : 'Delete all data';
+  $('#storageNote').textContent = signedInUser
+    ? 'Your receipts and photos are saved to your account and sync across your devices. You can still download a backup for your records.'
+    : 'All data (including photos) stays on this device. Export a backup regularly — tax records generally need to be kept for 6+ years.';
+}
+
+async function loadData() {
+  const saved = await backend.loadSettings();
+  settings = saved ? { ...DEFAULT_SETTINGS, ...saved, km: saved.km || {} } : { ...DEFAULT_SETTINGS, km: {} };
+  receipts = await backend.list();
+  selectedFy = null;
   renderSettings();
   renderAll();
+}
+
+/** Offer to move receipts saved on this device (before accounts existed) into the account. */
+async function offerLocalUpload(user) {
+  const flag = 'uploaded:' + user.uid;
+  let local;
+  try {
+    if (await store.getMeta(flag)) return;
+    local = await store.all();
+  } catch {
+    return;
+  }
+  if (!local.length) return;
+  const ok = await ask(`This device has ${local.length} receipt(s) saved before you signed in. Copy them into your account?`, { okText: 'Copy to account' });
+  if (!ok) return;
+  if (!receipts.length) {
+    const localSettings = await store.getMeta('settings');
+    if (localSettings) {
+      settings = { ...DEFAULT_SETTINGS, ...localSettings, km: localSettings.km || {} };
+      await backend.saveSettings(settings);
+    }
+  }
+  await importReceipts(local);
+  await store.setMeta(flag, Date.now());
+  await loadData();
+  notify(`Copied ${local.length} receipt(s) to your account.`);
+}
+
+async function init() {
+  if (cloudConfig && !embedded) {
+    await loadFirebase();
+    wireAuthUi();
+    setAuthMode(false);
+    firebase.auth().getRedirectResult().catch(authError);
+    firebase.auth().onAuthStateChanged(async (user) => {
+      if (!user) {
+        $('#appShell').hidden = true;
+        $('#authScreen').hidden = false;
+        return;
+      }
+      backend = cloudBackend(user);
+      showApp(user);
+      await loadData();
+      offerLocalUpload(user);
+    });
+  } else {
+    showApp(null);
+    await loadData();
+  }
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
   if (!embedded && 'serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
 init().catch((err) => {
-  document.body.insertAdjacentHTML('afterbegin', `<p style="padding:16px;color:#b42318">Could not open storage: ${esc(err.message)}</p>`);
+  document.body.insertAdjacentHTML('afterbegin', `<p style="padding:16px;color:#b42318">Could not start the app: ${esc(err.message)}</p>`);
 });
