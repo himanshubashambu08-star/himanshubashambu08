@@ -543,8 +543,8 @@ $('#scanBtn').onclick = () => runScan();
 /* ---------- Receipt scanning (Gemini via Firebase AI Logic) ---------- */
 
 const AI_SDK_VERSION = '12.19.0';
-// Newest first; later models are fallbacks in case a name is unavailable.
-const SCAN_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash'];
+// Newest first; later models are fallbacks in case a name is unavailable to this project.
+const SCAN_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
 const SCANNABLE = ['date', 'station', 'litres', 'pricePerLitre', 'total', 'tax', 'fuelType', 'payment', 'receiptNo', 'odometer'];
 const RECEIPT_SCHEMA = {
   type: 'object',
@@ -581,7 +581,7 @@ function loadScanModels() {
       const app = getApps().find((a) => a.name === 'scan') || initializeApp(cloudConfig, 'scan');
       const ai = getAI(app, { backend: new GoogleAIBackend() });
       const generationConfig = { responseMimeType: 'application/json', responseJsonSchema: RECEIPT_SCHEMA, temperature: 0 };
-      return SCAN_MODELS.map((model) => getGenerativeModel(ai, { model, generationConfig }));
+      return SCAN_MODELS.map((name) => ({ name, model: getGenerativeModel(ai, { model: name, generationConfig }) }));
     })();
     scanModelsPromise.catch(() => (scanModelsPromise = null));
   }
@@ -603,15 +603,21 @@ function scanPrompt() {
   ].join('\n');
 }
 
-const isMissingModel = (err) => /not.?found|404|no-model|is not supported/i.test(`${err.code || ''} ${err.message || ''}`);
+const httpStatus = (err) => err.customErrorData?.status;
+const isMissingModel = (err) =>
+  httpStatus(err) === 404 || err.code === 'no-model' || /model.*(not found|not supported|does not exist)/i.test(err.message || '');
+
+let workingModel = null; // name of the last model that answered, tried first next time
 
 async function scanPhoto(dataUrl) {
   const models = await loadScanModels();
+  const ordered = [...models].sort((a, b) => (b.name === workingModel) - (a.name === workingModel));
   const image = { inlineData: { data: dataUrl.split(',')[1], mimeType: dataUrl.slice(5, dataUrl.indexOf(';')) } };
   let lastErr;
-  for (const model of models) {
+  for (const { name, model } of ordered) {
     try {
       const result = await model.generateContent([scanPrompt(), image]);
+      workingModel = name;
       return JSON.parse(result.response.text());
     } catch (err) {
       lastErr = err;
@@ -622,13 +628,22 @@ async function scanPhoto(dataUrl) {
 }
 
 function scanErrorMessage(err) {
+  const status = httpStatus(err);
   const text = `${err.code || ''} ${err.message || ''}`;
-  if (/api-not-enabled|not been used|is disabled|SERVICE_DISABLED/i.test(text)) {
-    return 'Receipt reading is not turned on yet. In Firebase, open AI Logic → Get started and choose the Gemini Developer API.';
+  const detail = String(err.message || err).replace(/^.*?\]\s*/, '').slice(0, 200);
+  if (!navigator.onLine) return 'No internet connection. Enter the details by hand or try again later.';
+  if (err.code === 'api-not-enabled' || /SERVICE_DISABLED|has not been used/i.test(text)) {
+    return 'Receipt reading is not turned on yet. In Firebase, open AI Logic → Get started and choose the Gemini Developer API. If you just did, wait a few minutes.';
   }
-  if (/quota|429|RESOURCE_EXHAUSTED/i.test(text)) return 'Too many receipts read in a short time. Wait a minute and try again.';
-  if (/Failed to fetch|NetworkError|fetch-error|offline/i.test(text)) return 'No internet connection. Enter the details by hand or try again later.';
-  return 'Couldn’t read this receipt. Enter the details by hand. (' + (err.message || err) + ')';
+  if (status === 429 || /RESOURCE_EXHAUSTED/i.test(text)) return 'Too many receipts read in a short time. Wait a minute and try again.';
+  if (/API_KEY_SERVICE_BLOCKED|are blocked|API key not valid/i.test(text)) {
+    return 'The app’s Firebase key isn’t allowed to use AI Logic. In Google Cloud → APIs & Services → Credentials, edit the Browser key and add “Firebase AI Logic API” to its allowed APIs. (' + detail + ')';
+  }
+  if (isMissingModel(err)) return 'The Gemini model isn’t available to this project. (' + detail + ')';
+  if (/Importing a module|dynamically imported module|Load failed|Failed to fetch/i.test(text) && !status) {
+    return 'Couldn’t reach the receipt reader. Check your connection and try again.';
+  }
+  return 'Couldn’t read this receipt. Enter the details by hand.' + (status ? ` [${status}] ` : ' ') + '(' + detail + ')';
 }
 
 function clearScanMarks() {
@@ -998,7 +1013,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
 
 /* ---------- Accounts (Firebase) ---------- */
 
-const APP_VERSION = '2026.10.25-scan2';
+const APP_VERSION = '2026.10.25-scan3';
 const FIREBASE_VERSION = '10.12.2';
 const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
 let signUpMode = false;
