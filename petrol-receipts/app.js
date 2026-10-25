@@ -545,7 +545,11 @@ $('#scanBtn').onclick = () => runScan();
 
 const AI_SDK_VERSION = '12.19.0';
 // Newest first; later models are fallbacks in case a name is unavailable to this project.
-const SCAN_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+// Flash-Lite comes second: it is the quickest and usually least loaded, and receipts are easy to read.
+const SCAN_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+const ATTEMPT_TIMEOUT_MS = 15000; // give up on one model after this
+const HEDGE_AFTER_MS = 4000; // start another model in parallel if no answer yet
+const SCAN_DEADLINE_MS = 30000; // never keep the user waiting longer than this
 const SCANNABLE = ['date', 'station', 'litres', 'pricePerLitre', 'total', 'tax', 'fuelType', 'payment', 'receiptNo', 'odometer'];
 const RECEIPT_SCHEMA = {
   type: 'object',
@@ -645,7 +649,6 @@ function rememberModel(name, fast) {
 // Overloaded or temporarily failing on Google's side: another model usually has capacity.
 const isBusy = (err) =>
   [500, 502, 503, 504].includes(httpStatus(err)) || /high demand|overloaded|UNAVAILABLE|try again later/i.test(err.message || '');
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const isThinkingRejected = (err) => httpStatus(err) === 400 && /think/i.test(err.message || '');
 
@@ -662,38 +665,81 @@ async function scanPhoto(dataUrl) {
   const [models, small] = await Promise.all([loadScanModels(), scanImage(dataUrl)]);
   const ordered = [...models].sort((a, b) => (b.name === workingModel?.name) - (a.name === workingModel?.name));
   const image = { inlineData: { data: small.split(',')[1], mimeType: 'image/jpeg' } };
+  return hedgedScan(ordered, image);
+}
+
+const isTimeout = (err) => err?.name === 'AbortError' || /abort|timed? ?out/i.test(err?.message || '');
+// A dropped connection (iOS reports "Load failed") is worth retrying on another model.
+const isDropped = (err) => !httpStatus(err) && /Load failed|Failed to fetch|NetworkError|network connection was lost/i.test(err?.message || '');
+
+/** Ask one model, retrying once without the thinking setting if the model rejects it. */
+async function askModel(entry, image, signal) {
+  const call = async (fast) => {
+    const result = await (fast ? entry.fast : entry.plain).generateContent([scanPrompt(), image], { signal, timeout: ATTEMPT_TIMEOUT_MS });
+    const data = JSON.parse(result.response.text());
+    if (!signal.aborted) rememberModel(entry.name, fast);
+    return data;
+  };
+  const fast = !(entry.name === workingModel?.name && workingModel.fast === false);
   try {
-    return await tryModels(ordered, image);
+    return await call(fast);
   } catch (err) {
-    if (!isBusy(err)) throw err;
-    await sleep(1500); // every model was busy; give Google a moment and go round once more
-    return tryModels(ordered, image);
+    if (fast && isThinkingRejected(err)) return call(false);
+    throw err;
   }
 }
 
-async function tryModels(ordered, image) {
-  let lastErr;
-  let busyErr = null;
-  for (const entry of ordered) {
-    let fast = !(entry.name === workingModel?.name && workingModel.fast === false);
-    for (;;) {
-      try {
-        const result = await (fast ? entry.fast : entry.plain).generateContent([scanPrompt(), image]);
-        rememberModel(entry.name, fast);
-        return JSON.parse(result.response.text());
-      } catch (err) {
-        lastErr = err;
-        if (fast && isThinkingRejected(err)) {
-          fast = false; // this model doesn't accept the thinking setting; retry without it
-          continue;
-        }
-        break;
+/**
+ * Race models: start the preferred one, add another every HEDGE_AFTER_MS while none has answered,
+ * replace any that fail with busy/missing/timeout errors, and take the first answer.
+ */
+function hedgedScan(ordered, image) {
+  return new Promise((resolve, reject) => {
+    const controllers = [];
+    let next = 0;
+    let running = 0;
+    let done = false;
+    let lastErr = null;
+    let hedgeTimer;
+    const finish = (settle, value) => {
+      if (done) return;
+      done = true;
+      clearTimeout(hedgeTimer);
+      clearTimeout(deadline);
+      controllers.forEach((c) => c.abort());
+      settle(value);
+    };
+    const launch = () => {
+      clearTimeout(hedgeTimer);
+      if (done) return;
+      if (next >= ordered.length) {
+        if (running === 0) finish(reject, lastErr || new Error('No Gemini model answered.'));
+        return;
       }
-    }
-    if (isBusy(lastErr)) busyErr = lastErr;
-    else if (!isMissingModel(lastErr)) throw lastErr;
-  }
-  throw busyErr || lastErr;
+      const entry = ordered[next++];
+      const ctrl = new AbortController();
+      controllers.push(ctrl);
+      running++;
+      askModel(entry, image, ctrl.signal).then(
+        (data) => finish(resolve, data),
+        (err) => {
+          running--;
+          if (done) return;
+          // A busy error says more than "model not found", so keep it for the final message.
+          if (!lastErr || isBusy(err) || isTimeout(err)) lastErr = err;
+          if (isBusy(err) || isMissingModel(err) || isTimeout(err) || isDropped(err)) launch();
+          else finish(reject, err); // e.g. App Check or key problems: other models won't help
+        }
+      );
+      hedgeTimer = setTimeout(launch, HEDGE_AFTER_MS);
+    };
+    const deadline = setTimeout(() => {
+      const err = new Error('Gemini did not answer in time.');
+      err.code = 'scan-timeout';
+      finish(reject, err);
+    }, SCAN_DEADLINE_MS);
+    launch();
+  });
 }
 
 /** Load the AI SDK and App Check token in the background so the first scan starts immediately. */
@@ -718,6 +764,9 @@ function scanErrorMessage(err) {
       : 'Receipt reading needs App Check set up first (a reCAPTCHA key). See “Turn on receipt reading” in the README.';
   }
   if (/appCheck\//i.test(text)) return 'App Check couldn’t verify this device. Try again in a minute. (' + detail + ')';
+  if (err.code === 'scan-timeout' || isTimeout(err)) {
+    return 'Gemini took too long to answer (Google is busy). Tap “Read details from photo” to try again, or enter the details by hand.';
+  }
   if (isBusy(err)) return 'Google’s Gemini is very busy right now. Tap “Read details from photo” again in a minute, or enter the details by hand.';
   if (status === 429 || /RESOURCE_EXHAUSTED/i.test(text)) return 'Too many receipts read in a short time. Wait a minute and try again.';
   if (/API_KEY_SERVICE_BLOCKED|are blocked|API key not valid/i.test(text)) {
@@ -1102,7 +1151,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
 
 /* ---------- Accounts (Firebase) ---------- */
 
-const APP_VERSION = '2026.10.25-fast2';
+const APP_VERSION = '2026.10.25-fast3';
 const FIREBASE_VERSION = '10.12.2';
 const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
 let signUpMode = false;
