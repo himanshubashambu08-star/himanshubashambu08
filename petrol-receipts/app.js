@@ -631,7 +631,7 @@ function scanErrorMessage(err) {
   const status = httpStatus(err);
   const text = `${err.code || ''} ${err.message || ''}`;
   const detail = String(err.message || err).replace(/^.*?\]\s*/, '').slice(0, 200);
-  if (!navigator.onLine) return 'No internet connection. Enter the details by hand or try again later.';
+  if (navigator.onLine === false) return 'This phone is offline. Enter the details by hand or try again when connected.';
   if (err.code === 'api-not-enabled' || /SERVICE_DISABLED|has not been used/i.test(text)) {
     return 'Receipt reading is not turned on yet. In Firebase, open AI Logic → Get started and choose the Gemini Developer API. If you just did, wait a few minutes.';
   }
@@ -708,7 +708,7 @@ async function runScan() {
       : 'Couldn’t find details on this receipt. Enter them by hand.';
   } catch (err) {
     if (token !== scanToken) return;
-    status.textContent = scanErrorMessage(err);
+    status.textContent = `${scanErrorMessage(err)} [${APP_VERSION}]`;
     status.classList.add('error');
   } finally {
     if (token === scanToken) btn.disabled = false;
@@ -1013,7 +1013,7 @@ $('#settingsForm').addEventListener('submit', async (e) => {
 
 /* ---------- Accounts (Firebase) ---------- */
 
-const APP_VERSION = '2026.10.25-scan3';
+const APP_VERSION = '2026.10.25-scan4';
 const FIREBASE_VERSION = '10.12.2';
 const cloudConfig = window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey ? window.FIREBASE_CONFIG : null;
 let signUpMode = false;
