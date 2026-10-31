@@ -121,6 +121,7 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .gatehint{text-align:center;font-size:13px;color:var(--muted);margin:0}
 
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stats .stat:nth-child(5){grid-column:1/-1}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:2px}
 .stat b{font-family:var(--f-num);font-size:24px;font-weight:500}
 .pos{color:var(--good)} .neg{color:var(--bad)}
@@ -543,9 +544,20 @@ function pop(kind, badge, title, reason, msg, actions){
   actions.forEach(([label, cls, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + cls; b.textContent = label; b.addEventListener('click', () => { p.hidden = true; fn && fn(); }); a.appendChild(b); });
   p.hidden = false; a.firstChild && a.firstChild.focus();
 }
-function resetPlan(){ form.reset(); LS.set('gtd.draft', null); lastVerdict = null; draftPhotos = []; mentor = null; renderPhotos(); renderMentor(); evaluate(); window.scrollTo({ top: 0 }); }
+function resetPlan(){ confirmedAgainst = false; form.reset(); LS.set('gtd.draft', null); lastVerdict = null; draftPhotos = []; mentor = null; renderPhotos(); renderMentor(); evaluate(); window.scrollTo({ top: 0 }); }
 function showNo(reason){
   pop('no', 'Rule fail', 'Mat lo', reason, pick('no'), [['Theek hai, checklist reset', '', resetPlan], ['Galat tap hua, wapas jao', 'ghost']]);
+}
+let confirmedAgainst = false;
+const currentMentor = () => mentor && mentor.forPhotos === photoKey(draftPhotos) ? mentor : null;
+const MSG_AGAINST = ['Checklist pass hai, par chart kuch aur bol raha hai. Ek baar aur dekh lo.', 'Doubt ho to trade nahi. Market kal bhi khulega.', 'Mentor ki baat galat bhi ho sakti hai, par chart ek baar phir check kar lo.', 'Jo trade samajh na aaye, wo skip karna hi pro move hai.'];
+function showAgainst(mv){
+  const bad = (mv.checks || []).filter(c => c.status === 'mismatch').map(c => `${RULE_NAMES[c.rule] || c.rule}: ${c.note}`);
+  const msg = MSG_AGAINST[Math.floor(Math.random() * MSG_AGAINST.length)];
+  pop('no', 'Mentor: ruko', 'Pakka lena hai?', bad.length ? bad.join(' · ') : (mv.headline || ''), msg, [
+    ['Nahi, skip karta hoon', '', resetPlan],
+    ['Haan, phir bhi lunga', 'ghost', () => { confirmedAgainst = true; form.requestSubmit(); }]
+  ]);
 }
 function showGo(d){
   const n = +d.sld;
@@ -564,9 +576,13 @@ function showResult(t){
 form.addEventListener('submit', async e => {
   e.preventDefault(); evaluate();
   const info = dayInfo(); if (!plan || info.open || info.lock) return;
+  const mv = currentMentor();
+  if (mv && mv.verdict === 'wait' && !confirmedAgainst) { showAgainst(mv); return; }
   const t = Object.assign({ id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), lots: R.lots, status:'open' }, plan);
   t.photos = await savePhotos(t.id, 'setup', draftPhotos);
-  if (mentor && mentor.forPhotos === photoKey(draftPhotos)) { const { forPhotos, ...m } = mentor; t.mentor = m; }
+  if (mv) { const { forPhotos, ...m } = mv; t.mentor = m; }
+  if (mv && mv.verdict === 'wait') t.againstMentor = true;
+  confirmedAgainst = false;
   $('go').disabled = true;
   try { await store.save(t); form.reset(); LS.set('gtd.draft', null); draftPhotos = []; mentor = null; renderPhotos(); renderMentor(); renderAll(); window.scrollTo({ top: 0 }); }
   catch { $('gatehint').textContent = 'Save nahi hua. Internet check karke dobara try karo.'; $('go').disabled = false; }
@@ -624,10 +640,13 @@ function renderJournal(){
   const wins = closed.filter(t => outcome(t) === 'win').length;
   const net = closed.reduce((s,t) => s + (t.pnl||0), 0);
   const clean = closed.filter(t => !(t.ruleBreaks||[]).length).length;
+  const against = closed.filter(t => t.againstMentor);
+  const againstPnl = against.reduce((s,t) => s + (t.pnl||0), 0);
+  const extra = against.length ? [['Mentor ke against', `${against.length} · ${money(againstPnl)}`, againstPnl > 0 ? 'pos' : againstPnl < 0 ? 'neg' : '']] : [];
   $('stats').innerHTML = [['Total trades', String(closed.length), ''],
     ['Win rate', closed.length ? Math.round(wins/closed.length*100) + '%' : '—', ''],
     ['Net P&L', money(net), net > 0 ? 'pos' : net < 0 ? 'neg' : ''],
-    ['Rules followed', closed.length ? Math.round(clean/closed.length*100) + '%' : '—', closed.length && clean === closed.length ? 'pos' : '']]
+    ['Rules followed', closed.length ? Math.round(clean/closed.length*100) + '%' : '—', closed.length && clean === closed.length ? 'pos' : '']].concat(extra)
     .map(([k,v,c]) => `<div class="stat"><span class="lbl">${k}</span><b class="${c}">${v}</b></div>`).join('');
   const j = $('journal'); j.innerHTML = '';
   if (!closed.length) { j.innerHTML = '<div class="empty">Abhi koi closed trade nahi. Trade tab pe checklist pass karo, trade close karne ke baad yahan dikhega.</div>'; return; }
@@ -647,7 +666,7 @@ function tradeRow(t){
   const resTxt = { tp:'TP hit', sl:'SL hit', manual:'Manual exit' }[t.result];
   const liqTxt = { '15':'$15–20', '20':'$20–30', '30':'$30+' }[t.liq] || '';
   el.innerHTML = `<summary><span class="dir ${t.dir}">${t.dir}</span><span class="trmid"><span>${resTxt}</span><small>${new Date(t.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} · SL $${t.sld} · Liq ${liqTxt}</small></span><span class="trpnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${money(t.pnl)}</span></summary>
-    <div class="trbody"><span class="flag ${br.length ? '' : 'clean'}">${br.length ? 'Rule break: ' + esc(br.join(', ')) : 'Sab rules follow kiye'}</span>
+    <div class="trbody"><span class="flag ${br.length ? '' : 'clean'}">${br.length ? 'Rule break: ' + esc(br.join(', ')) : 'Sab rules follow kiye'}</span>${t.againstMentor ? '<span class="flag">⚠ Mentor ke against liya</span>' : ''}
     <div class="tags">${(t.tags||[]).map(x => `<span>${esc(x)}</span>`).join('')}</div>
     ${t.note ? `<p class="lesson">${esc(t.note)}</p>` : ''}
     <div class="photos jph"></div>
