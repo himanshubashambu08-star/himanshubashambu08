@@ -118,6 +118,10 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
 .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-size:14px;padding:9px 14px;width:auto}
 .btn.danger{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+.btn.ghost.warn-text{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.trash{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.trash:hover,.trash:focus-visible{color:var(--bad);border-color:var(--bad);outline:none}
+.reset-note{margin:0;font-size:13px;color:var(--muted)}
 .gatehint{text-align:center;font-size:13px;color:var(--muted);margin:0}
 
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -129,7 +133,7 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .dayh{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-weight:600;padding-inline:2px}
 .dayh .num{font-family:var(--f-num)}
 details.tr{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-details.tr summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:12px 14px}
+details.tr summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:12px 14px}
 details.tr summary::-webkit-details-marker{display:none}
 .dir{font:700 13px var(--f-display);letter-spacing:.06em;padding:3px 8px;border-radius:5px;text-transform:uppercase}
 .dir.long{background:var(--good-soft);color:var(--good)} .dir.short{background:var(--bad-soft);color:var(--bad)}
@@ -270,6 +274,7 @@ details.tr summary::-webkit-details-marker{display:none}
     <div class="q"><label class="qlabel" for="note">Note (optional)</label><textarea class="in" id="note" placeholder="Chaho to ek line, warna chhod do"></textarea></div>
     <div class="msgs" id="close-msgs"></div>
     <button class="btn" id="close-btn" disabled>Trade close &amp; save</button>
+    <button class="btn ghost warn-text" id="cancel-open" type="button">Galti se record hua? Ye trade delete karo</button>
   </div>
 
   <!-- Pre-trade gate: built from STEPS in script -->
@@ -311,6 +316,8 @@ details.tr summary::-webkit-details-marker{display:none}
       <input type="file" id="bk-file" accept=".json,application/json" hidden>
     </div>
     <button class="btn ghost" id="sign-out" type="button">Sign out</button>
+    <button class="btn ghost warn-text" id="reset-all" type="button">Poora journal reset karo</button>
+    <p class="reset-note">Ek trade hatana ho to neeche us trade ke 🗑 pe tap karo.</p>
     <div class="msgs" id="acct-msg"></div>
   </div>
   <div class="stats" id="stats"></div>
@@ -665,22 +672,17 @@ function tradeRow(t){
   const br = t.ruleBreaks || [];
   const resTxt = { tp:'TP hit', sl:'SL hit', manual:'Manual exit' }[t.result];
   const liqTxt = { '15':'$15–20', '20':'$20–30', '30':'$30+' }[t.liq] || '';
-  el.innerHTML = `<summary><span class="dir ${t.dir}">${t.dir}</span><span class="trmid"><span>${resTxt}</span><small>${new Date(t.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} · SL $${t.sld} · Liq ${liqTxt}</small></span><span class="trpnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${money(t.pnl)}</span></summary>
+  el.innerHTML = `<summary><span class="dir ${t.dir}">${t.dir}</span><span class="trmid"><span>${resTxt}</span><small>${new Date(t.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} · SL $${t.sld} · Liq ${liqTxt}</small></span><span class="trpnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${money(t.pnl)}</span><button type="button" class="trash" aria-label="Ye trade delete karo" title="Delete"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></summary>
     <div class="trbody"><span class="flag ${br.length ? '' : 'clean'}">${br.length ? 'Rule break: ' + esc(br.join(', ')) : 'Sab rules follow kiye'}</span>${t.againstMentor ? '<span class="flag">⚠ Mentor ke against liya</span>' : ''}
     <div class="tags">${(t.tags||[]).map(x => `<span>${esc(x)}</span>`).join('')}</div>
     ${t.note ? `<p class="lesson">${esc(t.note)}</p>` : ''}
     <div class="photos jph"></div>
     <div class="jmentor"></div>
-    <div><button class="btn ghost" type="button">Delete</button></div></div>`;
+    </div>`;
   const jp = el.querySelector('.jph');
   (t.photos || []).forEach(p => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ph'; b.title = p.kind === 'exit' ? 'Exit chart' : 'Setup chart'; b.innerHTML = `<img alt="">`; b.firstChild.src = p.thumb; b.addEventListener('click', () => openPhoto(p)); jp.appendChild(b); });
   if (t.mentor) el.querySelector('.jmentor').appendChild(mentorView(t.mentor));
-  const del = el.querySelector('.btn.ghost'); let armed = null;
-  del.addEventListener('click', async () => {
-    if (!armed) { del.textContent = 'Pakka delete?'; del.classList.add('danger'); armed = setTimeout(() => { armed = null; del.textContent = 'Delete'; del.classList.remove('danger'); }, 3000); return; }
-    clearTimeout(armed); del.disabled = true;
-    try { (t.photos || []).forEach(p => photosCol && photosCol.doc(p.id).delete().catch(() => {})); await store.remove(t.id); } catch { del.disabled = false; del.textContent = 'Delete nahi hua'; }
-  });
+  el.querySelector('.trash').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); askDeleteTrade(t); });
   return el;
 }
 
@@ -880,6 +882,44 @@ $('mentor-btn').addEventListener('click', async () => {
     const offline = !navigator.onLine || /Load failed|Failed to fetch|network/i.test(err?.message || '');
     msgs($('mentor-out'), [['bad', offline ? 'Internet nahi hai. Connect karke dobara try karo.' : 'Mentor abhi jawab nahi de paya. Thodi der baad dobara try karo. Tab tak checklist ke rules hi final hain.']]);
   }
+});
+
+/* ---------- delete one trade / reset everything ---------- */
+async function deleteTrade(t){
+  (t.photos || []).forEach(p => photosCol && photosCol.doc(p.id).delete().catch(() => {}));
+  await store.remove(t.id);
+}
+function askDeleteTrade(t){
+  const resTxt = t.status === 'open' ? 'Open trade' : ({ tp:'TP hit', sl:'SL hit', manual:'Manual exit' }[t.result] + ' · ' + money(t.pnl));
+  const when = new Date(t.createdAt).toLocaleString(undefined, { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  pop('no', 'Delete', 'Ye trade hatana hai?', `${t.dir.toUpperCase()} · ${resTxt} · ${when}`, 'Trade, uski photos aur mentor notes hamesha ke liye hat jayenge. Stats bhi update ho jayenge.', [
+    ['Haan, delete karo', 'danger', async () => { try { await deleteTrade(t); } catch { pop('no', 'Error', 'Delete nahi hua', '', 'Internet check karke dobara try karo.', [['Theek hai', '']]); } }],
+    ['Rehne do', 'ghost']
+  ]);
+}
+$('cancel-open').addEventListener('click', () => { const t = dayInfo().open; if (t) askDeleteTrade(t); });
+async function deleteEverything(){
+  if (col && photosCol) {
+    const [a, b] = await Promise.all([col.get(), photosCol.get()]);
+    const refs = [...a.docs, ...b.docs].map(d => d.ref);
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = firebase.firestore().batch();
+      refs.slice(i, i + 400).forEach(r => batch.delete(r));
+      await settle(batch.commit());
+    }
+  } else { trades = []; LS.set('gtd.trades', []); }
+  LS.set('gtd.draft', null); draftPhotos = []; closePhotos = []; mentor = null;
+  form.reset(); lastVerdict = null; renderPhotos(); renderMentor(); renderAll();
+}
+$('reset-all').addEventListener('click', () => {
+  const n = trades.length;
+  pop('no', 'Reset', 'Sab delete karna hai?', `${n} trade${n === 1 ? '' : 's'}, saari photos aur mentor notes`, 'Journal bilkul khaali ho jayega aur ye wapas nahi aayega. Chaho to pehle "Backup file save karo" kar lo.', [
+    ['Haan, sab delete karo', 'danger', () => pop('no', 'Last check', 'Pakka?', 'Ye undo nahi hoga.', `${n} trades hamesha ke liye hat jayenge.`, [
+      ['Haan, reset karo', 'danger', async () => { try { await deleteEverything(); pop('', 'Reset', 'Journal khaali', '', 'Fresh start. Ab sirf real trades record karna.', [['Theek hai', '']]); } catch { pop('no', 'Error', 'Reset nahi hua', '', 'Internet check karke dobara try karo.', [['Theek hai', '']]); } }],
+      ['Rehne do', 'ghost']
+    ])],
+    ['Rehne do', 'ghost']
+  ]);
 });
 
 /* ---------- backup / restore ---------- */
