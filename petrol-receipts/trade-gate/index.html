@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#80620F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trade Gate">
+<title>Gold Trade Gate</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one narrow column, a gated stack of tap-only rule steps; each step unlocks only when the one above passes. */
+:root{
+  --bg:#EDEFEA; --surface:#FFFFFF; --ink:#191C19; --muted:#5B635C; --line:#D3D8D0;
+  --gold:#80620F; --gold-soft:#F2E7C6; --on-gold:#FFFFFF;
+  --good:#1D7446; --good-soft:#DDF0E4; --bad:#B0261D; --bad-soft:#F8E0DD; --warn:#8F5400; --warn-soft:#F7E9D2;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111311; --surface:#1A1D1A; --ink:#E7EAE5; --muted:#99A199; --line:#2C312C;
+  --gold:#D8B34B; --gold-soft:#372F17; --on-gold:#1A1500;
+  --good:#52C68F; --good-soft:#16301F; --bad:#F27A6F; --bad-soft:#3A1A17; --warn:#E8A848; --warn-soft:#382912; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111311; --surface:#1A1D1A; --ink:#E7EAE5; --muted:#99A199; --line:#2C312C;
+  --gold:#D8B34B; --gold-soft:#372F17; --on-gold:#1A1500;
+  --good:#52C68F; --good-soft:#16301F; --bad:#F27A6F; --bad-soft:#3A1A17; --warn:#E8A848; --warn-soft:#382912; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg)}
+img{max-width:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:14px;width:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:28px;letter-spacing:.01em;margin:0;line-height:1}
+.brand h1 span{color:var(--gold)}
+.sym{font-family:var(--f-num);font-size:12px;color:var(--muted);letter-spacing:.04em}
+.tabs{display:flex;gap:6px}
+.tabs button{flex:1;font:600 15px var(--f-body);padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+.daybar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.daybar div{background:var(--surface);padding:10px 8px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.daybar b{font-family:var(--f-num);font-size:18px;font-weight:500}
+.status{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;font-weight:600}
+.status.ok{background:var(--good-soft);color:var(--good)}
+.status.lock{background:var(--bad-soft);color:var(--bad)}
+.status.open{background:var(--gold-soft);color:var(--gold)}
+.dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.save-note{font-size:13px;color:var(--muted);margin:0}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.card h2{font-family:var(--f-display);font-size:22px;font-weight:700;margin:0;letter-spacing:.01em;text-wrap:balance}
+
+fieldset.step{margin:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;min-width:0;transition:opacity .2s}
+fieldset.step:disabled{opacity:.42}
+fieldset.step.done{border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+fieldset.step.fail{border-color:color-mix(in srgb,var(--bad) 55%,var(--line))}
+legend{display:contents}
+.shead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.idx{font-family:var(--f-num);font-size:13px;color:var(--gold);background:var(--gold-soft);padding:2px 7px;border-radius:5px}
+.stitle{font-family:var(--f-display);font-size:21px;font-weight:700;letter-spacing:.01em}
+.tf{font-size:13px;color:var(--muted);font-weight:500}
+.chip{margin-left:auto;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.06em}
+.chip.wait{background:var(--bg);color:var(--muted)}
+.chip.pass{background:var(--good-soft);color:var(--good)}
+.chip.stop{background:var(--bad-soft);color:var(--bad)}
+.rule{margin:0;color:var(--muted);font-size:15px;border-left:2px solid var(--gold);padding-left:10px}
+
+.chk{display:flex;gap:12px;align-items:center;font-size:15px;cursor:pointer;padding:12px;border-radius:10px;background:var(--bg);border:1px solid transparent}
+.chk input{width:22px;height:22px;margin:0;accent-color:var(--gold);flex:none}
+.chk:has(input:checked){border-color:var(--gold);background:var(--gold-soft)}
+.q{display:flex;flex-direction:column;gap:6px;min-width:0}
+.qlabel{font-size:13px;font-weight:600;color:var(--muted)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg label{flex:1 1 0;min-width:56px;cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:block;text-align:center;padding:12px 4px;border-radius:9px;border:1px solid var(--line);background:var(--bg);font-weight:600;font-size:15px;white-space:nowrap}
+.seg input:checked+span{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg input.t-good:checked+span{background:var(--good);border-color:var(--good);color:var(--surface)}
+.seg input.t-bad:checked+span{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+.seg input:focus-visible+span,.tabs button:focus-visible,.btn:focus-visible,.chk input:focus-visible,.step-btn:focus-visible,textarea:focus{outline:2px solid var(--gold);outline-offset:2px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tags label{cursor:pointer}
+.tags input{position:absolute;opacity:0;pointer-events:none}
+.tags span{display:inline-block;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--bg);font-size:14px;font-weight:500}
+.tags input:checked+span{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);font-weight:600}
+.tags input:focus-visible+span{outline:2px solid var(--gold);outline-offset:2px}
+
+.readouts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ro{background:var(--bg);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.ro b{font-family:var(--f-num);font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.ro.good b{color:var(--good)} .ro.bad b{color:var(--bad)} .ro.warn b{color:var(--warn)}
+.msgs{display:flex;flex-direction:column;gap:6px}
+.msgs:empty{display:none}
+.msg{margin:0;font-size:14px;padding:8px 10px;border-radius:8px}
+.msg.bad{background:var(--bad-soft);color:var(--bad)}
+.msg.warn{background:var(--warn-soft);color:var(--warn)}
+.msg.good{background:var(--good-soft);color:var(--good)}
+
+.stepper{display:flex;align-items:center;gap:6px}
+.step-btn{font:600 15px var(--f-num);padding:10px 0;width:52px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
+.stepper output{flex:1;text-align:center;font:500 22px var(--f-num);font-variant-numeric:tabular-nums}
+textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%;min-height:54px;resize:vertical}
+
+.btn{font:700 18px var(--f-display);letter-spacing:.04em;text-transform:uppercase;padding:15px;border-radius:10px;border:0;background:var(--gold);color:var(--on-gold);cursor:pointer;width:100%}
+.btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-size:14px;padding:9px 14px;width:auto}
+.btn.danger{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+.gatehint{text-align:center;font-size:13px;color:var(--muted);margin:0}
+
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--f-num);font-size:24px;font-weight:500}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.daygrp{display:flex;flex-direction:column;gap:8px}
+.dayh{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);font-weight:600;padding-inline:2px}
+.dayh .num{font-family:var(--f-num)}
+details.tr{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+details.tr summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:12px 14px}
+details.tr summary::-webkit-details-marker{display:none}
+.dir{font:700 13px var(--f-display);letter-spacing:.06em;padding:3px 8px;border-radius:5px;text-transform:uppercase}
+.dir.long{background:var(--good-soft);color:var(--good)} .dir.short{background:var(--bad-soft);color:var(--bad)}
+.trmid{display:flex;flex-direction:column;min-width:0;font-size:14px}
+.trmid small{color:var(--muted)}
+.trpnl{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.flag{font-size:13px;font-weight:600;color:var(--warn)}
+.flag.clean{color:var(--good)}
+.trbody{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.lesson{margin:0;padding:8px 10px;background:var(--bg);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.empty{text-align:center;color:var(--muted);padding:28px 12px;border:1px dashed var(--line);border-radius:12px}
+@media (max-width:380px){.daybar{grid-template-columns:repeat(2,1fr)}}
+.acct-btns{display:flex;gap:8px;flex-wrap:wrap}
+.acct-btns .btn{flex:1 1 140px;width:auto;text-align:center;font-size:15px;color:var(--ink)}
+.auth{min-height:80vh;display:flex;align-items:center;justify-content:center;padding-block:24px}
+.auth .card{max-width:420px;width:100%;text-align:center;gap:16px;padding:28px 22px}
+.auth h1{font-family:var(--f-display);font-weight:700;font-size:40px;margin:0;line-height:1}
+.auth h1 span{color:var(--gold)}
+.auth p{margin:0;color:var(--muted)}
+.btn.google{display:flex;align-items:center;justify-content:center;gap:12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);font:600 17px var(--f-body);text-transform:none;letter-spacing:0}
+.btn.google:disabled{opacity:.6}
+.who{display:flex;align-items:center;gap:12px}
+.who img{width:40px;height:40px;border-radius:50%;flex:none}
+.who div{min-width:0;display:flex;flex-direction:column}
+.who b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pop{position:fixed;inset:0;z-index:50;background:color-mix(in srgb,#000 50%,transparent);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.pop-card{background:var(--surface);border-radius:18px;padding:24px 20px 20px;max-width:400px;width:100%;display:flex;flex-direction:column;gap:12px;text-align:center;animation:popin .22s ease-out;border-top:6px solid var(--gold)}
+.pop.go .pop-card{border-top-color:var(--good)} .pop.no .pop-card{border-top-color:var(--bad)}
+.pop-badge{align-self:center;font:700 13px var(--f-display);letter-spacing:.1em;text-transform:uppercase;padding:4px 12px;border-radius:999px;background:var(--gold-soft);color:var(--gold)}
+.pop.go .pop-badge{background:var(--good-soft);color:var(--good)} .pop.no .pop-badge{background:var(--bad-soft);color:var(--bad)}
+.pop h2{font:700 40px/1 var(--f-display);margin:0;letter-spacing:.01em}
+.pop.go h2{color:var(--good)} .pop.no h2{color:var(--bad)}
+.pop-reason{margin:0;font-size:14px;color:var(--muted)}
+.pop-reason:empty{display:none}
+.pop-msg{margin:0;font-size:19px;font-weight:600;text-wrap:balance}
+.pop-actions{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.pop-actions .btn{width:100%}
+.pop.go .pop-actions .btn:not(.ghost){background:var(--good);color:var(--surface)}
+@keyframes popin{from{transform:scale(.92);opacity:.5}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<section id="auth" class="auth" hidden>
+  <div class="card">
+    <h1>Gold <span>Trade Gate</span></h1>
+    <p>Rules follow karo, har trade record karo. Google se sign in karo, data tumhare account me save hoga aur har device pe milega.</p>
+    <button type="button" class="btn google" id="google-btn">
+      <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Continue with Google
+    </button>
+    <div class="msgs" id="auth-msg"></div>
+  </div>
+</section>
+
+<div class="wrap" id="app" hidden>
+<header class="top">
+  <div class="brand"><h1>Gold <span>Trade Gate</span></h1><span class="sym">XAUUSD · MGC</span></div>
+  <div class="tabs" role="tablist">
+    <button id="tab-trade" role="tab" aria-selected="true">Trade</button>
+    <button id="tab-journal" role="tab" aria-selected="false">Journal</button>
+  </div>
+</header>
+
+<section id="view-trade" class="wrap">
+  <div class="daybar">
+    <div><span class="lbl">Aaj trades</span><b id="d-count">0</b></div>
+    <div><span class="lbl">Win</span><b id="d-win">0</b></div>
+    <div><span class="lbl">Loss</span><b id="d-loss">0</b></div>
+    <div><span class="lbl">Aaj P&amp;L</span><b id="d-pnl">$0</b></div>
+  </div>
+  <div id="status" class="status ok"><span class="dot"></span><span id="status-text">Loading…</span></div>
+  <p class="save-note" id="save-note"></p>
+
+  <!-- Post-trade: must be completed before any new trade -->
+  <div id="open-card" class="card" hidden>
+    <h2>Trade chal raha hai. Band hone ke baad 4 tap.</h2>
+    <div class="readouts" id="open-sum"></div>
+    <div class="q"><span class="qlabel">Result</span>
+      <div class="seg">
+        <label><input type="radio" name="res" value="tp" class="t-good" id="res-tp"><span>TP hit</span></label>
+        <label><input type="radio" name="res" value="sl" class="t-bad" id="res-sl"><span>SL hit</span></label>
+        <label><input type="radio" name="res" value="manual" id="res-man"><span>Haath se exit</span></label>
+      </div>
+    </div>
+    <div class="q" id="manual-box" hidden><span class="qlabel">Kitne $ ka move mila? (− loss, + profit)</span>
+      <div class="stepper">
+        <button type="button" class="step-btn" data-d="-5">−5</button>
+        <button type="button" class="step-btn" data-d="-1">−1</button>
+        <output id="mv-out">$0</output>
+        <button type="button" class="step-btn" data-d="1">+1</button>
+        <button type="button" class="step-btn" data-d="5">+5</button>
+      </div>
+    </div>
+    <div class="q"><span class="qlabel">SL move kiya?</span>
+      <div class="seg">
+        <label><input type="radio" name="moved" value="no" class="t-good" id="mv-no"><span>Nahi</span></label>
+        <label><input type="radio" name="moved" value="yes" class="t-bad" id="mv-yes"><span>Haan</span></label>
+      </div>
+    </div>
+    <div class="q"><span class="qlabel">Entry ke baad screen dekhi?</span>
+      <div class="seg">
+        <label><input type="radio" name="watched" value="no" class="t-good" id="wt-no"><span>Nahi</span></label>
+        <label><input type="radio" name="watched" value="yes" class="t-bad" id="wt-yes"><span>Haan</span></label>
+      </div>
+    </div>
+    <div class="q"><span class="qlabel">Kaisa raha? (kam se kam ek tap)</span>
+      <div class="tags" id="tags"></div>
+    </div>
+    <div class="q"><label class="qlabel" for="note">Note (optional)</label><textarea class="in" id="note" placeholder="Chaho to ek line, warna chhod do"></textarea></div>
+    <div class="msgs" id="close-msgs"></div>
+    <button class="btn" id="close-btn" disabled>Trade close &amp; save</button>
+  </div>
+
+  <!-- Pre-trade gate: built from STEPS in script -->
+  <form id="plan" class="wrap" autocomplete="off">
+    <div id="steps" class="wrap"></div>
+    <button class="btn" type="submit" id="go" disabled>Trade lo</button>
+    <p class="gatehint" id="gatehint">Har step pass hone par hi agla step khulega.</p>
+  </form>
+
+  <div id="locked-card" class="card" hidden>
+    <h2 id="locked-title">Aaj ke liye band</h2>
+    <p style="margin:0" id="locked-text"></p>
+    <p class="save-note">Kal naya din. Checklist kal apne aap khul jayegi.</p>
+  </div>
+</section>
+
+<div id="pop" class="pop" hidden role="dialog" aria-modal="true" aria-labelledby="pop-title"><div class="pop-card"><span class="pop-badge" id="pop-badge"></span><h2 id="pop-title"></h2><p class="pop-reason" id="pop-reason"></p><p class="pop-msg" id="pop-msg"></p><div class="pop-actions" id="pop-actions"></div></div></div>
+
+<section id="view-journal" class="wrap" hidden>
+  <div class="card" id="acct">
+    <h2>Account &amp; backup</h2>
+    <div class="who"><img id="who-pic" alt="" hidden><div><b id="who-name"></b><small id="who-email"></small></div></div>
+    <p class="save-note" id="acct-status">Checking…</p>
+    <div class="acct-btns">
+      <button class="btn ghost" id="bk-save" type="button">Backup file save karo</button>
+      <label class="btn ghost" for="bk-file" tabindex="0">Backup se restore</label>
+      <input type="file" id="bk-file" accept=".json,application/json" hidden>
+    </div>
+    <button class="btn ghost" id="sign-out" type="button">Sign out</button>
+    <div class="msgs" id="acct-msg"></div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div id="journal" class="wrap"></div>
+</section>
+</div>
+
+<script src="../firebase-config.js"></script>
+<script>
+(() => {
+const R = { tp:15, lots:2, perDollar:10 };
+const PER = R.lots * R.perDollar; // $ per $1 move
+const $ = id => document.getElementById(id);
+const money = n => (n < 0 ? '−$' : '$') + Math.abs(Math.round(n)).toLocaleString();
+const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const LS = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- the rules, as tap questions ---------- */
+const STEPS = [
+  { idx:'00', title:'Pehle', tf:'Session start', rule:'USD high-impact news check karo. 5pm close ke baad levels mark karo.',
+    qs:[ { k:'news', t:'tick', text:'News check kiya, abhi koi USD high-impact news nahi' },
+         { k:'lvl5', t:'tick', text:'5pm close ke baad levels mark kiye' } ],
+    check: d => [ !d.news && ['bad','News check karo.'], !d.lvl5 && ['bad','Levels mark karo.'] ] },
+  { idx:'01', title:'Liquidity', tf:'4H / Daily', rule:'Liquidity level mark karo. Next liquidity kam se kam $15 door ho, warna skip.',
+    qs:[ { k:'dir', t:'seg', label:'Direction', opts:[['long','Long','t-good'],['short','Short','t-bad']] },
+         { k:'liq', t:'seg', label:'Next liquidity kitni door?', opts:[['lt15','< $15','t-bad'],['15','$15–20'],['20','$20–30'],['30','$30+']] },
+         { k:'fail', t:'seg', label:'Ye level aaj pehle fail hua (loss)?', opts:[['no','Nahi','t-good'],['yes','Haan','t-bad']] } ],
+    check: d => [ !d.dir && ['bad','Direction choose karo.'],
+                  !d.liq && ['bad','Liquidity distance choose karo.'],
+                  d.liq === 'lt15' && ['bad','Liquidity $15 se kam door hai. Rule: warna skip.','hard'],
+                  !d.fail && ['bad','Level fail hua ya nahi, batao.'],
+                  d.fail === 'yes' && ['bad','Ye level aaj fail ho chuka hai. Rule: level fail = re-entry nahi.','hard'] ] },
+  { idx:'02', title:'Trend', tf:'15m + 5m', rule:'Dono ka trend same side? 1m ulta chal raha = sirf retracement.',
+    qs:[ { k:'t15', t:'seg', label:'15m trend', opts:[['up','Up ↑'],['down','Down ↓']] },
+         { k:'t5', t:'seg', label:'5m trend', opts:[['up','Up ↑'],['down','Down ↓']] },
+         { k:'retr', t:'tick', text:'1m ulta chal raha hai = sirf retracement, reversal nahi' } ],
+    check: d => { const want = d.dir === 'long' ? 'up' : 'down';
+      return [ (!d.t15 || !d.t5) && ['bad','15m aur 5m trend choose karo.'],
+               d.t15 && d.t5 && d.t15 !== d.t5 && ['bad','15m aur 5m ka trend alag side hai. Rule: dono same side.','hard'],
+               d.t15 && d.t5 && d.t15 === d.t5 && d.t15 !== want && ['bad',`Trend ${d.t15} hai, tum ${d.dir} le rahe ho. Rule: trend ke saath hi trade.`,'hard'],
+               !d.retr && ['bad','1m retracement confirm karo.'] ]; } },
+  { idx:'03', title:'Entry', tf:'1m', rule:'Retracement 4H level tak aaye. Pehli rejection candle ka low (short) / high (long) toote = entry.',
+    qs:[ { k:'reached', t:'tick', text:'Retracement 4H level tak aa gaya' },
+         { k:'broke', t:'tick', text: d => d.dir === 'short' ? 'Pehli rejection candle ka LOW toota' : d.dir === 'long' ? 'Pehli rejection candle ka HIGH toota' : 'Pehli rejection candle ka low/high toota' } ],
+    check: d => [ !d.reached && ['bad','Level tak aane do. Wait.'], !d.broke && ['bad','Pehli rejection candle break hone do.'] ] },
+  { idx:'04', title:'Exit', tf:'SL · TP · Lot', rule:'SL retracement high ke upar, $4–5 (max $6), kabhi move nahi. TP fixed $15. Lot 2 MGC.',
+    qs:[ { k:'sld', t:'seg', label:'SL kitne $ ka? (retracement high/low ke paar)', opts:[['3','$3','t-bad'],['4','$4'],['5','$5'],['6','$6'],['7','$7+','t-bad']] },
+         { k:'ro', t:'readout' },
+         { k:'nomove', t:'tick', text:'SL + TP order lag gaya. SL kabhi move nahi karunga.' },
+         { k:'alert', t:'tick', text:'Alert laga diya. Ab screen band.' } ],
+    check: d => [ !d.sld && ['bad','SL distance choose karo.'],
+                  d.sld === '3' && ['bad','SL sirf $3, bahut tight. Rule: $4–5.','hard'],
+                  d.sld === '7' && ['bad','SL $6 se zyada chahiye. Rule: max $6.','hard'],
+                  d.sld === '6' && ['warn','$6 allowed hai, par ideal $4–5.'],
+                  !d.nomove && ['bad','SL/TP order lagao.'], !d.alert && ['bad','Alert lagao.'] ] },
+];
+const TAGS = ['Plan follow kiya','Patience rakha','Jaldi entry','Late entry','FOMO','Dar laga','Greedy','Revenge mood','Thaka hua'];
+
+/* ---------- build the form once ---------- */
+const stepsEl = $('steps');
+STEPS.forEach((s, i) => {
+  const fs = document.createElement('fieldset'); fs.className = 'step'; fs.id = 's' + i;
+  let h = `<legend class="shead"><span class="idx">${s.idx}</span><span class="stitle">${s.title}</span><span class="tf">${s.tf}</span><span class="chip wait" id="c${i}">Pending</span></legend><p class="rule">${s.rule}</p>`;
+  s.qs.forEach(q => {
+    if (q.t === 'tick') h += `<label class="chk"><input type="checkbox" id="q-${q.k}" data-k="${q.k}"><span id="qt-${q.k}"></span></label>`;
+    if (q.t === 'seg') h += `<div class="q"><span class="qlabel">${q.label}</span><div class="seg">` +
+      q.opts.map(([v,l,c]) => `<label><input type="radio" name="${q.k}" value="${v}" id="q-${q.k}-${v}" class="${c||''}"><span>${l}</span></label>`).join('') + `</div></div>`;
+    if (q.t === 'readout') h += `<div class="readouts"><div class="ro" id="ro-risk"><span class="lbl">Risk</span><b>—</b></div><div class="ro good"><span class="lbl">TP</span><b>+$15 · ${money(R.tp*PER)}</b></div><div class="ro"><span class="lbl">Lot</span><b>2 MGC</b></div></div>`;
+  });
+  h += `<div class="msgs" id="m${i}"></div>`;
+  fs.innerHTML = h; stepsEl.appendChild(fs);
+});
+$('tags').innerHTML = TAGS.map((t,i) => `<label><input type="checkbox" value="${esc(t)}" id="tag-${i}"><span>${esc(t)}</span></label>`).join('');
+
+/* ---------- storage: Firebase (Google account), same project as Fuel Receipts ---------- */
+const FB_VERSION = '10.12.2';
+let trades = [], col = null, unsub = null;
+// Firestore keeps a local copy and syncs later, so never let a slow network block the screen.
+const settle = p => Promise.race([p, new Promise(r => setTimeout(r, 1500))]);
+const store = {
+  async save(t){ if (col) await settle(col.doc(t.id).set(t)); else { trades = trades.filter(x => x.id !== t.id).concat([t]); LS.set('gtd.trades', trades); renderAll(); } },
+  async remove(id){ if (col) await settle(col.doc(id).delete()); else { trades = trades.filter(x => x.id !== id); LS.set('gtd.trades', trades); renderAll(); } }
+};
+const setNote = t => { $('save-note').textContent = t; $('acct-status').textContent = t; };
+const authMsg = (k, t) => msgs($('auth-msg'), t ? [[k, t]] : []);
+function loadScript(src){
+  return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error(src)); document.head.appendChild(el); });
+}
+function showAuth(){
+  if (unsub) { unsub(); unsub = null; }
+  col = null; trades = [];
+  $('app').hidden = true; $('auth').hidden = false;
+}
+async function startUser(user){
+  $('auth').hidden = true; $('app').hidden = false;
+  $('who-name').textContent = user.displayName || 'Signed in';
+  $('who-email').textContent = user.email || '';
+  if (user.photoURL) { $('who-pic').src = user.photoURL; $('who-pic').hidden = false; } else $('who-pic').hidden = true;
+  col = firebase.firestore().collection('users').doc(user.uid).collection('trades');
+  setNote('Connecting…'); renderAll();
+  // move any trades saved only on this device into the account
+  const local = LS.get('gtd.trades') || [];
+  if (local.length) { for (const t of local) col.doc(t.id).set(t).catch(() => {}); LS.set('gtd.trades', []); }
+  if (unsub) unsub();
+  unsub = col.onSnapshot({ includeMetadataChanges: true }, snap => {
+    setNote(snap.metadata.fromCache ? 'Offline. Trades phone pe save hain, internet aate hi sync ho jayenge.' : 'Synced to your Google account. Har device pe same journal.');
+    trades = snap.docs.map(d => d.data()); renderAll();
+  }, () => setNote('Sync ruk gaya. Sign out karke dobara sign in karo.'));
+}
+const AUTH_ERR = {
+  'auth/popup-blocked': 'Browser ne Google window block kar di. Safari ya Chrome me kholo.',
+  'auth/operation-not-supported-in-this-environment': 'Is browser me Google sign-in nahi chalta. Safari ya Chrome me kholo.',
+  'auth/web-storage-unsupported': 'Is browser me Google sign-in nahi chalta. Safari ya Chrome me kholo.',
+  'auth/network-request-failed': 'Internet nahi hai. Connect karke dobara try karo.',
+  'auth/unauthorized-domain': 'Ye website abhi Firebase me allowed nahi hai (Authentication → Settings → Authorized domains).',
+  'auth/too-many-requests': 'Bahut baar try hua. Ek minute ruko.'
+};
+async function boot(){
+  const cfg = window.FIREBASE_CONFIG;
+  if (!cfg) { $('auth').hidden = false; $('google-btn').disabled = true; authMsg('bad', 'Firebase config missing hai (firebase-config.js).'); return; }
+  try {
+    if (!window.firebase) {
+      const base = `https://www.gstatic.com/firebasejs/${FB_VERSION}`;
+      await loadScript(`${base}/firebase-app-compat.js`);
+      await Promise.all([loadScript(`${base}/firebase-auth-compat.js`), loadScript(`${base}/firebase-firestore-compat.js`)]);
+    }
+  } catch { $('auth').hidden = false; $('google-btn').disabled = true; authMsg('bad', 'Load nahi ho paya. Internet check karke page reload karo.'); return; }
+  const { appCheckSiteKey, ...config } = cfg;
+  // On Firebase Hosting, sign in through this same site so Safari keeps the sign-in.
+  if (location.hostname === `${config.projectId}.firebaseapp.com` || location.hostname === `${config.projectId}.web.app`) config.authDomain = location.hostname;
+  if (!firebase.apps.length) firebase.initializeApp(config);
+  await firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(() => {});
+  firebase.auth().onAuthStateChanged(u => u ? startUser(u) : showAuth());
+  $('google-btn').addEventListener('click', () => {
+    authMsg();
+    firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+      authMsg('bad', AUTH_ERR[err.code] || err.message);
+    });
+  });
+  $('sign-out').addEventListener('click', () => firebase.auth().signOut());
+}
+
+/* ---------- day logic ---------- */
+const outcome = t => t.pnl > 0 ? 'win' : t.pnl < 0 ? 'loss' : 'be';
+function dayInfo(){
+  const todays = trades.filter(t => t.date === today());
+  const closed = todays.filter(t => t.status === 'closed');
+  const wins = closed.filter(t => outcome(t) === 'win').length;
+  const losses = closed.filter(t => outcome(t) === 'loss').length;
+  const pnl = closed.reduce((s,t) => s + (t.pnl||0), 0);
+  const open = trades.find(t => t.status === 'open');
+  let lock = null;
+  if (wins >= 2) lock = ['Win + win = band', 'Aaj 2 win ho gaye. Profit bachao, platform band karo.'];
+  else if (losses >= 2) lock = ['Do loss = band', 'Aaj 2 loss ho gaye. Revenge trade nahi. Kal fresh aao.'];
+  return { todays, wins, losses, pnl, open, lock };
+}
+
+/* ---------- pre-trade gate ---------- */
+const form = $('plan');
+function readDraft(){
+  const d = {};
+  STEPS.forEach(s => s.qs.forEach(q => {
+    if (q.t === 'tick') d[q.k] = $('q-' + q.k).checked;
+    if (q.t === 'seg') d[q.k] = (form.querySelector(`input[name="${q.k}"]:checked`) || {}).value || null;
+  }));
+  return d;
+}
+function restoreDraft(){
+  const d = LS.get('gtd.draft'); if (!d || d._date !== today()) return;
+  Object.entries(d).forEach(([k,v]) => {
+    if (v === true) { const el = $('q-' + k); if (el) el.checked = true; }
+    else if (typeof v === 'string') { const el = $(`q-${k}-${v}`); if (el) el.checked = true; }
+  });
+}
+function msgs(el, list){ el.innerHTML = ''; list.forEach(([k,t]) => { const p = document.createElement('p'); p.className = 'msg ' + k; p.textContent = t; el.appendChild(p); }); }
+const touched = (s, d) => s.qs.some(q => d[q.k]);
+
+let plan = null, lastVerdict = null;
+function evaluate(fromUser){
+  const d = readDraft();
+  LS.set('gtd.draft', Object.assign({ _date: today() }, d));
+  STEPS.forEach(s => s.qs.forEach(q => { if (q.t === 'tick') $('qt-' + q.k).textContent = typeof q.text === 'function' ? q.text(d) : q.text; }));
+  const risk = $('ro-risk');
+  if (d.sld) { const n = +d.sld; risk.className = 'ro ' + (n < 4 || n > 6 ? 'bad' : n === 6 ? 'warn' : 'good'); risk.querySelector('b').textContent = `−$${d.sld}${n>6?'+':''} · ${money(-n*PER)}`; }
+  else { risk.className = 'ro'; risk.querySelector('b').textContent = '—'; }
+
+  let open = true, all = true, hard = null;
+  STEPS.forEach((s, i) => {
+    const m = s.check(d).filter(Boolean);
+    const ok = !m.some(x => x[0] === 'bad');
+    const fs = $('s' + i), chip = $('c' + i), t = touched(s, d);
+    fs.disabled = !open;
+    fs.classList.toggle('done', open && ok);
+    fs.classList.toggle('fail', open && !ok && t);
+    chip.className = 'chip ' + (!open ? 'wait' : ok ? 'pass' : t ? 'stop' : 'wait');
+    chip.textContent = !open ? 'Locked' : ok ? 'Pass' : t ? 'Rule fail' : 'Pending';
+    // only show blocking messages once the step has been touched; show the first one only to keep it short
+    const show = !open ? [] : ok ? m : (t ? m.filter(x => x[2] === 'hard').slice(0,1) : []);
+    msgs($('m' + i), show);
+    if (open && !hard) hard = m.find(x => x[2] === 'hard') || null;
+    if (!ok) { open = false; all = false; }
+  });
+  $('go').disabled = !all;
+  $('gatehint').textContent = all ? 'Sab rules pass. Order lagao aur yahan record karo.' : 'Har step pass hone par hi agla step khulega.';
+  plan = all ? { dir:d.dir, liq:d.liq, t15:d.t15, t5:d.t5, sld:+d.sld } : null;
+  const key = hard ? hard[1] : all ? 'go' : null;
+  if (fromUser && key && key !== lastVerdict) { if (hard) showNo(hard[1]); else showGo(d); }
+  lastVerdict = key;
+}
+form.addEventListener('change', () => evaluate(true));
+
+/* ---------- verdict pop-ups ---------- */
+const MSG = {
+  go: ['All the best! Plan pe bharosa rakho.', 'A+ setup. Order lagao aur screen band.', 'Tumhara kaam ho gaya, ab market ka kaam.', 'SL fixed, TP fixed, dimaag free. Jao!', 'Process follow kiya = aadhi jeet already.', 'Confidence se lo. Rules tumhare saath hain.', 'Alert pe milte hain. Best of luck!'],
+  no: ['Wait karo, setup phir aayega.', 'Market kahin nahi ja raha. Next setup pakka aayega.', 'No trade bhi ek trade hai.', 'Paisa bachaya = paisa kamaya.', 'Sabr rakho. Sahi setup khud chal ke aayega.', 'Skip karna bhi skill hai. Shabaash.', 'Aaj ka best trade shayad ye skip hi hai.', 'Bina setup ke trade = gamble. Hum gamble nahi karte.'],
+  win: ['Shabaash! Plan ne kaam kiya.', 'Bank kar liya. Ab aaram karo.', 'Discipline = profit. Aise hi chalte raho.', 'Clean trade. Aisa hi chahiye roz.'],
+  loss: ['SL hit = business ka kharcha. Rules follow kiye, yahi jeet hai.', 'Ek loss se kuch nahi badalta. Process pe raho.', 'Pro traders bhi SL khaate hain. Tum sahi raste pe ho.', 'Chhota loss, bada sabak. Revenge mat lena.'],
+  brk: ['Is baar rule toota. Agli baar sirf process.', 'Profit ho ya loss, rule todna sabse bada loss hai.', 'Note kar liya. Kal se SL aur screen dono pe control.']
+};
+const lastPick = {};
+function pick(k){ const l = MSG[k]; let i; do { i = Math.floor(Math.random() * l.length); } while (l.length > 1 && i === lastPick[k]); lastPick[k] = i; return l[i]; }
+function pop(kind, badge, title, reason, msg, actions){
+  const p = $('pop'); p.className = 'pop ' + kind;
+  $('pop-badge').textContent = badge; $('pop-title').textContent = title;
+  $('pop-reason').textContent = reason || ''; $('pop-msg').textContent = msg;
+  const a = $('pop-actions'); a.innerHTML = '';
+  actions.forEach(([label, cls, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + cls; b.textContent = label; b.addEventListener('click', () => { p.hidden = true; fn && fn(); }); a.appendChild(b); });
+  p.hidden = false; a.firstChild && a.firstChild.focus();
+}
+function resetPlan(){ form.reset(); LS.set('gtd.draft', null); lastVerdict = null; evaluate(); window.scrollTo({ top: 0 }); }
+function showNo(reason){
+  pop('no', 'Rule fail', 'Mat lo', reason, pick('no'), [['Theek hai, checklist reset', '', resetPlan], ['Galat tap hua, wapas jao', 'ghost']]);
+}
+function showGo(d){
+  const n = +d.sld;
+  pop('go', 'Sab rules pass', 'Trade lo', `${d.dir.toUpperCase()} · SL $${n} · TP $15 · Risk ${money(-n*PER)} · 2 MGC`, pick('go'), [['Trade le liya, save karo', '', () => form.requestSubmit()], ['Abhi nahi', 'ghost']]);
+}
+function showResult(t){
+  const lock = dayInfo().lock;
+  const kind = t.pnl > 0 ? 'go' : t.pnl < 0 ? 'no' : '';
+  const br = (t.ruleBreaks || []).length;
+  const msg = br ? pick('brk') : t.pnl >= 0 ? pick('win') : pick('loss');
+  const reason = [br ? 'Rule break: ' + t.ruleBreaks.join(', ') : 'Sab rules follow kiye', lock ? lock[0] + '. Aaj ke liye band.' : ''].filter(Boolean).join(' · ');
+  pop(kind, t.pnl > 0 ? 'Win' : t.pnl < 0 ? 'Loss' : 'Breakeven', money(t.pnl), reason, msg, [['Theek hai', '']]);
+}
+form.addEventListener('submit', async e => {
+  e.preventDefault(); evaluate();
+  const info = dayInfo(); if (!plan || info.open || info.lock) return;
+  const t = Object.assign({ id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), lots: R.lots, status:'open' }, plan);
+  $('go').disabled = true;
+  try { await store.save(t); form.reset(); LS.set('gtd.draft', null); renderAll(); window.scrollTo({ top: 0 }); }
+  catch { $('gatehint').textContent = 'Save nahi hua. Internet check karke dobara try karo.'; $('go').disabled = false; }
+});
+
+/* ---------- post-trade ---------- */
+let manualMove = 0;
+const checked = n => (document.querySelector(`#open-card input[name="${n}"]:checked`) || {}).value;
+function closePnl(t){ const r = checked('res'); return r === 'tp' ? R.tp*PER : r === 'sl' ? -t.sld*PER : r === 'manual' ? manualMove*PER : null; }
+function openTradeView(t){
+  const liqTxt = { '15':'$15–20', '20':'$20–30', '30':'$30+' }[t.liq] || t.liq;
+  $('open-sum').innerHTML = [['Direction', t.dir.toUpperCase()], ['SL', '−$' + t.sld], ['TP', '+$15'], ['Liquidity', liqTxt], ['Risk', money(-t.sld*PER)], ['Lot', t.lots + ' MGC']]
+    .map(([k,v]) => `<div class="ro"><span class="lbl">${k}</span><b>${esc(v)}</b></div>`).join('');
+  closeEval();
+}
+function closeEval(){
+  const t = dayInfo().open; if (!t) return;
+  const res = checked('res'), moved = checked('moved'), watched = checked('watched');
+  $('manual-box').hidden = res !== 'manual';
+  $('mv-out').textContent = (manualMove > 0 ? '+$' : manualMove < 0 ? '−$' : '$') + Math.abs(manualMove);
+  const tags = [...document.querySelectorAll('#tags input:checked')];
+  const m = [];
+  if (res === 'manual') m.push(['warn','Haath se exit = rule break. TP $15 fixed tha.']);
+  if (moved === 'yes') m.push(['warn','SL move kiya = rule break.']);
+  if (watched === 'yes') m.push(['warn','Screen dekhi = rule break. Agli baar alert pe aao.']);
+  const p = closePnl(t);
+  if (p != null) m.push([p >= 0 ? 'good' : 'bad', 'P&L: ' + money(p)]);
+  msgs($('close-msgs'), m);
+  $('close-btn').disabled = !(res && moved && watched && tags.length);
+}
+$('open-card').addEventListener('change', closeEval);
+$('open-card').addEventListener('input', closeEval);
+document.querySelectorAll('.step-btn').forEach(b => b.addEventListener('click', () => { manualMove = Math.max(-30, Math.min(30, manualMove + +b.dataset.d)); closeEval(); }));
+$('close-btn').addEventListener('click', async () => {
+  const t = dayInfo().open; if (!t) return;
+  const res = checked('res'), breaks = [];
+  if (res === 'manual') breaks.push('Manual exit');
+  if (checked('moved') === 'yes') breaks.push('SL moved');
+  if (checked('watched') === 'yes') breaks.push('Screen dekhi');
+  const done = Object.assign({}, t, { status:'closed', result:res, closedAt: Date.now(), pnl: closePnl(t),
+    move: res === 'tp' ? R.tp : res === 'sl' ? -t.sld : manualMove,
+    ruleBreaks: breaks, tags: [...document.querySelectorAll('#tags input:checked')].map(x => x.value), note: $('note').value.trim() });
+  $('close-btn').disabled = true;
+  try {
+    await store.save(done);
+    document.querySelectorAll('#open-card input').forEach(r => r.checked = false);
+    $('note').value = ''; manualMove = 0; renderAll(); showResult(done);
+  } catch { msgs($('close-msgs'), [['bad','Save nahi hua. Internet check karke dobara try karo.']]); $('close-btn').disabled = false; }
+});
+
+/* ---------- journal ---------- */
+function renderJournal(){
+  const closed = trades.filter(t => t.status === 'closed').sort((a,b) => b.createdAt - a.createdAt);
+  const wins = closed.filter(t => outcome(t) === 'win').length;
+  const net = closed.reduce((s,t) => s + (t.pnl||0), 0);
+  const clean = closed.filter(t => !(t.ruleBreaks||[]).length).length;
+  $('stats').innerHTML = [['Total trades', String(closed.length), ''],
+    ['Win rate', closed.length ? Math.round(wins/closed.length*100) + '%' : '—', ''],
+    ['Net P&L', money(net), net > 0 ? 'pos' : net < 0 ? 'neg' : ''],
+    ['Rules followed', closed.length ? Math.round(clean/closed.length*100) + '%' : '—', closed.length && clean === closed.length ? 'pos' : '']]
+    .map(([k,v,c]) => `<div class="stat"><span class="lbl">${k}</span><b class="${c}">${v}</b></div>`).join('');
+  const j = $('journal'); j.innerHTML = '';
+  if (!closed.length) { j.innerHTML = '<div class="empty">Abhi koi closed trade nahi. Trade tab pe checklist pass karo, trade close karne ke baad yahan dikhega.</div>'; return; }
+  const byDay = {};
+  closed.forEach(t => (byDay[t.date] = byDay[t.date] || []).push(t));
+  Object.keys(byDay).sort().reverse().forEach(day => {
+    const list = byDay[day], dp = list.reduce((s,t) => s + t.pnl, 0);
+    const g = document.createElement('div'); g.className = 'daygrp';
+    g.innerHTML = `<div class="dayh"><span>${new Date(day + 'T12:00').toLocaleDateString(undefined, { weekday:'short', day:'numeric', month:'short' })}</span><span class="num ${dp >= 0 ? 'pos' : 'neg'}">${money(dp)}</span></div>`;
+    list.forEach(t => g.appendChild(tradeRow(t)));
+    j.appendChild(g);
+  });
+}
+function tradeRow(t){
+  const el = document.createElement('details'); el.className = 'tr';
+  const br = t.ruleBreaks || [];
+  const resTxt = { tp:'TP hit', sl:'SL hit', manual:'Manual exit' }[t.result];
+  const liqTxt = { '15':'$15–20', '20':'$20–30', '30':'$30+' }[t.liq] || '';
+  el.innerHTML = `<summary><span class="dir ${t.dir}">${t.dir}</span><span class="trmid"><span>${resTxt}</span><small>${new Date(t.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} · SL $${t.sld} · Liq ${liqTxt}</small></span><span class="trpnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${money(t.pnl)}</span></summary>
+    <div class="trbody"><span class="flag ${br.length ? '' : 'clean'}">${br.length ? 'Rule break: ' + esc(br.join(', ')) : 'Sab rules follow kiye'}</span>
+    <div class="tags">${(t.tags||[]).map(x => `<span>${esc(x)}</span>`).join('')}</div>
+    ${t.note ? `<p class="lesson">${esc(t.note)}</p>` : ''}
+    <div><button class="btn ghost" type="button">Delete</button></div></div>`;
+  const del = el.querySelector('button'); let armed = null;
+  del.addEventListener('click', async () => {
+    if (!armed) { del.textContent = 'Pakka delete?'; del.classList.add('danger'); armed = setTimeout(() => { armed = null; del.textContent = 'Delete'; del.classList.remove('danger'); }, 3000); return; }
+    clearTimeout(armed); del.disabled = true;
+    try { await store.remove(t.id); } catch { del.disabled = false; del.textContent = 'Delete nahi hua'; }
+  });
+  return el;
+}
+
+/* ---------- top-level render ---------- */
+function renderAll(){
+  const info = dayInfo();
+  $('d-count').textContent = info.todays.length;
+  $('d-win').textContent = info.wins;
+  $('d-loss').textContent = info.losses;
+  $('d-pnl').textContent = money(info.pnl); $('d-pnl').className = info.pnl > 0 ? 'pos' : info.pnl < 0 ? 'neg' : '';
+  const st = $('status');
+  if (info.open) { st.className = 'status open'; $('status-text').textContent = 'Trade open hai. Close karke result bharo, tabhi agla trade khulega.'; }
+  else if (info.lock) { st.className = 'status lock'; $('status-text').textContent = info.lock[0] + '. Aaj aur trade nahi.'; }
+  else { st.className = 'status ok'; $('status-text').textContent = 'Trading allowed. Upar se neeche tap karte jao.'; }
+  $('open-card').hidden = !info.open;
+  $('locked-card').hidden = !(info.lock && !info.open);
+  form.hidden = !!(info.open || info.lock);
+  if (info.lock) { $('locked-title').textContent = info.lock[0]; $('locked-text').textContent = info.lock[1]; }
+  if (info.open) openTradeView(info.open); else evaluate();
+  renderJournal();
+}
+
+/* ---------- tabs ---------- */
+function show(tab){
+  $('tab-trade').setAttribute('aria-selected', tab === 'trade');
+  $('tab-journal').setAttribute('aria-selected', tab === 'journal');
+  $('view-trade').hidden = tab !== 'trade';
+  $('view-journal').hidden = tab !== 'journal';
+}
+$('tab-trade').addEventListener('click', () => show('trade'));
+$('tab-journal').addEventListener('click', () => show('journal'));
+
+/* ---------- backup / restore ---------- */
+const acctMsg = (k, t) => msgs($('acct-msg'), [[k, t]]);
+$('bk-save').addEventListener('click', async () => {
+  const data = JSON.stringify({ app:'gold-trade-gate', v:1, exportedAt: new Date().toISOString(), trades }, null, 1);
+  const name = `gold-trades-${today()}.json`;
+  const file = new File([data], name, { type: 'application/json' });
+  // On a phone the share sheet lets you put the file straight into Google Drive or Files.
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'Gold Trade Gate backup' }); acctMsg('good', `Backup ready (${trades.length} trades).`); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  acctMsg('good', `Backup download ho gaya (${trades.length} trades).`);
+});
+$('bk-file').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const obj = JSON.parse(await f.text());
+    const arr = Array.isArray(obj) ? obj : obj.trades;
+    const ok = (arr || []).filter(t => t && typeof t.id === 'string' && typeof t.date === 'string' && (t.status === 'open' || t.status === 'closed'));
+    if (!ok.length) { acctMsg('bad', 'Is file me koi trade nahi mila. Sahi backup file chuno.'); return; }
+    for (const t of ok) await store.save(t);
+    acctMsg('good', `${ok.length} trades restore ho gaye.`);
+  } catch { acctMsg('bad', 'Ye file padh nahi paya. App se save ki hui .json backup file chuno.'); }
+});
+$('bk-file').previousElementSibling.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('bk-file').click(); } });
+
+restoreDraft();
+boot();
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('../sw.js').catch(() => {});
+let lastDay = today();
+setInterval(() => { if (today() !== lastDay) { lastDay = today(); renderAll(); } }, 60000);
+})();
+</script>
+</body>
+</html>
