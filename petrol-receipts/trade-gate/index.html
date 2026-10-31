@@ -402,7 +402,8 @@ async function boot(){
   } catch { $('auth').hidden = false; $('google-btn').disabled = true; authMsg('bad', 'Load nahi ho paya. Internet check karke page reload karo.'); return; }
   const { appCheckSiteKey, ...config } = cfg;
   // On Firebase Hosting, sign in through this same site so Safari keeps the sign-in.
-  if (location.hostname === `${config.projectId}.firebaseapp.com` || location.hostname === `${config.projectId}.web.app`) config.authDomain = location.hostname;
+  // (Only firebaseapp.com: its sign-in handler is the one registered with Google.)
+  if (location.hostname === `${config.projectId}.firebaseapp.com`) config.authDomain = location.hostname;
   if (!firebase.apps.length) firebase.initializeApp(config);
   await firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(() => {});
   firebase.auth().onAuthStateChanged(u => u ? startUser(u) : showAuth());
