@@ -140,7 +140,19 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .gatehint{text-align:center;font-size:13px;color:var(--muted);margin:0}
 
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.stats .stat:nth-child(5){grid-column:1/-1}
+.stats .stat.wide{grid-column:1/-1}
+.stats .stat.wide b{font-size:18px}
+.skips{display:flex;flex-direction:column;gap:8px}
+.skips:empty{display:none}
+.skip{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.skip-top{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+.skip-top small{color:var(--muted)}
+.skip .why{margin:0;color:var(--muted);overflow-wrap:anywhere}
+.skip .seg span{padding:9px 4px;font-size:14px}
+.skip .res{font-weight:600;font-size:13px}
+.res.saved{color:var(--good)} .res.missed{color:var(--bad)} .res.unknown{color:var(--muted)}
+.sec-h{font-family:var(--f-display);font-size:20px;font-weight:700;margin:6px 0 0}
+.cool{font-family:var(--f-num);font-size:34px;font-weight:500;color:var(--bad);margin:0}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:2px}
 .stat b{font-family:var(--f-num);font-size:24px;font-weight:500}
 .pos{color:var(--good)} .neg{color:var(--bad)}
@@ -313,7 +325,8 @@ details.tr summary::-webkit-details-marker{display:none}
   <div id="locked-card" class="card" hidden>
     <h2 id="locked-title">Aaj ke liye band</h2>
     <p style="margin:0" id="locked-text"></p>
-    <p class="save-note">Kal naya din. Checklist kal apne aap khul jayegi.</p>
+    <p class="cool" id="locked-timer" hidden></p>
+    <p class="save-note" id="locked-note">Kal naya din. Checklist kal apne aap khul jayegi.</p>
   </div>
 </section>
 
@@ -350,8 +363,19 @@ details.tr summary::-webkit-details-marker{display:none}
       <label for="sess-end">End (ET)<input class="in" type="time" id="sess-end" value="11:00"></label>
     </div>
     <div class="msgs" id="sess-msg"></div>
+    <h2 style="font-size:19px">Loss ke baad cooldown</h2>
+    <p class="save-note">SL hit hone ke baad itni der naya trade band rahega, taaki revenge trade na ho.</p>
+    <div class="tags" id="cool-opts">
+      <label><input type="radio" name="cool" value="0" id="cool-0"><span>Band</span></label>
+      <label><input type="radio" name="cool" value="20" id="cool-20"><span>20 min</span></label>
+      <label><input type="radio" name="cool" value="30" id="cool-30"><span>30 min</span></label>
+      <label><input type="radio" name="cool" value="45" id="cool-45"><span>45 min</span></label>
+      <label><input type="radio" name="cool" value="60" id="cool-60"><span>1 ghanta</span></label>
+    </div>
+    <div class="msgs" id="cool-msg"></div>
   </div>
   <div class="stats" id="stats"></div>
+  <div id="skips" class="skips"></div>
   <div id="journal" class="wrap"></div>
 </section>
 </div>
@@ -422,7 +446,7 @@ const minLabel = n => { const h = Math.floor(n / 60) % 24, m = n % 60; return `$
 const relTime = ms => { const a = Math.round(Math.abs(ms) / 60000), h = Math.floor(a / 60), m = a % 60; const s = h ? `${h}h ${m}m` : `${m}m`; return ms >= 0 ? `${s} baad` : `${s} pehle`; };
 
 const SESSIONS = { london: ['03:00','06:00','London'], ny: ['08:00','11:00','New York'], both: ['03:00','11:00','London + NY'] };
-let settings = LS.get('gtd.settings') || { session: { mode: 'off' } };
+let settings = Object.assign({ session: { mode: 'off' }, cooldown: 30 }, LS.get('gtd.settings') || {});
 function sessionWindow(){
   const s = settings.session || { mode: 'off' };
   if (s.mode === 'off') return null;
@@ -487,6 +511,7 @@ function renderLive(){
   box.innerHTML = `<div class="live-row"><b>🕐 Session</b><span>${sess}</span></div><div class="live-row"><b>📰 USD news (ET)</b><div>${nw}</div></div>`;
 }
 function syncSessionUI(){
+  const c = document.querySelector(`input[name="cool"][value="${settings.cooldown || 0}"]`); if (c) c.checked = true;
   const s = settings.session || { mode: 'off' };
   const r = document.querySelector(`input[name="sess"][value="${s.mode}"]`); if (r) r.checked = true;
   $('sess-custom').hidden = s.mode !== 'custom';
@@ -505,6 +530,13 @@ function saveSession(){
   evaluate();
 }
 document.querySelectorAll('input[name="sess"]').forEach(r => r.addEventListener('change', saveSession));
+document.querySelectorAll('input[name="cool"]').forEach(r => r.addEventListener('change', () => {
+  const cooldown = +r.value;
+  settings = Object.assign({}, settings, { cooldown }); LS.set('gtd.settings', settings);
+  if (settingsDoc) settingsDoc.set({ cooldown }, { merge: true }).catch(() => {});
+  msgs($('cool-msg'), [['good', cooldown ? `Saved: loss ke baad ${cooldown} min break.` : 'Cooldown band hai.']]);
+  renderAll();
+}));
 $('sess-start').addEventListener('change', saveSession);
 $('sess-end').addEventListener('change', saveSession);
 
@@ -556,7 +588,7 @@ async function startUser(user){
   if (unsubSettings) unsubSettings();
   unsubSettings = settingsDoc.onSnapshot(snap => {
     const v = snap.exists ? snap.data() : null;
-    if (v && v.session) { settings = Object.assign({}, settings, { session: v.session }); LS.set('gtd.settings', settings); syncSessionUI(); evaluate(); }
+    if (v && (v.session || v.cooldown != null)) { settings = Object.assign({}, settings, v.session ? { session: v.session } : {}, v.cooldown != null ? { cooldown: v.cooldown } : {}); LS.set('gtd.settings', settings); syncSessionUI(); renderAll(); }
   }, () => {});
   setNote('Connecting…'); renderAll();
   // move any trades saved only on this device into the account
@@ -606,7 +638,7 @@ async function boot(){
 /* ---------- day logic ---------- */
 const outcome = t => t.pnl > 0 ? 'win' : t.pnl < 0 ? 'loss' : 'be';
 function dayInfo(){
-  const todays = trades.filter(t => t.date === today());
+  const todays = trades.filter(t => t.date === today() && t.status !== 'skipped');
   const closed = todays.filter(t => t.status === 'closed');
   const wins = closed.filter(t => outcome(t) === 'win').length;
   const losses = closed.filter(t => outcome(t) === 'loss').length;
@@ -615,7 +647,17 @@ function dayInfo(){
   let lock = null;
   if (wins >= 2) lock = ['Win + win = band', 'Aaj 2 win ho gaye. Profit bachao, platform band karo.'];
   else if (losses >= 2) lock = ['Do loss = band', 'Aaj 2 loss ho gaye. Revenge trade nahi. Kal fresh aao.'];
-  return { todays, wins, losses, pnl, open, lock };
+  // cooldown after a loss: the moment revenge trades happen
+  let cooldownUntil = 0;
+  const mins = +settings.cooldown || 0;
+  if (!lock && mins) {
+    const lastLoss = trades.filter(t => t.status === 'closed' && t.pnl < 0 && t.closedAt).sort((a, b) => b.closedAt - a.closedAt)[0];
+    if (lastLoss && Date.now() < lastLoss.closedAt + mins * 60e3) {
+      cooldownUntil = lastLoss.closedAt + mins * 60e3;
+      lock = ['Cooldown', `Loss ke baad ${mins} min ka break. Chart band karo, paani piyo, walk pe jao. Revenge trade yahin se shuru hota hai.`];
+    }
+  }
+  return { todays, wins, losses, pnl, open, lock, cooldownUntil };
 }
 
 /* ---------- pre-trade gate ---------- */
@@ -698,8 +740,14 @@ function pop(kind, badge, title, reason, msg, actions){
   p.hidden = false; a.firstChild && a.firstChild.focus();
 }
 function resetPlan(){ confirmedAgainst = false; form.reset(); LS.set('gtd.draft', null); lastVerdict = null; draftPhotos = []; mentor = null; renderPhotos(); renderMentor(); evaluate(); window.scrollTo({ top: 0 }); }
+function logSkip(reason){
+  const d = readDraft();
+  if (!d.dir) return; // nothing was being set up yet (e.g. news or session block before choosing a side)
+  store.save({ id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), status: 'skipped',
+    dir: d.dir, sld: d.sld && +d.sld <= 6 && +d.sld >= 4 ? +d.sld : null, liq: d.liq || null, reason, review: null }).catch(() => {});
+}
 function showNo(reason){
-  pop('no', 'Rule fail', 'Mat lo', reason, pick('no'), [['Theek hai, checklist reset', '', resetPlan], ['Galat tap hua, wapas jao', 'ghost']]);
+  pop('no', 'Rule fail', 'Mat lo', reason, pick('no'), [['Theek hai, skip kiya', '', () => { logSkip(reason); resetPlan(); }], ['Galat tap hua, wapas jao', 'ghost']]);
 }
 let confirmedAgainst = false;
 const currentMentor = () => mentor && mentor.forPhotos === photoKey(draftPhotos) ? mentor : null;
@@ -708,7 +756,7 @@ function showAgainst(mv){
   const bad = (mv.checks || []).filter(c => c.status === 'mismatch').map(c => `${RULE_NAMES[c.rule] || c.rule}: ${c.note}`);
   const msg = MSG_AGAINST[Math.floor(Math.random() * MSG_AGAINST.length)];
   pop('no', 'Mentor: ruko', 'Pakka lena hai?', bad.length ? bad.join(' · ') : (mv.headline || ''), msg, [
-    ['Nahi, skip karta hoon', '', resetPlan],
+    ['Nahi, skip karta hoon', '', () => { logSkip('Mentor: ' + (bad.length ? bad.join(' · ') : (mv.headline || 'ruko'))); resetPlan(); }],
     ['Haan, phir bhi lunga', 'ghost', () => { confirmedAgainst = true; form.requestSubmit(); }]
   ]);
 }
@@ -723,7 +771,8 @@ function showResult(t){
   const kind = t.pnl > 0 ? 'go' : t.pnl < 0 ? 'no' : '';
   const br = (t.ruleBreaks || []).length;
   const msg = br ? pick('brk') : t.pnl >= 0 ? pick('win') : pick('loss');
-  const reason = [br ? 'Rule break: ' + t.ruleBreaks.join(', ') : 'Sab rules follow kiye', lock ? lock[0] + '. Aaj ke liye band.' : ''].filter(Boolean).join(' · ');
+  const cd = dayInfo().cooldownUntil;
+  const reason = [br ? 'Rule break: ' + t.ruleBreaks.join(', ') : 'Sab rules follow kiye', cd ? `Ab ${settings.cooldown} min cooldown. Naya trade ${new Date(cd).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })} ke baad.` : lock ? lock[0] + '. Aaj ke liye band.' : ''].filter(Boolean).join(' · ');
   pop(kind, t.pnl > 0 ? 'Win' : t.pnl < 0 ? 'Loss' : 'Breakeven', money(t.pnl), reason, msg, [['Theek hai', '']]);
 }
 form.addEventListener('submit', async e => {
@@ -795,12 +844,18 @@ function renderJournal(){
   const clean = closed.filter(t => !(t.ruleBreaks||[]).length).length;
   const against = closed.filter(t => t.againstMentor);
   const againstPnl = against.reduce((s,t) => s + (t.pnl||0), 0);
-  const extra = against.length ? [['Mentor ke against', `${against.length} · ${money(againstPnl)}`, againstPnl > 0 ? 'pos' : againstPnl < 0 ? 'neg' : '']] : [];
+  const extra = against.length ? [['Mentor ke against', `${against.length} · ${money(againstPnl)}`, againstPnl > 0 ? 'pos' : againstPnl < 0 ? 'neg' : '', 'wide']] : [];
+  const skips = trades.filter(t => t.status === 'skipped').sort((a,b) => b.createdAt - a.createdAt);
+  const saved = skips.filter(t => t.review === 'saved'), missed = skips.filter(t => t.review === 'missed');
+  // estimate: a skip that would have lost saved its stop (or $5 if unknown); one that would have won cost the $15 target
+  const est = saved.reduce((s,t) => s + (t.sld || 5) * PER, 0) - missed.length * R.tp * PER;
+  if (saved.length + missed.length) extra.push(['Skip kiye trades: rules ka hisaab', `${saved.length} bachaye · ${missed.length} miss · ${money(est)} (andaza)`, est > 0 ? 'pos' : est < 0 ? 'neg' : '', 'wide']);
+  renderSkips(skips);
   $('stats').innerHTML = [['Total trades', String(closed.length), ''],
     ['Win rate', closed.length ? Math.round(wins/closed.length*100) + '%' : '—', ''],
     ['Net P&L', money(net), net > 0 ? 'pos' : net < 0 ? 'neg' : ''],
     ['Rules followed', closed.length ? Math.round(clean/closed.length*100) + '%' : '—', closed.length && clean === closed.length ? 'pos' : '']].concat(extra)
-    .map(([k,v,c]) => `<div class="stat"><span class="lbl">${k}</span><b class="${c}">${v}</b></div>`).join('');
+    .map(([k,v,c,w]) => `<div class="stat ${w || ''}"><span class="lbl">${k}</span><b class="${c}">${v}</b></div>`).join('');
   const j = $('journal'); j.innerHTML = '';
   if (!closed.length) { j.innerHTML = '<div class="empty">Abhi koi closed trade nahi. Trade tab pe checklist pass karo, trade close karne ke baad yahan dikhega.</div>'; return; }
   const byDay = {};
@@ -832,7 +887,44 @@ function tradeRow(t){
   return el;
 }
 
+function renderSkips(skips){
+  const box = $('skips'); box.innerHTML = '';
+  if (!skips.length) return;
+  const pending = skips.filter(t => !t.review);
+  const h = document.createElement('h3'); h.className = 'sec-h';
+  h.textContent = pending.length ? `Skip kiye trades · ${pending.length} ka result bharo` : 'Skip kiye trades';
+  box.appendChild(h);
+  if (pending.length) { const p = document.createElement('p'); p.className = 'save-note'; p.textContent = 'Chart dekho: agar trade lete to kya hota? Isse pata chalega rules sach me paisa bacha rahe hain ya nahi.'; box.appendChild(p); }
+  skips.slice(0, 15).forEach(t => {
+    const el = document.createElement('div'); el.className = 'skip';
+    const when = new Date(t.createdAt).toLocaleString(undefined, { weekday:'short', hour:'2-digit', minute:'2-digit' });
+    const resTxt = { saved:'✓ Bach gaya, loss hota', missed:'✗ Miss hua, TP hota', unknown:'? Pata nahi' }[t.review];
+    el.innerHTML = `<div class="skip-top"><span class="dir ${esc(t.dir)}">${esc(t.dir)}</span><small>${esc(when)}</small>
+      <button type="button" class="trash" aria-label="Skip entry hatao"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button></div>
+      <p class="why">${esc(t.reason || '')}</p>
+      ${t.review ? `<span class="res ${esc(t.review)}">${resTxt}</span>` : `<div class="seg">
+        <label><input type="radio" name="rv-${esc(t.id)}" value="saved" class="t-good"><span>Bach gaya</span></label>
+        <label><input type="radio" name="rv-${esc(t.id)}" value="missed" class="t-bad"><span>Miss hua</span></label>
+        <label><input type="radio" name="rv-${esc(t.id)}" value="unknown"><span>Pata nahi</span></label></div>`}`;
+    el.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => store.save(Object.assign({}, t, { review: r.value, reviewedAt: Date.now() })).catch(() => {})));
+    el.querySelector('.trash').addEventListener('click', () => store.remove(t.id).catch(() => {}));
+    box.appendChild(el);
+  });
+}
+
 /* ---------- top-level render ---------- */
+let cooldownActive = false;
+const fmtLeft = ms => { const t = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(t / 60), sec = t % 60; return `${m}:${String(sec).padStart(2,'0')} min`; };
+function tickCooldown(until){
+  const left = until - Date.now();
+  $('locked-timer').textContent = fmtLeft(left);
+  $('status-text').textContent = `Cooldown: ${fmtLeft(left)} baaki. Abhi trade nahi.`;
+}
+setInterval(() => {
+  if (!cooldownActive) return;
+  const info = dayInfo();
+  if (info.cooldownUntil) tickCooldown(info.cooldownUntil); else renderAll();
+}, 1000);
 function renderAll(){
   const info = dayInfo();
   $('d-count').textContent = info.todays.length;
@@ -841,12 +933,17 @@ function renderAll(){
   $('d-pnl').textContent = money(info.pnl); $('d-pnl').className = info.pnl > 0 ? 'pos' : info.pnl < 0 ? 'neg' : '';
   const st = $('status');
   if (info.open) { st.className = 'status open'; $('status-text').textContent = 'Trade open hai. Close karke result bharo, tabhi agla trade khulega.'; }
+  else if (info.cooldownUntil) { st.className = 'status lock'; $('status-text').textContent = `Cooldown: ${fmtLeft(info.cooldownUntil - Date.now())} baaki. Abhi trade nahi.`; }
   else if (info.lock) { st.className = 'status lock'; $('status-text').textContent = info.lock[0] + '. Aaj aur trade nahi.'; }
   else { st.className = 'status ok'; $('status-text').textContent = 'Trading allowed. Upar se neeche tap karte jao.'; }
   $('open-card').hidden = !info.open;
   $('locked-card').hidden = !(info.lock && !info.open);
   form.hidden = !!(info.open || info.lock);
   if (info.lock) { $('locked-title').textContent = info.lock[0]; $('locked-text').textContent = info.lock[1]; }
+  $('locked-timer').hidden = !info.cooldownUntil;
+  $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : 'Kal naya din. Checklist kal apne aap khul jayegi.';
+  cooldownActive = !!info.cooldownUntil;
+  if (info.cooldownUntil) tickCooldown(info.cooldownUntil);
   if (info.open) openTradeView(info.open); else evaluate();
   renderJournal();
 }
@@ -1089,7 +1186,7 @@ $('bk-file').addEventListener('change', async e => {
   try {
     const obj = JSON.parse(await f.text());
     const arr = Array.isArray(obj) ? obj : obj.trades;
-    const ok = (arr || []).filter(t => t && typeof t.id === 'string' && typeof t.date === 'string' && (t.status === 'open' || t.status === 'closed'));
+    const ok = (arr || []).filter(t => t && typeof t.id === 'string' && typeof t.date === 'string' && (t.status === 'open' || t.status === 'closed' || t.status === 'skipped'));
     if (!ok.length) { acctMsg('bad', 'Is file me koi trade nahi mila. Sahi backup file chuno.'); return; }
     for (const t of ok) await store.save(t);
     acctMsg('good', `${ok.length} trades restore ho gaye.`);
