@@ -142,6 +142,17 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .stats .stat.wide{grid-column:1/-1}
 .stats .stat.wide b{font-size:18px}
+.prop{gap:12px}
+.prop h2{font-size:19px}
+.pbar{display:flex;flex-direction:column;gap:5px}
+.pbar-top{display:flex;justify-content:space-between;gap:10px;font-size:13px;flex-wrap:wrap}
+.pbar-top b{font-weight:600}
+.pbar-top span{font-family:var(--f-num);font-size:12px;color:var(--muted)}
+.track{height:10px;border-radius:999px;background:var(--bg);overflow:hidden;border:1px solid var(--line)}
+.fill{height:100%;border-radius:999px;background:var(--good);transition:width .3s}
+.fill.warn{background:var(--warn)} .fill.bad{background:var(--bad)} .fill.gold{background:var(--gold)}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pgrid label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted);min-width:0}
 .skips{display:flex;flex-direction:column;gap:8px}
 .skips:empty{display:none}
 .skip{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
@@ -250,6 +261,10 @@ details.tr summary::-webkit-details-marker{display:none}
 </header>
 
 <section id="view-trade" class="wrap">
+  <div class="card prop" id="prop-card" hidden>
+    <h2 id="prop-title">Prop account</h2>
+    <div id="prop-bars" class="wrap" style="gap:12px"></div>
+  </div>
   <div class="daybar">
     <div><span class="lbl">Aaj trades</span><b id="d-count">0</b></div>
     <div><span class="lbl">Win</span><b id="d-win">0</b></div>
@@ -374,6 +389,29 @@ details.tr summary::-webkit-details-marker{display:none}
     </div>
     <div class="msgs" id="cool-msg"></div>
   </div>
+  <div class="card" id="prop-settings">
+    <h2>Prop account</h2>
+    <p class="save-note">Apni prop firm ke rules ek baar bhar do. App daily loss aur drawdown track karega, aur limit ke paas aate hi trade lock kar dega.</p>
+    <label class="chk"><input type="checkbox" id="p-on"><span>Prop account track karo</span></label>
+    <div class="pgrid">
+      <label for="p-size">Account size ($)<input class="in" id="p-size" inputmode="numeric" placeholder="50000"></label>
+      <label for="p-daily">Daily loss limit ($)<input class="in" id="p-daily" inputmode="numeric" placeholder="1000"></label>
+      <label for="p-dd">Max drawdown ($)<input class="in" id="p-dd" inputmode="numeric" placeholder="2000"></label>
+      <label for="p-target">Profit target ($)<input class="in" id="p-target" inputmode="numeric" placeholder="3000"></label>
+    </div>
+    <div class="q"><span class="qlabel">Drawdown kaisa hai?</span>
+      <div class="seg">
+        <label><input type="radio" name="p-type" value="eod" id="p-eod"><span>Trailing (end of day)</span></label>
+        <label><input type="radio" name="p-type" value="static" id="p-static"><span>Static</span></label>
+      </div>
+    </div>
+    <label class="field" for="p-start" style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)">Account kab shuru hua<input class="in" type="date" id="p-start"></label>
+    <button class="btn" type="button" id="p-save">Save karo</button>
+    <div class="q"><label class="qlabel" for="p-bal">Prop dashboard ka asli balance (fees/commission ke baad match karne ke liye)</label>
+      <div class="acct-btns"><input class="in" id="p-bal" inputmode="decimal" placeholder="50120.50" style="flex:1 1 140px"><button class="btn ghost" type="button" id="p-sync">Balance sync karo</button></div>
+    </div>
+    <div class="msgs" id="p-msg"></div>
+  </div>
   <div class="stats" id="stats"></div>
   <div id="skips" class="skips"></div>
   <div id="journal" class="wrap"></div>
@@ -431,6 +469,7 @@ const STEPS = [
     check: d => [ !d.sld && ['bad','SL distance choose karo.'],
                   d.sld === '3' && ['bad','SL sirf $3, bahut tight. Rule: $4–5.','hard'],
                   d.sld === '7' && ['bad','SL $6 se zyada chahiye. Rule: max $6.','hard'],
+                  (() => { const ps = propState(); return ps && d.sld && d.sld !== '7' && +d.sld * PER > ps.room && ['bad', `Is SL ka risk ${money(+d.sld * PER)} hai, par prop limit me sirf ${money(Math.max(0, ps.room))} bacha. SL hit hua to limit toot jayegi.`, 'hard']; })(),
                   d.sld === '6' && ['warn','$6 allowed hai, par ideal $4–5.'],
                   !d.nomove && ['bad','SL/TP order lagao.'], !d.alert && ['bad','Alert lagao.'] ] },
 ];
@@ -588,7 +627,7 @@ async function startUser(user){
   if (unsubSettings) unsubSettings();
   unsubSettings = settingsDoc.onSnapshot(snap => {
     const v = snap.exists ? snap.data() : null;
-    if (v && (v.session || v.cooldown != null)) { settings = Object.assign({}, settings, v.session ? { session: v.session } : {}, v.cooldown != null ? { cooldown: v.cooldown } : {}); LS.set('gtd.settings', settings); syncSessionUI(); renderAll(); }
+    if (v && (v.session || v.cooldown != null || v.prop)) { settings = Object.assign({}, settings, v.session ? { session: v.session } : {}, v.cooldown != null ? { cooldown: v.cooldown } : {}, v.prop ? { prop: v.prop } : {}); LS.set('gtd.settings', settings); syncSessionUI(); syncPropUI(); renderAll(); }
   }, () => {});
   setNote('Connecting…'); renderAll();
   // move any trades saved only on this device into the account
@@ -637,6 +676,86 @@ async function boot(){
 
 /* ---------- day logic ---------- */
 const outcome = t => t.pnl > 0 ? 'win' : t.pnl < 0 ? 'loss' : 'be';
+/* ---------- prop account: daily loss limit, max drawdown, target ---------- */
+const MIN_RISK = 4 * PER; // smallest stop the rules allow ($4 x 2 MGC)
+function propState(){
+  const P = settings.prop;
+  if (!P || !P.on || !(P.size > 0)) return null;
+  const start = P.startDate || '0000-00-00', td = today();
+  const closed = trades.filter(t => t.status === 'closed' && t.date >= start);
+  const base = P.size + (+P.adj || 0);
+  const balance = base + closed.reduce((s, t) => s + (t.pnl || 0), 0);
+  const todayPnl = closed.filter(t => t.date === td).reduce((s, t) => s + (t.pnl || 0), 0);
+  // highest end-of-day balance before today (trailing drawdown follows it)
+  const byDay = {};
+  closed.filter(t => t.date < td).forEach(t => { byDay[t.date] = (byDay[t.date] || 0) + (t.pnl || 0); });
+  let run = base, peak = base;
+  Object.keys(byDay).sort().forEach(d => { run += byDay[d]; peak = Math.max(peak, run); });
+  const dd = +P.maxDD || 0;
+  // trailing: follows the peak but stops at the starting balance (Topstep-style)
+  const threshold = dd ? (P.type === 'static' ? P.size - dd : Math.min(peak - dd, P.size)) : -Infinity;
+  const ddRoom = balance - threshold;
+  const dailyRoom = +P.daily ? +P.daily + todayPnl : Infinity;
+  return { P, balance, todayPnl, threshold, ddRoom, dailyRoom, room: Math.min(ddRoom, dailyRoom), profit: balance - P.size };
+}
+function propBar(label, right, pct, cls){
+  const w = Math.max(0, Math.min(100, pct));
+  return `<div class="pbar"><div class="pbar-top"><b>${label}</b><span>${right}</span></div><div class="track"><div class="fill ${cls}" style="width:${w}%"></div></div></div>`;
+}
+function renderProp(){
+  const ps = propState();
+  $('prop-card').hidden = !ps;
+  if (!ps) return;
+  const { P } = ps, bars = [];
+  const lvl = used => used >= 80 ? 'bad' : used >= 50 ? 'warn' : '';
+  $('prop-title').textContent = `Prop account · ${money(ps.balance)}`;
+  if (+P.daily) {
+    const used = Math.max(0, -ps.todayPnl) / P.daily * 100;
+    bars.push(propBar('Aaj ka loss limit', `${money(Math.min(0, ps.todayPnl))} / ${money(-P.daily)} · ${money(Math.max(0, ps.dailyRoom))} bacha`, used, lvl(used)));
+  }
+  if (+P.maxDD) {
+    const used = (1 - ps.ddRoom / P.maxDD) * 100;
+    bars.push(propBar('Max drawdown', `Liquidation ${money(ps.threshold)} · ${money(Math.max(0, ps.ddRoom))} bacha`, used, lvl(used)));
+  }
+  if (+P.target) {
+    const pct = ps.profit / P.target * 100;
+    bars.push(propBar('Profit target', `${money(ps.profit)} / ${money(+P.target)}${pct >= 100 ? ' · 🎯 Target hit!' : ''}`, pct, 'gold'));
+  }
+  $('prop-bars').innerHTML = bars.join('');
+}
+function syncPropUI(){
+  const P = settings.prop || {};
+  $('p-on').checked = !!P.on;
+  $('p-size').value = P.size || ''; $('p-daily').value = P.daily || ''; $('p-dd').value = P.maxDD || ''; $('p-target').value = P.target || '';
+  const t = document.querySelector(`input[name="p-type"][value="${P.type || 'eod'}"]`); if (t) t.checked = true;
+  $('p-start').value = P.startDate || today();
+}
+function saveProp(extra){
+  const n = id => { const v = parseFloat(String($(id).value).replace(/[,$\s]/g, '')); return Number.isFinite(v) && v > 0 ? v : 0; };
+  const prev = settings.prop || {};
+  const prop = Object.assign({ adj: +prev.adj || 0 }, {
+    on: $('p-on').checked, size: n('p-size'), daily: n('p-daily'), maxDD: n('p-dd'), target: n('p-target'),
+    type: (document.querySelector('input[name="p-type"]:checked') || {}).value || 'eod', startDate: $('p-start').value || today()
+  }, extra || {});
+  if (prop.on && !prop.size) { msgs($('p-msg'), [['bad', 'Account size daalo.']]); return false; }
+  settings = Object.assign({}, settings, { prop }); LS.set('gtd.settings', settings);
+  if (settingsDoc) settingsDoc.set({ prop }, { merge: true }).catch(() => {});
+  renderAll();
+  return true;
+}
+$('p-save').addEventListener('click', () => { if (saveProp()) { const ps = propState(); msgs($('p-msg'), [['good', ps ? `Saved. Balance ${money(ps.balance)}, drawdown me ${money(ps.ddRoom === Infinity ? 0 : ps.ddRoom)} bacha.` : 'Saved. Prop tracking band hai.']]); } });
+$('p-on').addEventListener('change', () => saveProp());
+$('p-sync').addEventListener('click', () => {
+  const actual = parseFloat(String($('p-bal').value).replace(/[,$\s]/g, ''));
+  const P = settings.prop;
+  if (!P || !P.size) { msgs($('p-msg'), [['bad', 'Pehle account size bhar ke Save karo.']]); return; }
+  if (!Number.isFinite(actual)) { msgs($('p-msg'), [['bad', 'Balance number me daalo, jaise 50120.50']]); return; }
+  const tracked = propState() ? propState().balance - (+P.adj || 0) : P.size;
+  saveProp({ adj: Math.round((actual - tracked) * 100) / 100, on: true });
+  $('p-bal').value = '';
+  msgs($('p-msg'), [['good', `Balance ${money(actual)} se match kar diya. Fees aur commission ka farak adjust ho gaya.`]]);
+});
+
 function dayInfo(){
   const todays = trades.filter(t => t.date === today() && t.status !== 'skipped');
   const closed = todays.filter(t => t.status === 'closed');
@@ -647,6 +766,9 @@ function dayInfo(){
   let lock = null;
   if (wins >= 2) lock = ['Win + win = band', 'Aaj 2 win ho gaye. Profit bachao, platform band karo.'];
   else if (losses >= 2) lock = ['Do loss = band', 'Aaj 2 loss ho gaye. Revenge trade nahi. Kal fresh aao.'];
+  const ps = propState();
+  if (!lock && ps && ps.dailyRoom < MIN_RISK) lock = ['Daily loss limit', `Prop account ki aaj ki limit me sirf ${money(Math.max(0, ps.dailyRoom))} bacha hai. Sabse chhota SL bhi ${money(MIN_RISK)} ka hai. Aaj band, account bachao.`];
+  if (!lock && ps && ps.ddRoom < MIN_RISK) lock = ['Max drawdown ke paas', `Liquidation ${money(ps.threshold)} pe hai, sirf ${money(Math.max(0, ps.ddRoom))} bacha. Ek aur SL = account khatam. Trading band, plan dobara banao.`];
   // cooldown after a loss: the moment revenge trades happen
   let cooldownUntil = 0;
   const mins = +settings.cooldown || 0;
@@ -943,6 +1065,7 @@ function renderAll(){
   $('locked-timer').hidden = !info.cooldownUntil;
   $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : 'Kal naya din. Checklist kal apne aap khul jayegi.';
   cooldownActive = !!info.cooldownUntil;
+  renderProp();
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil);
   if (info.open) openTradeView(info.open); else evaluate();
   renderJournal();
@@ -1196,6 +1319,7 @@ $('bk-file').previousElementSibling.addEventListener('keydown', e => { if (e.key
 
 restoreDraft();
 syncSessionUI();
+syncPropUI();
 boot();
 loadNews();
 setInterval(() => { if (!form.hidden) evaluate(); else renderLive(); }, 60000);
