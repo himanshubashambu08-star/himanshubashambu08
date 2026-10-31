@@ -143,6 +143,12 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .stats .stat.wide{grid-column:1/-1}
 .stats .stat.wide b{font-size:18px}
 .prop{gap:12px}
+.url{display:block;font:500 12px var(--f-num);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow-wrap:anywhere;user-select:all}
+details.howto{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
+details.howto summary{cursor:pointer;font-weight:600}
+details.howto ol{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+details.howto code{font-family:var(--f-num);font-size:12px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px;overflow-wrap:anywhere}
+pre.rules{font:500 11px/1.5 var(--f-num);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;overflow-x:auto;margin:8px 0 0;white-space:pre}
 .prop h2{font-size:19px}
 .pbar{display:flex;flex-direction:column;gap:5px}
 .pbar-top{display:flex;justify-content:space-between;gap:10px;font-size:13px;flex-wrap:wrap}
@@ -389,6 +395,36 @@ details.tr summary::-webkit-details-marker{display:none}
     </div>
     <div class="msgs" id="cool-msg"></div>
   </div>
+  <div class="card" id="shortcut-card">
+    <h2>TradingView lock (iPhone)</h2>
+    <p class="save-note">Cooldown ya lock chal raha ho aur tum TradingView kholo, to iPhone tumhe wapas Home Screen pe bhej dega aur batayega kitni der baaki hai. Ek baar setup karna hai.</p>
+    <div class="msgs" id="sc-status"></div>
+    <div class="q"><span class="qlabel">Tumhara status link (secret hai, kisi ko mat dena)</span>
+      <code class="url" id="sc-url">Sign in ke baad link yahan aayega…</code>
+      <div class="acct-btns"><button class="btn ghost" type="button" id="sc-copy">Link copy karo</button><a class="btn ghost" id="sc-open" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Link test karo ↗</a></div>
+    </div>
+    <details class="howto"><summary>Step 1 · Firebase rules update (ek baar, 2 min)</summary>
+      <ol>
+        <li><a href="https://console.firebase.google.com/project/recite-66f60/firestore/rules" target="_blank" rel="noopener">Firebase console → Firestore → Rules</a> kholo.</li>
+        <li>Wahan jo likha hai sab hata ke neeche wala paste karo, phir <b>Publish</b> dabao.
+          <pre class="rules" id="sc-rules"></pre>
+          <div class="acct-btns" style="margin-top:6px"><button class="btn ghost" type="button" id="sc-rules-copy">Rules copy karo</button></div></li>
+        <li>Wapas aao aur upar "Link test karo" dabao. <code>lockUntil</code> wala text dikhe to rules sahi lage.</li>
+      </ol>
+    </details>
+    <details class="howto"><summary>Step 2 · iPhone Shortcut banao (5 min)</summary>
+      <ol>
+        <li><b>Shortcuts</b> app → neeche <b>Automation</b> → <b>+</b> → <b>App</b>.</li>
+        <li>App: <b>TradingView</b> chuno, <b>Is Opened</b> tick karo, <b>Run Immediately</b> chuno → <b>Next</b> → <b>New Blank Automation</b>.</li>
+        <li>Action add karo: <b>Get Contents of URL</b>. URL me upar wala status link paste karo.</li>
+        <li>Action: <b>Get Dictionary Value</b> → Key me likho <code>fields.lockUntil.stringValue</code>.</li>
+        <li>Action: <b>Get Dates from Input</b> (input: Dictionary Value).</li>
+        <li>Action: <b>If</b> → <b>Dates</b> <b>is after</b> <b>Current Date</b>.</li>
+        <li>If ke andar: <b>Get Dictionary Value</b> → Key <code>fields.message.stringValue</code> from <b>Contents of URL</b>, phir <b>Show Notification</b> (Dictionary Value), phir <b>Go to Home Screen</b>.</li>
+        <li><b>End If</b> ke baad kuch nahi. Done dabao. Ab cooldown me TradingView kholo, wo band ho jayega.</li>
+      </ol>
+    </details>
+  </div>
   <div class="card" id="prop-settings">
     <h2>Prop account</h2>
     <p class="save-note">Apni prop firm ke rules ek baar bhar do. App daily loss aur drawdown track karega, aur limit ke paas aate hi trade lock kar dega.</p>
@@ -612,10 +648,78 @@ function loadScript(src){
 }
 function showAuth(){
   if (unsub) { unsub(); unsub = null; }
-  if (unsubSettings) { unsubSettings(); unsubSettings = null; } settingsDoc = null;
+  if (unsubSettings) { unsubSettings(); unsubSettings = null; } settingsDoc = null; statusRef = null; statusUid = null; lastStatusKey = ''; renderShortcut();
   col = null; photosCol = null; trades = [];
   $('app').hidden = true; $('auth').hidden = false;
 }
+/* ---------- lock status for the iPhone Shortcut ---------- */
+// A public, read-only doc at gateStatus/<secret token>. Firestore's REST API serves it without sign-in,
+// so a Shortcut can read it when TradingView opens. It holds only the lock state, never trades.
+let statusRef = null, statusUid = null, statusToken = null, lastStatusKey = '', statusErr = '';
+const makeToken = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return Array.from(a, b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join(''); };
+const statusUrl = tok => `https://firestore.googleapis.com/v1/projects/${(window.FIREBASE_CONFIG || {}).projectId}/databases/(default)/documents/gateStatus/${tok}`;
+const RULES = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each signed-in user can read and write only their own data.
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    // Trade Gate lock status for the iPhone Shortcut: anyone with the secret
+    // link can read one doc (no listing); only its owner can write it.
+    match /gateStatus/{token} {
+      allow get: if true;
+      allow create, update: if request.auth != null && request.resource.data.uid == request.auth.uid
+        && (resource == null || resource.data.uid == request.auth.uid);
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+  }
+}`;
+function setStatusToken(tok, uid){
+  if (statusToken === tok && statusRef) return;
+  statusToken = tok; statusUid = uid; lastStatusKey = '';
+  statusRef = firebase.firestore().collection('gateStatus').doc(tok);
+  pushStatus(dayInfo()); renderShortcut();
+}
+function lockStatus(info){
+  if (!info.lock) return { locked: false, until: Date.now(), reason: 'Trading allowed' };
+  if (info.cooldownUntil) return { locked: true, until: info.cooldownUntil, reason: 'Loss ke baad cooldown' };
+  if (info.lock[0] === 'Max drawdown ke paas') return { locked: true, until: Date.now() + 30 * 864e5, reason: info.lock[0] };
+  const eod = new Date(); eod.setHours(23, 59, 0, 0);
+  return { locked: true, until: eod.getTime(), reason: info.lock[0] };
+}
+function pushStatus(info){
+  if (!statusRef) return;
+  const st = lockStatus(info);
+  const key = st.locked ? `L|${Math.round(st.until / 60000)}|${st.reason}` : 'open';
+  if (key === lastStatusKey) return;
+  lastStatusKey = key;
+  const untilText = new Date(st.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  statusRef.set({
+    uid: statusUid, locked: st.locked, reason: st.reason,
+    lockUntil: new Date(st.until).toISOString(), untilText,
+    message: st.locked ? `🔒 Trade Gate: ${st.reason}. ${untilText} tak trade nahi.` : 'Trade Gate: trading allowed.',
+    updatedAt: new Date().toISOString()
+  }).then(() => { statusErr = ''; renderShortcut(); })
+    .catch(err => { statusErr = (err && err.code) || 'error'; lastStatusKey = ''; renderShortcut(); });
+}
+function renderShortcut(){
+  const has = !!statusToken && !!statusRef;
+  $('sc-url').textContent = has ? statusUrl(statusToken) : 'Sign in ke baad link yahan aayega…';
+  $('sc-open').href = has ? statusUrl(statusToken) : '#';
+  $('sc-rules').textContent = RULES;
+  if (!has) { msgs($('sc-status'), []); return; }
+  if (statusErr === 'permission-denied') msgs($('sc-status'), [['bad', 'Status save nahi ho raha. Pehle Step 1 (Firebase rules) karo.']]);
+  else if (statusErr) msgs($('sc-status'), [['warn', 'Status abhi sync nahi hua. Internet check karo.']]);
+  else { const st = lockStatus(dayInfo()); msgs($('sc-status'), [[st.locked ? 'bad' : 'good', st.locked ? `Abhi lock hai: ${st.reason}. Shortcut TradingView band karega.` : 'Abhi trading allowed hai. Shortcut TradingView khulne dega.']]); }
+}
+async function copyText(text, btn){
+  try { await navigator.clipboard.writeText(text); const o = btn.textContent; btn.textContent = 'Copy ho gaya ✓'; setTimeout(() => btn.textContent = o, 1500); }
+  catch { const r = document.createRange(); r.selectNodeContents(btn.closest('.q, li').querySelector('.url, pre')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+}
+$('sc-copy').addEventListener('click', e => { if (statusToken) copyText(statusUrl(statusToken), e.currentTarget); });
+$('sc-rules-copy').addEventListener('click', e => copyText(RULES, e.currentTarget));
+
 async function startUser(user){
   $('auth').hidden = true; $('app').hidden = false;
   $('who-name').textContent = user.displayName || 'Signed in';
@@ -627,6 +731,8 @@ async function startUser(user){
   if (unsubSettings) unsubSettings();
   unsubSettings = settingsDoc.onSnapshot(snap => {
     const v = snap.exists ? snap.data() : null;
+    if (v && v.statusToken) setStatusToken(v.statusToken, user.uid);
+    else if (!snap.metadata.fromCache) { const tok = makeToken(); settingsDoc.set({ statusToken: tok }, { merge: true }).catch(() => {}); setStatusToken(tok, user.uid); }
     if (v && (v.session || v.cooldown != null || v.prop)) { settings = Object.assign({}, settings, v.session ? { session: v.session } : {}, v.cooldown != null ? { cooldown: v.cooldown } : {}, v.prop ? { prop: v.prop } : {}); LS.set('gtd.settings', settings); syncSessionUI(); syncPropUI(); renderAll(); }
   }, () => {});
   setNote('Connecting…'); renderAll();
@@ -1066,6 +1172,7 @@ function renderAll(){
   $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : 'Kal naya din. Checklist kal apne aap khul jayegi.';
   cooldownActive = !!info.cooldownUntil;
   renderProp();
+  pushStatus(info); renderShortcut();
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil);
   if (info.open) openTradeView(info.open); else evaluate();
   renderJournal();
@@ -1320,6 +1427,7 @@ $('bk-file').previousElementSibling.addEventListener('keydown', e => { if (e.key
 restoreDraft();
 syncSessionUI();
 syncPropUI();
+renderShortcut();
 boot();
 loadNews();
 setInterval(() => { if (!form.hidden) evaluate(); else renderLive(); }, 60000);
