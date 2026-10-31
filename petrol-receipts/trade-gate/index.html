@@ -46,7 +46,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .brand h1 span{color:var(--gold)}
 .sym{font-family:var(--f-num);font-size:12px;color:var(--muted);letter-spacing:.04em}
 .tabs{display:flex;gap:6px}
-.tabs button{flex:1;font:600 15px var(--f-body);padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button{flex:1;white-space:nowrap;font:600 15px var(--f-body);padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
 .tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 
 .daybar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -143,6 +143,18 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .stats .stat.wide{grid-column:1/-1}
 .stats .stat.wide b{font-size:18px}
 .prop{gap:12px}
+details.set{display:block;padding:0}
+details.set>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:16px}
+details.set>summary::-webkit-details-marker{display:none}
+details.set>summary::after{content:"";width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);margin-left:auto;flex:none;transition:transform .2s}
+details.set[open]>summary::after{transform:rotate(-135deg)}
+details.set>summary:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:12px}
+.set-ic{font-size:22px;flex:none}
+.set-t{display:flex;flex-direction:column;min-width:0}
+.set-t b{font-family:var(--f-display);font-size:20px;font-weight:700;letter-spacing:.01em}
+.set-t small{color:var(--muted);font-size:13px}
+.set-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:14px;border-top:1px solid var(--line);padding-top:14px}
+.set-body h2{font-size:19px}
 .url{display:block;font:500 12px var(--f-num);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow-wrap:anywhere;user-select:all}
 details.howto{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
 details.howto summary{cursor:pointer;font-weight:600}
@@ -263,6 +275,7 @@ details.tr summary::-webkit-details-marker{display:none}
   <div class="tabs" role="tablist">
     <button id="tab-trade" role="tab" aria-selected="true">Trade</button>
     <button id="tab-journal" role="tab" aria-selected="false">Journal</button>
+    <button id="tab-settings" role="tab" aria-selected="false">⚙ Settings</button>
   </div>
 </header>
 
@@ -355,22 +368,46 @@ details.tr summary::-webkit-details-marker{display:none}
 <div id="pop" class="pop" hidden role="dialog" aria-modal="true" aria-labelledby="pop-title"><div class="pop-card"><span class="pop-badge" id="pop-badge"></span><h2 id="pop-title"></h2><p class="pop-reason" id="pop-reason"></p><p class="pop-msg" id="pop-msg"></p><div class="pop-actions" id="pop-actions"></div></div></div>
 
 <section id="view-journal" class="wrap" hidden>
-  <div class="card" id="acct">
-    <h2>Account &amp; backup</h2>
-    <div class="who"><img id="who-pic" alt="" hidden><div><b id="who-name"></b><small id="who-email"></small></div></div>
-    <p class="save-note" id="acct-status">Checking…</p>
-    <div class="acct-btns">
-      <button class="btn ghost" id="bk-save" type="button">Backup file save karo</button>
-      <label class="btn ghost" for="bk-file" tabindex="0">Backup se restore</label>
-      <input type="file" id="bk-file" accept=".json,application/json" hidden>
+  <div class="stats" id="stats"></div>
+  <div id="skips" class="skips"></div>
+  <div id="journal" class="wrap"></div>
+</section>
+
+<section id="view-settings" class="wrap" hidden>
+  <details class="card set" id="prop-settings">
+    <summary><span class="set-ic" aria-hidden="true">🏦</span><span class="set-t"><b>Prop account</b><small>Daily loss, drawdown, target, consistency, dashboard sync</small></span></summary>
+    <div class="set-body">
+    <p class="save-note">Apni prop firm ke rules ek baar bhar do. App daily loss aur drawdown track karega, aur limit ke paas aate hi trade lock kar dega.</p>
+    <label class="chk"><input type="checkbox" id="p-on"><span>Prop account track karo</span></label>
+    <div class="pgrid">
+      <label for="p-size">Account size ($)<input class="in" id="p-size" inputmode="numeric" placeholder="50000"></label>
+      <label for="p-daily">Daily loss limit ($)<input class="in" id="p-daily" inputmode="numeric" placeholder="1000"></label>
+      <label for="p-dd">Max drawdown ($)<input class="in" id="p-dd" inputmode="numeric" placeholder="2000"></label>
+      <label for="p-target">Profit target ($)<input class="in" id="p-target" inputmode="numeric" placeholder="3000"></label>
+      <label for="p-cons">Consistency rule (%)<input class="in" id="p-cons" inputmode="numeric" placeholder="40 (nahi hai to khali)"></label>
     </div>
-    <button class="btn ghost" id="sign-out" type="button">Sign out</button>
-    <button class="btn ghost warn-text" id="reset-all" type="button">Poora journal reset karo</button>
-    <p class="reset-note">Ek trade hatana ho to neeche us trade ke 🗑 pe tap karo.</p>
-    <div class="msgs" id="acct-msg"></div>
-  </div>
-  <div class="card" id="settings-card">
-    <h2>Trading session</h2>
+    <div class="q"><span class="qlabel">Drawdown kaisa hai?</span>
+      <div class="seg">
+        <label><input type="radio" name="p-type" value="eod" id="p-eod"><span>Trailing (end of day)</span></label>
+        <label><input type="radio" name="p-type" value="static" id="p-static"><span>Static</span></label>
+      </div>
+    </div>
+    <label class="field" for="p-start" style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)">Account kab shuru hua<input class="in" type="date" id="p-start"></label>
+    <button class="btn" type="button" id="p-save">Save karo</button>
+    <div class="q"><span class="qlabel">Dashboard se sync karo (purana peak, fees, commission sab match ho jayega)</span>
+      <div class="pgrid">
+        <label for="p-bal">Account balance ($)<input class="in" id="p-bal" inputmode="decimal" placeholder="24675"></label>
+        <label for="p-mll">MLL / liquidation ($)<input class="in" id="p-mll" inputmode="decimal" placeholder="24258"></label>
+      </div>
+      <button class="btn ghost" type="button" id="p-sync">Dashboard se sync karo</button>
+      <p class="save-note" id="p-synced"></p>
+    </div>
+    <div class="msgs" id="p-msg"></div>
+    </div>
+  </details>
+  <details class="card set" id="settings-card">
+    <summary><span class="set-ic" aria-hidden="true">🕐</span><span class="set-t"><b>Trading session</b><small>Kis time trade karna allowed hai</small></span></summary>
+    <div class="set-body">
     <p class="save-note">Checklist sirf isi time me trade hone degi. Time New York (ET) me hai, jo gold ka standard time hai.</p>
     <div class="tags" id="sess-opts">
       <label><input type="radio" name="sess" value="off" id="sess-off"><span>Koi limit nahi</span></label>
@@ -384,7 +421,11 @@ details.tr summary::-webkit-details-marker{display:none}
       <label for="sess-end">End (ET)<input class="in" type="time" id="sess-end" value="11:00"></label>
     </div>
     <div class="msgs" id="sess-msg"></div>
-    <h2 style="font-size:19px">Loss ke baad cooldown</h2>
+    </div>
+  </details>
+  <details class="card set" id="cool-card">
+    <summary><span class="set-ic" aria-hidden="true">⏱</span><span class="set-t"><b>Loss ke baad cooldown</b><small>SL ke baad kitni der break</small></span></summary>
+    <div class="set-body">
     <p class="save-note">SL hit hone ke baad itni der naya trade band rahega, taaki revenge trade na ho.</p>
     <div class="tags" id="cool-opts">
       <label><input type="radio" name="cool" value="0" id="cool-0"><span>Band</span></label>
@@ -394,9 +435,11 @@ details.tr summary::-webkit-details-marker{display:none}
       <label><input type="radio" name="cool" value="60" id="cool-60"><span>1 ghanta</span></label>
     </div>
     <div class="msgs" id="cool-msg"></div>
-  </div>
-  <div class="card" id="shortcut-card">
-    <h2>TradingView lock (iPhone)</h2>
+    </div>
+  </details>
+  <details class="card set" id="shortcut-card">
+    <summary><span class="set-ic" aria-hidden="true">📱</span><span class="set-t"><b>TradingView lock (iPhone)</b><small>Lock ke time TradingView band karo</small></span></summary>
+    <div class="set-body">
     <p class="save-note">Cooldown ya lock chal raha ho aur tum TradingView kholo, to iPhone tumhe wapas Home Screen pe bhej dega aur batayega kitni der baaki hai. Ek baar setup karna hai.</p>
     <div class="msgs" id="sc-status"></div>
     <div class="q"><span class="qlabel">Tumhara status link (secret hai, kisi ko mat dena)</span>
@@ -424,39 +467,24 @@ details.tr summary::-webkit-details-marker{display:none}
         <li><b>End If</b> ke baad kuch nahi. Done dabao. Ab cooldown me TradingView kholo, wo band ho jayega.</li>
       </ol>
     </details>
-  </div>
-  <div class="card" id="prop-settings">
-    <h2>Prop account</h2>
-    <p class="save-note">Apni prop firm ke rules ek baar bhar do. App daily loss aur drawdown track karega, aur limit ke paas aate hi trade lock kar dega.</p>
-    <label class="chk"><input type="checkbox" id="p-on"><span>Prop account track karo</span></label>
-    <div class="pgrid">
-      <label for="p-size">Account size ($)<input class="in" id="p-size" inputmode="numeric" placeholder="50000"></label>
-      <label for="p-daily">Daily loss limit ($)<input class="in" id="p-daily" inputmode="numeric" placeholder="1000"></label>
-      <label for="p-dd">Max drawdown ($)<input class="in" id="p-dd" inputmode="numeric" placeholder="2000"></label>
-      <label for="p-target">Profit target ($)<input class="in" id="p-target" inputmode="numeric" placeholder="3000"></label>
-      <label for="p-cons">Consistency rule (%)<input class="in" id="p-cons" inputmode="numeric" placeholder="40 (nahi hai to khali)"></label>
     </div>
-    <div class="q"><span class="qlabel">Drawdown kaisa hai?</span>
-      <div class="seg">
-        <label><input type="radio" name="p-type" value="eod" id="p-eod"><span>Trailing (end of day)</span></label>
-        <label><input type="radio" name="p-type" value="static" id="p-static"><span>Static</span></label>
-      </div>
+  </details>
+  <details class="card set" id="acct">
+    <summary><span class="set-ic" aria-hidden="true">👤</span><span class="set-t"><b>Account & backup</b><small>Sign out, backup, restore, reset</small></span></summary>
+    <div class="set-body">
+    <div class="who"><img id="who-pic" alt="" hidden><div><b id="who-name"></b><small id="who-email"></small></div></div>
+    <p class="save-note" id="acct-status">Checking…</p>
+    <div class="acct-btns">
+      <button class="btn ghost" id="bk-save" type="button">Backup file save karo</button>
+      <label class="btn ghost" for="bk-file" tabindex="0">Backup se restore</label>
+      <input type="file" id="bk-file" accept=".json,application/json" hidden>
     </div>
-    <label class="field" for="p-start" style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)">Account kab shuru hua<input class="in" type="date" id="p-start"></label>
-    <button class="btn" type="button" id="p-save">Save karo</button>
-    <div class="q"><span class="qlabel">Dashboard se sync karo (purana peak, fees, commission sab match ho jayega)</span>
-      <div class="pgrid">
-        <label for="p-bal">Account balance ($)<input class="in" id="p-bal" inputmode="decimal" placeholder="24675"></label>
-        <label for="p-mll">MLL / liquidation ($)<input class="in" id="p-mll" inputmode="decimal" placeholder="24258"></label>
-      </div>
-      <button class="btn ghost" type="button" id="p-sync">Dashboard se sync karo</button>
-      <p class="save-note" id="p-synced"></p>
+    <button class="btn ghost" id="sign-out" type="button">Sign out</button>
+    <button class="btn ghost warn-text" id="reset-all" type="button">Poora journal reset karo</button>
+    <p class="reset-note">Ek trade hatana ho to neeche us trade ke 🗑 pe tap karo.</p>
+    <div class="msgs" id="acct-msg"></div>
     </div>
-    <div class="msgs" id="p-msg"></div>
-  </div>
-  <div class="stats" id="stats"></div>
-  <div id="skips" class="skips"></div>
-  <div id="journal" class="wrap"></div>
+  </details>
 </section>
 </div>
 
@@ -577,7 +605,7 @@ function renderLive(){
   const ss = sessionState(), ns = newsState(), now = Date.now();
   const nowEt = minLabel(etMinutes());
   const sess = ss.state === 'off'
-    ? `<span class="st-wait">Session set nahi hai.</span> Journal → Trading session me apna time chuno.`
+    ? `<span class="st-wait">Session set nahi hai.</span> <a href="#" data-goto="settings-card">Settings → Trading session</a> me apna time chuno.`
     : `${esc(ss.label)} · abhi ${nowEt} ET · ${ss.state === 'in' ? '<span class="st-ok">✓ andar ho</span>' : '<span class="st-bad">✗ bahar ho</span>'}`;
   let nw;
   if (news.status === 'loading') nw = `<span class="st-wait">Aaj ki news la raha hoon…</span>`;
@@ -1207,13 +1235,12 @@ function renderAll(){
 
 /* ---------- tabs ---------- */
 function show(tab){
-  $('tab-trade').setAttribute('aria-selected', tab === 'trade');
-  $('tab-journal').setAttribute('aria-selected', tab === 'journal');
-  $('view-trade').hidden = tab !== 'trade';
-  $('view-journal').hidden = tab !== 'journal';
+  ['trade','journal','settings'].forEach(t => { $('tab-' + t).setAttribute('aria-selected', t === tab); $('view-' + t).hidden = t !== tab; });
+  window.scrollTo({ top: 0 });
 }
-$('tab-trade').addEventListener('click', () => show('trade'));
-$('tab-journal').addEventListener('click', () => show('journal'));
+['trade','journal','settings'].forEach(t => $('tab-' + t).addEventListener('click', () => show(t)));
+// links like "Settings → Trading session" in other screens open that section
+document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); show('settings'); const d = $(a.dataset.goto); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); } });
 
 /* ---------- chart photos ---------- */
 let draftPhotos = [], closePhotos = [], mentor = null;
