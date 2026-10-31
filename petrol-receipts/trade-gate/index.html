@@ -112,6 +112,21 @@ legend{display:contents}
 .stepper{display:flex;align-items:center;gap:6px}
 .step-btn{font:600 15px var(--f-num);padding:10px 0;width:52px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
 .stepper output{flex:1;text-align:center;font:500 22px var(--f-num);font-variant-numeric:tabular-nums}
+.live{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:var(--bg);font-size:14px}
+.live-row{display:flex;flex-direction:column;gap:4px}
+.live-row b{font-weight:600}
+.live .st-ok{color:var(--good);font-weight:600} .live .st-bad{color:var(--bad);font-weight:600} .live .st-wait{color:var(--muted)}
+.live a{color:var(--gold);font-weight:600;text-decoration:none}
+.live a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.nlist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.nlist li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:baseline}
+.nlist .tm{font-family:var(--f-num);font-size:13px}
+.nlist .past{color:var(--muted)} .nlist .past .nm{text-decoration:line-through}
+.nlist .now{color:var(--bad);font-weight:600}
+.nlist .rel{font-size:12px;color:var(--muted);white-space:nowrap}
+.times{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.times label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+input.in{font:500 17px var(--f-num);padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%;min-width:0}
 textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%;min-height:54px;resize:vertical}
 
 .btn{font:700 18px var(--f-display);letter-spacing:.04em;text-transform:uppercase;padding:15px;border-radius:10px;border:0;background:var(--gold);color:var(--on-gold);cursor:pointer;width:100%}
@@ -320,6 +335,22 @@ details.tr summary::-webkit-details-marker{display:none}
     <p class="reset-note">Ek trade hatana ho to neeche us trade ke 🗑 pe tap karo.</p>
     <div class="msgs" id="acct-msg"></div>
   </div>
+  <div class="card" id="settings-card">
+    <h2>Trading session</h2>
+    <p class="save-note">Checklist sirf isi time me trade hone degi. Time New York (ET) me hai, jo gold ka standard time hai.</p>
+    <div class="tags" id="sess-opts">
+      <label><input type="radio" name="sess" value="off" id="sess-off"><span>Koi limit nahi</span></label>
+      <label><input type="radio" name="sess" value="london" id="sess-london"><span>London 3–6 AM</span></label>
+      <label><input type="radio" name="sess" value="ny" id="sess-ny"><span>New York 8–11 AM</span></label>
+      <label><input type="radio" name="sess" value="both" id="sess-both"><span>London + NY 3–11 AM</span></label>
+      <label><input type="radio" name="sess" value="custom" id="sess-custom-r"><span>Apna time</span></label>
+    </div>
+    <div class="times" id="sess-custom" hidden>
+      <label for="sess-start">Start (ET)<input class="in" type="time" id="sess-start" value="08:00"></label>
+      <label for="sess-end">End (ET)<input class="in" type="time" id="sess-end" value="11:00"></label>
+    </div>
+    <div class="msgs" id="sess-msg"></div>
+  </div>
   <div class="stats" id="stats"></div>
   <div id="journal" class="wrap"></div>
 </section>
@@ -338,10 +369,14 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 
 /* ---------- the rules, as tap questions ---------- */
 const STEPS = [
-  { idx:'00', title:'Pehle', tf:'Session start', rule:'USD high-impact news check karo. 5pm close ke baad levels mark karo.',
-    qs:[ { k:'news', t:'tick', text:'News check kiya, abhi koi USD high-impact news nahi' },
+  { idx:'00', title:'Pehle', tf:'Session · News · Levels', rule:'Apne session me hi trade. USD high-impact news ke 30 min pehle aur 30 min baad trade nahi. 5pm close ke baad levels mark karo.',
+    qs:[ { k:'gate', t:'live' },
+         { k:'newsManual', t:'tick', text:'Calendar khol ke dekha, abhi koi USD high-impact news nahi' },
          { k:'lvl5', t:'tick', text:'5pm close ke baad levels mark kiye' } ],
-    check: d => [ !d.news && ['bad','News check karo.'], !d.lvl5 && ['bad','Levels mark karo.'] ] },
+    check: d => [ d.session === 'out' && ['bad', d.sessionMsg, 'hard'],
+                  d.news === 'blocked' && ['bad', d.newsMsg, 'hard'],
+                  d.news === 'manual' && !d.newsManual && ['bad','News calendar check karo.'],
+                  !d.lvl5 && ['bad','Levels mark karo.'] ] },
   { idx:'01', title:'Liquidity', tf:'4H / Daily', rule:'Liquidity level mark karo. Next liquidity kam se kam $15 door ho, warna skip.',
     qs:[ { k:'dir', t:'seg', label:'Direction', opts:[['long','Long','t-good'],['short','Short','t-bad']] },
          { k:'liq', t:'seg', label:'Next liquidity kitni door?', opts:[['lt15','< $15','t-bad'],['15','$15–20'],['20','$20–30'],['30','$30+']] },
@@ -377,6 +412,102 @@ const STEPS = [
 ];
 const TAGS = ['Plan follow kiya','Patience rakha','Jaldi entry','Late entry','FOMO','Dar laga','Greedy','Revenge mood','Thaka hua'];
 
+/* ---------- clock (New York time), session window, news calendar ---------- */
+const ET = 'America/New_York';
+const etMinutes = (d = new Date()) => { const p = new Intl.DateTimeFormat('en-US', { timeZone: ET, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d); return (+p.find(x => x.type === 'hour').value % 24) * 60 + +p.find(x => x.type === 'minute').value; };
+const etDate = (d = new Date()) => new Date(d).toLocaleDateString('en-CA', { timeZone: ET });
+const fmtET = t => new Date(t).toLocaleTimeString('en-US', { timeZone: ET, hour: 'numeric', minute: '2-digit' });
+const hm2min = v => { const [h, m] = String(v).split(':').map(Number); return h * 60 + (m || 0); };
+const minLabel = n => { const h = Math.floor(n / 60) % 24, m = n % 60; return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const relTime = ms => { const a = Math.round(Math.abs(ms) / 60000), h = Math.floor(a / 60), m = a % 60; const s = h ? `${h}h ${m}m` : `${m}m`; return ms >= 0 ? `${s} baad` : `${s} pehle`; };
+
+const SESSIONS = { london: ['03:00','06:00','London'], ny: ['08:00','11:00','New York'], both: ['03:00','11:00','London + NY'] };
+let settings = LS.get('gtd.settings') || { session: { mode: 'off' } };
+function sessionWindow(){
+  const s = settings.session || { mode: 'off' };
+  if (s.mode === 'off') return null;
+  const [a, b, name] = s.mode === 'custom' ? [s.start || '08:00', s.end || '11:00', 'Tumhara session'] : SESSIONS[s.mode] || [];
+  return a ? { a: hm2min(a), b: hm2min(b), name } : null;
+}
+function sessionState(){
+  const w = sessionWindow();
+  if (!w) return { state: 'off', msg: '' };
+  const now = etMinutes();
+  const inside = w.a <= w.b ? now >= w.a && now < w.b : now >= w.a || now < w.b;
+  const label = `${w.name} ${minLabel(w.a)}–${minLabel(w.b)} ET`;
+  return { state: inside ? 'in' : 'out', label, msg: `Session ke bahar ho (${label}). Abhi trade nahi.` };
+}
+
+// Forex Factory's public weekly calendar feed. Cached for an hour: the feed rate-limits frequent requests.
+const NEWS_URL = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+const CAL_URL = 'https://www.forexfactory.com/calendar';
+const NEWS_BEFORE = 30, NEWS_AFTER = 30; // minutes
+let news = { status: 'loading', events: [], at: 0 };
+async function loadNews(){
+  const cached = LS.get('gtd.news');
+  if (cached && Date.now() - cached.at < 3600e3) { news = { status: 'ok', events: cached.events, at: cached.at }; renderLive(); evaluate(); return; }
+  try {
+    const r = await fetch(NEWS_URL, { cache: 'no-store' });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const all = await r.json();
+    const events = all.filter(e => e.country === 'USD' && e.impact === 'High').map(e => ({ t: Date.parse(e.date), title: e.title })).filter(e => Number.isFinite(e.t)).sort((a, b) => a.t - b.t);
+    news = { status: 'ok', events, at: Date.now() }; LS.set('gtd.news', news);
+  } catch {
+    // a copy from the last 12 hours is still good for today's times
+    if (cached && Date.now() - cached.at < 12 * 3600e3) news = { status: 'ok', events: cached.events, at: cached.at, stale: true };
+    else news = { status: 'failed', events: [], at: 0 };
+  }
+  renderLive(); evaluate();
+}
+function newsState(){
+  if (news.status !== 'ok') return { state: 'manual', msg: '' };
+  const now = Date.now();
+  const hit = news.events.find(e => now >= e.t - NEWS_BEFORE * 60e3 && now <= e.t + NEWS_AFTER * 60e3);
+  if (hit) return { state: 'blocked', msg: `News time: ${hit.title} ${fmtET(hit.t)} ET. ${fmtET(hit.t + NEWS_AFTER * 60e3)} ET ke baad hi trade.` };
+  return { state: 'ok', msg: '' };
+}
+function renderLive(){
+  const box = $('live-box'); if (!box) return;
+  const ss = sessionState(), ns = newsState(), now = Date.now();
+  const nowEt = minLabel(etMinutes());
+  const sess = ss.state === 'off'
+    ? `<span class="st-wait">Session set nahi hai.</span> Journal → Trading session me apna time chuno.`
+    : `${esc(ss.label)} · abhi ${nowEt} ET · ${ss.state === 'in' ? '<span class="st-ok">✓ andar ho</span>' : '<span class="st-bad">✗ bahar ho</span>'}`;
+  let nw;
+  if (news.status === 'loading') nw = `<span class="st-wait">Aaj ki news la raha hoon…</span>`;
+  else if (news.status === 'failed') nw = `<span class="st-bad">News load nahi hui.</span> <a href="${CAL_URL}" target="_blank" rel="noopener">Forex Factory calendar kholo ↗</a>, phir neeche tick karo.`;
+  else {
+    const todays = news.events.filter(e => etDate(e.t) === etDate());
+    const list = todays.length ? `<ul class="nlist">${todays.map(e => {
+      const cls = now > e.t + NEWS_AFTER * 60e3 ? 'past' : now >= e.t - NEWS_BEFORE * 60e3 ? 'now' : '';
+      return `<li class="${cls}"><span class="tm">${fmtET(e.t)}</span><span class="nm">${esc(e.title)}</span><span class="rel">${cls === 'past' ? 'ho gayi' : relTime(e.t - now)}</span></li>`; }).join('')}</ul>` : '';
+    const head = ns.state === 'blocked' ? `<span class="st-bad">✗ News ka time hai</span>` : todays.length ? `<span class="st-ok">✓ Abhi news window nahi</span>` : `<span class="st-ok">✓ Aaj koi USD high-impact news nahi</span>`;
+    nw = `${head} · <a href="${CAL_URL}" target="_blank" rel="noopener">Calendar ↗</a>${list}${news.stale ? '<span class="st-wait">Purani copy dikh rahi hai, internet check karo.</span>' : ''}`;
+  }
+  box.innerHTML = `<div class="live-row"><b>🕐 Session</b><span>${sess}</span></div><div class="live-row"><b>📰 USD news (ET)</b><div>${nw}</div></div>`;
+}
+function syncSessionUI(){
+  const s = settings.session || { mode: 'off' };
+  const r = document.querySelector(`input[name="sess"][value="${s.mode}"]`); if (r) r.checked = true;
+  $('sess-custom').hidden = s.mode !== 'custom';
+  if (s.start) $('sess-start').value = s.start;
+  if (s.end) $('sess-end').value = s.end;
+}
+function saveSession(){
+  const mode = (document.querySelector('input[name="sess"]:checked') || {}).value || 'off';
+  const session = { mode };
+  if (mode === 'custom') { session.start = $('sess-start').value || '08:00'; session.end = $('sess-end').value || '11:00'; }
+  settings = Object.assign({}, settings, { session }); LS.set('gtd.settings', settings);
+  if (settingsDoc) settingsDoc.set({ session }, { merge: true }).catch(() => {});
+  $('sess-custom').hidden = mode !== 'custom';
+  const ss = sessionState();
+  msgs($('sess-msg'), [['good', mode === 'off' ? 'Session limit band hai.' : `Saved: ${ss.label}. Abhi ${ss.state === 'in' ? 'andar' : 'bahar'} ho.`]]);
+  evaluate();
+}
+document.querySelectorAll('input[name="sess"]').forEach(r => r.addEventListener('change', saveSession));
+$('sess-start').addEventListener('change', saveSession);
+$('sess-end').addEventListener('change', saveSession);
+
 /* ---------- build the form once ---------- */
 const stepsEl = $('steps');
 STEPS.forEach((s, i) => {
@@ -386,6 +517,7 @@ STEPS.forEach((s, i) => {
     if (q.t === 'tick') h += `<label class="chk"><input type="checkbox" id="q-${q.k}" data-k="${q.k}"><span id="qt-${q.k}"></span></label>`;
     if (q.t === 'seg') h += `<div class="q"><span class="qlabel">${q.label}</span><div class="seg">` +
       q.opts.map(([v,l,c]) => `<label><input type="radio" name="${q.k}" value="${v}" id="q-${q.k}-${v}" class="${c||''}"><span>${l}</span></label>`).join('') + `</div></div>`;
+    if (q.t === 'live') h += `<div class="live" id="live-box"></div>`;
     if (q.t === 'readout') h += `<div class="readouts"><div class="ro" id="ro-risk"><span class="lbl">Risk</span><b>—</b></div><div class="ro good"><span class="lbl">TP</span><b>+$15 · ${money(R.tp*PER)}</b></div><div class="ro"><span class="lbl">Lot</span><b>2 MGC</b></div></div>`;
   });
   h += `<div class="msgs" id="m${i}"></div>`;
@@ -395,7 +527,7 @@ $('tags').innerHTML = TAGS.map((t,i) => `<label><input type="checkbox" value="${
 
 /* ---------- storage: Firebase (Google account), same project as Fuel Receipts ---------- */
 const FB_VERSION = '10.12.2';
-let trades = [], col = null, photosCol = null, unsub = null;
+let trades = [], col = null, photosCol = null, unsub = null, settingsDoc = null, unsubSettings = null;
 // Firestore keeps a local copy and syncs later, so never let a slow network block the screen.
 const settle = p => Promise.race([p, new Promise(r => setTimeout(r, 1500))]);
 const store = {
@@ -409,6 +541,7 @@ function loadScript(src){
 }
 function showAuth(){
   if (unsub) { unsub(); unsub = null; }
+  if (unsubSettings) { unsubSettings(); unsubSettings = null; } settingsDoc = null;
   col = null; photosCol = null; trades = [];
   $('app').hidden = true; $('auth').hidden = false;
 }
@@ -419,6 +552,12 @@ async function startUser(user){
   if (user.photoURL) { $('who-pic').src = user.photoURL; $('who-pic').hidden = false; } else $('who-pic').hidden = true;
   col = firebase.firestore().collection('users').doc(user.uid).collection('trades');
   photosCol = firebase.firestore().collection('users').doc(user.uid).collection('tradePhotos');
+  settingsDoc = firebase.firestore().collection('users').doc(user.uid).collection('meta').doc('tradeGate');
+  if (unsubSettings) unsubSettings();
+  unsubSettings = settingsDoc.onSnapshot(snap => {
+    const v = snap.exists ? snap.data() : null;
+    if (v && v.session) { settings = Object.assign({}, settings, { session: v.session }); LS.set('gtd.settings', settings); syncSessionUI(); evaluate(); }
+  }, () => {});
   setNote('Connecting…'); renderAll();
   // move any trades saved only on this device into the account
   const local = LS.get('gtd.trades') || [];
@@ -487,6 +626,9 @@ function readDraft(){
     if (q.t === 'tick') d[q.k] = $('q-' + q.k).checked;
     if (q.t === 'seg') d[q.k] = (form.querySelector(`input[name="${q.k}"]:checked`) || {}).value || null;
   }));
+  const ss = sessionState(), ns = newsState();
+  d.session = ss.state; d.sessionMsg = ss.msg; d.news = ns.state; d.newsMsg = ns.msg;
+  d.gate = ss.state === 'out' || ns.state === 'blocked';
   return d;
 }
 function restoreDraft(){
@@ -502,8 +644,11 @@ const touched = (s, d) => s.qs.some(q => d[q.k]);
 let plan = null, lastVerdict = null;
 function evaluate(fromUser){
   const d = readDraft();
-  LS.set('gtd.draft', Object.assign({ _date: today() }, d));
+  const { session, sessionMsg, news: _n, newsMsg, gate, ...keep } = d;
+  LS.set('gtd.draft', Object.assign({ _date: today() }, keep));
   STEPS.forEach(s => s.qs.forEach(q => { if (q.t === 'tick') $('qt-' + q.k).textContent = typeof q.text === 'function' ? q.text(d) : q.text; }));
+  $('q-newsManual').closest('label').hidden = d.news !== 'manual';
+  renderLive();
   const risk = $('ro-risk');
   if (d.sld) { const n = +d.sld; risk.className = 'ro ' + (n < 4 || n > 6 ? 'bad' : n === 6 ? 'warn' : 'good'); risk.querySelector('b').textContent = `−$${d.sld}${n>6?'+':''} · ${money(-n*PER)}`; }
   else { risk.className = 'ro'; risk.querySelector('b').textContent = '—'; }
@@ -529,7 +674,8 @@ function evaluate(fromUser){
   plan = all ? { dir:d.dir, liq:d.liq, t15:d.t15, t5:d.t5, sld:+d.sld } : null;
   const key = hard ? hard[1] : all ? 'go' : null;
   if (fromUser && key && key !== lastVerdict) { if (hard) showNo(hard[1]); else showGo(d); }
-  lastVerdict = key;
+  // only a tap moves the verdict on, so a block that appears on its own (news time, session end) still pops up at the next tap
+  if (fromUser) lastVerdict = key;
 }
 form.addEventListener('change', () => evaluate(true));
 
@@ -830,6 +976,7 @@ function mentorPrompt(d){
     '',
     'The trader answered the checklist like this:',
     `direction: ${ans(d.dir)}; next liquidity distance: ${ans(liq)}; this level failed today: ${ans(d.fail)}; 15m trend: ${ans(d.t15)}; 5m trend: ${ans(d.t5)}; 1m move is only a retracement: ${ans(d.retr)}; price reached 4H level: ${ans(d.reached)}; first rejection candle broke: ${ans(d.broke)}; stop loss distance: ${d.sld ? '$' + d.sld : 'not answered'}.`,
+    `The app itself checked: news = ${d.news === 'ok' ? 'economic calendar loaded, no USD high-impact news within 30 minutes (mark news ok)' : d.news === 'blocked' ? 'USD high-impact news within 30 minutes (mark news mismatch)' : 'calendar not loaded, trader ticked it manually'}; trading session = ${d.session}.`,
     '',
     'The images are the trader\'s chart screenshots (timeframes may be shown on the chart). For each rule, check whether what is VISIBLE on the charts agrees with the trader\'s answers.',
     '- ok: the chart clearly supports it. mismatch: the chart clearly contradicts it (say what you see). cant_tell: that timeframe or detail is not visible (news is usually cant_tell).',
@@ -951,7 +1098,11 @@ $('bk-file').addEventListener('change', async e => {
 $('bk-file').previousElementSibling.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('bk-file').click(); } });
 
 restoreDraft();
+syncSessionUI();
 boot();
+loadNews();
+setInterval(() => { if (!form.hidden) evaluate(); else renderLive(); }, 60000);
+setInterval(loadNews, 3600e3);
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('../sw.js').catch(() => {});
 let lastDay = today();
 setInterval(() => { if (today() !== lastDay) { lastDay = today(); renderAll(); } }, 60000);
