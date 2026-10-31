@@ -155,6 +155,28 @@ details.tr summary::-webkit-details-marker{display:none}
 .who div{min-width:0;display:flex;flex-direction:column}
 .who b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .who small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.photos{display:flex;gap:8px;flex-wrap:wrap}
+.photos:empty{display:none}
+.ph{position:relative;width:84px;height:84px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--bg);padding:0;cursor:pointer}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .x{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font:600 14px/24px var(--f-body);cursor:pointer;padding:0}
+.mentor{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;background:var(--bg)}
+.mentor-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.verdict{font:700 13px var(--f-display);letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:999px}
+.verdict.take{background:var(--good-soft);color:var(--good)} .verdict.wait{background:var(--bad-soft);color:var(--bad)} .verdict.unclear{background:var(--warn-soft);color:var(--warn)}
+.mentor h3{margin:0;font-size:16px;font-weight:600}
+.mchecks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mchecks li{display:grid;grid-template-columns:22px 1fr;gap:8px;font-size:14px;align-items:start}
+.mchecks .ic{font-weight:700;text-align:center}
+.mchecks .ok{color:var(--good)} .mchecks .mismatch{color:var(--bad)} .mchecks .cant_tell{color:var(--muted)}
+.mchecks b{font-weight:600}
+.mtip{margin:0;font-size:14px;color:var(--muted)}
+.loading{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--gold);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.viewer{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) 8px max(16px,env(safe-area-inset-bottom,0px))}
+.viewer img{max-width:100%;max-height:100%;object-fit:contain}
+.viewer button{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:max(12px,env(safe-area-inset-right,0px));width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;font-size:22px;cursor:pointer}
 .pop{position:fixed;inset:0;z-index:50;background:color-mix(in srgb,#000 50%,transparent);display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .pop-card{background:var(--surface);border-radius:18px;padding:24px 20px 20px;max-width:400px;width:100%;display:flex;flex-direction:column;gap:12px;text-align:center;animation:popin .22s ease-out;border-top:6px solid var(--gold)}
 .pop.go .pop-card{border-top-color:var(--good)} .pop.no .pop-card{border-top-color:var(--bad)}
@@ -240,6 +262,10 @@ details.tr summary::-webkit-details-marker{display:none}
     <div class="q"><span class="qlabel">Kaisa raha? (kam se kam ek tap)</span>
       <div class="tags" id="tags"></div>
     </div>
+    <div class="q"><span class="qlabel">Exit ka chart (optional)</span>
+      <div class="photos" id="cph-list"></div>
+      <div class="acct-btns"><label class="btn ghost" for="cph-in" tabindex="0">+ Screenshot daalo</label><input type="file" id="cph-in" accept="image/*" multiple hidden></div>
+    </div>
     <div class="q"><label class="qlabel" for="note">Note (optional)</label><textarea class="in" id="note" placeholder="Chaho to ek line, warna chhod do"></textarea></div>
     <div class="msgs" id="close-msgs"></div>
     <button class="btn" id="close-btn" disabled>Trade close &amp; save</button>
@@ -248,6 +274,17 @@ details.tr summary::-webkit-details-marker{display:none}
   <!-- Pre-trade gate: built from STEPS in script -->
   <form id="plan" class="wrap" autocomplete="off">
     <div id="steps" class="wrap"></div>
+    <div class="card" id="mentor-card">
+      <h2>Chart &amp; mentor</h2>
+      <p class="save-note">Chart ke screenshot daalo (4H, 15m/5m, 1m). Mentor tumhare rules se match karke batayega ki chart pe sach me wahi dikh raha hai ya nahi.</p>
+      <div class="photos" id="ph-list"></div>
+      <div class="acct-btns">
+        <label class="btn ghost" for="ph-in" tabindex="0">+ Screenshot daalo</label>
+        <input type="file" id="ph-in" accept="image/*" multiple hidden>
+        <button class="btn ghost" type="button" id="mentor-btn" disabled>Mentor se check karao</button>
+      </div>
+      <div id="mentor-out"></div>
+    </div>
     <button class="btn" type="submit" id="go" disabled>Trade lo</button>
     <p class="gatehint" id="gatehint">Har step pass hone par hi agla step khulega.</p>
   </form>
@@ -259,6 +296,7 @@ details.tr summary::-webkit-details-marker{display:none}
   </div>
 </section>
 
+<div id="viewer" class="viewer" hidden><img id="viewer-img" alt="Chart screenshot"><button type="button" id="viewer-close" aria-label="Close">×</button></div>
 <div id="pop" class="pop" hidden role="dialog" aria-modal="true" aria-labelledby="pop-title"><div class="pop-card"><span class="pop-badge" id="pop-badge"></span><h2 id="pop-title"></h2><p class="pop-reason" id="pop-reason"></p><p class="pop-msg" id="pop-msg"></p><div class="pop-actions" id="pop-actions"></div></div></div>
 
 <section id="view-journal" class="wrap" hidden>
@@ -349,7 +387,7 @@ $('tags').innerHTML = TAGS.map((t,i) => `<label><input type="checkbox" value="${
 
 /* ---------- storage: Firebase (Google account), same project as Fuel Receipts ---------- */
 const FB_VERSION = '10.12.2';
-let trades = [], col = null, unsub = null;
+let trades = [], col = null, photosCol = null, unsub = null;
 // Firestore keeps a local copy and syncs later, so never let a slow network block the screen.
 const settle = p => Promise.race([p, new Promise(r => setTimeout(r, 1500))]);
 const store = {
@@ -363,7 +401,7 @@ function loadScript(src){
 }
 function showAuth(){
   if (unsub) { unsub(); unsub = null; }
-  col = null; trades = [];
+  col = null; photosCol = null; trades = [];
   $('app').hidden = true; $('auth').hidden = false;
 }
 async function startUser(user){
@@ -372,6 +410,7 @@ async function startUser(user){
   $('who-email').textContent = user.email || '';
   if (user.photoURL) { $('who-pic').src = user.photoURL; $('who-pic').hidden = false; } else $('who-pic').hidden = true;
   col = firebase.firestore().collection('users').doc(user.uid).collection('trades');
+  photosCol = firebase.firestore().collection('users').doc(user.uid).collection('tradePhotos');
   setNote('Connecting…'); renderAll();
   // move any trades saved only on this device into the account
   const local = LS.get('gtd.trades') || [];
@@ -402,7 +441,8 @@ async function boot(){
   } catch { $('auth').hidden = false; $('google-btn').disabled = true; authMsg('bad', 'Load nahi ho paya. Internet check karke page reload karo.'); return; }
   const { appCheckSiteKey, ...config } = cfg;
   // On Firebase Hosting, sign in through this same site so Safari keeps the sign-in.
-  if (location.hostname === `${config.projectId}.firebaseapp.com` || location.hostname === `${config.projectId}.web.app`) config.authDomain = location.hostname;
+  // (Only firebaseapp.com: its sign-in handler is the one registered with Google.)
+  if (location.hostname === `${config.projectId}.firebaseapp.com`) config.authDomain = location.hostname;
   if (!firebase.apps.length) firebase.initializeApp(config);
   await firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(() => {});
   firebase.auth().onAuthStateChanged(u => u ? startUser(u) : showAuth());
@@ -503,13 +543,15 @@ function pop(kind, badge, title, reason, msg, actions){
   actions.forEach(([label, cls, fn]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + cls; b.textContent = label; b.addEventListener('click', () => { p.hidden = true; fn && fn(); }); a.appendChild(b); });
   p.hidden = false; a.firstChild && a.firstChild.focus();
 }
-function resetPlan(){ form.reset(); LS.set('gtd.draft', null); lastVerdict = null; evaluate(); window.scrollTo({ top: 0 }); }
+function resetPlan(){ form.reset(); LS.set('gtd.draft', null); lastVerdict = null; draftPhotos = []; mentor = null; renderPhotos(); renderMentor(); evaluate(); window.scrollTo({ top: 0 }); }
 function showNo(reason){
   pop('no', 'Rule fail', 'Mat lo', reason, pick('no'), [['Theek hai, checklist reset', '', resetPlan], ['Galat tap hua, wapas jao', 'ghost']]);
 }
 function showGo(d){
   const n = +d.sld;
-  pop('go', 'Sab rules pass', 'Trade lo', `${d.dir.toUpperCase()} · SL $${n} · TP $15 · Risk ${money(-n*PER)} · 2 MGC`, pick('go'), [['Trade le liya, save karo', '', () => form.requestSubmit()], ['Abhi nahi', 'ghost']]);
+  const mv = mentor && mentor.forPhotos === photoKey(draftPhotos) ? mentor : null;
+  const mline = !mv ? (draftPhotos.length ? ' · Mentor check abhi nahi hua' : '') : mv.verdict === 'take' ? ' · Mentor: chart match karta hai' : mv.verdict === 'wait' ? ' · ⚠ Mentor: ruko, chart match nahi karta' : ' · Mentor: chart clear nahi';
+  pop('go', 'Sab rules pass', 'Trade lo', `${d.dir.toUpperCase()} · SL $${n} · TP $15 · Risk ${money(-n*PER)} · 2 MGC${mline}`, pick('go'), [['Trade le liya, save karo', '', () => form.requestSubmit()], ['Abhi nahi', 'ghost']]);
 }
 function showResult(t){
   const lock = dayInfo().lock;
@@ -523,8 +565,10 @@ form.addEventListener('submit', async e => {
   e.preventDefault(); evaluate();
   const info = dayInfo(); if (!plan || info.open || info.lock) return;
   const t = Object.assign({ id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), lots: R.lots, status:'open' }, plan);
+  t.photos = await savePhotos(t.id, 'setup', draftPhotos);
+  if (mentor && mentor.forPhotos === photoKey(draftPhotos)) { const { forPhotos, ...m } = mentor; t.mentor = m; }
   $('go').disabled = true;
-  try { await store.save(t); form.reset(); LS.set('gtd.draft', null); renderAll(); window.scrollTo({ top: 0 }); }
+  try { await store.save(t); form.reset(); LS.set('gtd.draft', null); draftPhotos = []; mentor = null; renderPhotos(); renderMentor(); renderAll(); window.scrollTo({ top: 0 }); }
   catch { $('gatehint').textContent = 'Save nahi hua. Internet check karke dobara try karo.'; $('go').disabled = false; }
 });
 
@@ -565,11 +609,12 @@ $('close-btn').addEventListener('click', async () => {
   const done = Object.assign({}, t, { status:'closed', result:res, closedAt: Date.now(), pnl: closePnl(t),
     move: res === 'tp' ? R.tp : res === 'sl' ? -t.sld : manualMove,
     ruleBreaks: breaks, tags: [...document.querySelectorAll('#tags input:checked')].map(x => x.value), note: $('note').value.trim() });
+  done.photos = (t.photos || []).concat(await savePhotos(t.id, 'exit', closePhotos));
   $('close-btn').disabled = true;
   try {
     await store.save(done);
     document.querySelectorAll('#open-card input').forEach(r => r.checked = false);
-    $('note').value = ''; manualMove = 0; renderAll(); showResult(done);
+    $('note').value = ''; manualMove = 0; closePhotos = []; renderPhotos(); renderAll(); showResult(done);
   } catch { msgs($('close-msgs'), [['bad','Save nahi hua. Internet check karke dobara try karo.']]); $('close-btn').disabled = false; }
 });
 
@@ -605,12 +650,17 @@ function tradeRow(t){
     <div class="trbody"><span class="flag ${br.length ? '' : 'clean'}">${br.length ? 'Rule break: ' + esc(br.join(', ')) : 'Sab rules follow kiye'}</span>
     <div class="tags">${(t.tags||[]).map(x => `<span>${esc(x)}</span>`).join('')}</div>
     ${t.note ? `<p class="lesson">${esc(t.note)}</p>` : ''}
+    <div class="photos jph"></div>
+    <div class="jmentor"></div>
     <div><button class="btn ghost" type="button">Delete</button></div></div>`;
-  const del = el.querySelector('button'); let armed = null;
+  const jp = el.querySelector('.jph');
+  (t.photos || []).forEach(p => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ph'; b.title = p.kind === 'exit' ? 'Exit chart' : 'Setup chart'; b.innerHTML = `<img alt="">`; b.firstChild.src = p.thumb; b.addEventListener('click', () => openPhoto(p)); jp.appendChild(b); });
+  if (t.mentor) el.querySelector('.jmentor').appendChild(mentorView(t.mentor));
+  const del = el.querySelector('.btn.ghost'); let armed = null;
   del.addEventListener('click', async () => {
     if (!armed) { del.textContent = 'Pakka delete?'; del.classList.add('danger'); armed = setTimeout(() => { armed = null; del.textContent = 'Delete'; del.classList.remove('danger'); }, 3000); return; }
     clearTimeout(armed); del.disabled = true;
-    try { await store.remove(t.id); } catch { del.disabled = false; del.textContent = 'Delete nahi hua'; }
+    try { (t.photos || []).forEach(p => photosCol && photosCol.doc(p.id).delete().catch(() => {})); await store.remove(t.id); } catch { del.disabled = false; del.textContent = 'Delete nahi hua'; }
   });
   return el;
 }
@@ -643,6 +693,175 @@ function show(tab){
 }
 $('tab-trade').addEventListener('click', () => show('trade'));
 $('tab-journal').addEventListener('click', () => show('journal'));
+
+/* ---------- chart photos ---------- */
+let draftPhotos = [], closePhotos = [], mentor = null;
+const MAX_PHOTOS = 4;
+const loadImage = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('img')); i.src = src; });
+function drawScaled(img, maxDim, q){
+  const k = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', q);
+}
+// Each photo is its own Firestore document, so it must stay under the 1 MB limit.
+async function compress(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    for (const [d, q] of [[1600,.75],[1300,.65],[1000,.6],[800,.5]]) { const x = drawScaled(img, d, q); if (x.length < 900000) return { full: x, thumb: drawScaled(img, 200, .6) }; }
+    throw new Error('big');
+  } finally { URL.revokeObjectURL(url); }
+}
+const photoKey = list => list.map(p => p.full.length + ':' + p.full.slice(-24)).join('|');
+async function addPhotos(files, list, msgEl){
+  for (const f of [...files]) {
+    if (list.length >= MAX_PHOTOS) { msgs(msgEl, [['warn', `Ek trade me max ${MAX_PHOTOS} photos.`]]); break; }
+    try { list.push(await compress(f)); } catch { msgs(msgEl, [['bad', 'Ye photo khul nahi payi. Screenshot dobara lo.']]); }
+  }
+  renderPhotos();
+}
+function photoStrip(el, list){
+  el.innerHTML = '';
+  list.forEach((p, i) => {
+    const w = document.createElement('div'); w.className = 'ph';
+    w.innerHTML = `<img alt="Chart ${i+1}"><button type="button" class="x" aria-label="Photo hatao">×</button>`;
+    w.firstChild.src = p.thumb;
+    w.querySelector('.x').addEventListener('click', () => { list.splice(i, 1); renderPhotos(); renderMentor(); });
+    el.appendChild(w);
+  });
+}
+function renderPhotos(){
+  photoStrip($('ph-list'), draftPhotos); photoStrip($('cph-list'), closePhotos);
+  $('mentor-btn').disabled = !draftPhotos.length || mentorBusy;
+}
+async function savePhotos(tradeId, kind, list){
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const id = `${tradeId}_${kind}${i}`;
+    if (photosCol) await settle(photosCol.doc(id).set({ data: list[i].full, tradeId, kind, createdAt: Date.now() }).catch(() => {}));
+    out.push({ id, kind, thumb: list[i].thumb });
+  }
+  return out;
+}
+async function openPhoto(p){
+  $('viewer-img').src = p.thumb; $('viewer').hidden = false;
+  if (!photosCol) return;
+  try { const snap = await photosCol.doc(p.id).get(); const d = snap.data(); if (d && d.data && !$('viewer').hidden) $('viewer-img').src = d.data; } catch {}
+}
+$('viewer-close').addEventListener('click', () => { $('viewer').hidden = true; });
+$('viewer').addEventListener('click', e => { if (e.target.id === 'viewer') $('viewer').hidden = true; });
+$('ph-in').addEventListener('change', async e => { e.stopPropagation(); const f = e.target.files; await addPhotos(f, draftPhotos, $('mentor-out')); e.target.value = ''; renderMentor(); });
+$('cph-in').addEventListener('change', async e => { e.stopPropagation(); await addPhotos(e.target.files, closePhotos, $('close-msgs')); e.target.value = ''; });
+document.querySelectorAll('label[for="ph-in"],label[for="cph-in"]').forEach(l => l.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $(l.htmlFor).click(); } }));
+
+/* ---------- AI mentor (Gemini through Firebase AI Logic, same setup as Fuel Receipts) ---------- */
+const AI_VERSION = '12.19.0';
+const MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+const RULE_KEYS = ['news','liquidity','trend','entry','sl_tp'];
+const RULE_NAMES = { news:'00 News & levels', liquidity:'01 Liquidity $15+', trend:'02 15m + 5m trend', entry:'03 1m entry', sl_tp:'04 SL / TP' };
+const MENTOR_SCHEMA = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', enum: ['take','wait','unclear'], description: 'take = charts support the trade under the rules; wait = at least one rule clearly fails on the chart; unclear = charts do not show enough.' },
+    headline: { type: 'string', description: 'One short Hinglish sentence, the main message.' },
+    checks: { type: 'array', items: { type: 'object', properties: {
+      rule: { type: 'string', enum: RULE_KEYS },
+      status: { type: 'string', enum: ['ok','mismatch','cant_tell'] },
+      note: { type: 'string', description: 'Short Hinglish reason based only on what is visible.' } }, required: ['rule','status','note'] } },
+    tip: { type: 'string', description: 'One practical Hinglish tip for this setup.' }
+  },
+  required: ['verdict','headline','checks']
+};
+let aiPromise = null, mentorBusy = false;
+function loadAI(){
+  if (!aiPromise) {
+    aiPromise = (async () => {
+      const base = `https://www.gstatic.com/firebasejs/${AI_VERSION}`;
+      const [{ initializeApp, getApps }, { getAI, getGenerativeModel, GoogleAIBackend }] = await Promise.all([import(`${base}/firebase-app.js`), import(`${base}/firebase-ai.js`)]);
+      const { appCheckSiteKey, ...options } = window.FIREBASE_CONFIG;
+      let app = getApps().find(a => a.name === 'mentor');
+      if (!app) {
+        app = initializeApp(options, 'mentor');
+        // Firebase AI Logic only answers requests that carry an App Check token from this site.
+        if (appCheckSiteKey) { const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import(`${base}/firebase-app-check.js`); initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey), isTokenAutoRefreshEnabled: true }); }
+      }
+      const ai = getAI(app, { backend: new GoogleAIBackend() });
+      const generationConfig = { responseMimeType: 'application/json', responseJsonSchema: MENTOR_SCHEMA, temperature: 0.2 };
+      return MODELS.map(name => ({ name, m: getGenerativeModel(ai, { model: name, generationConfig }) }));
+    })();
+    aiPromise.catch(() => { aiPromise = null; });
+  }
+  return aiPromise;
+}
+function mentorPrompt(d){
+  const ans = v => v == null || v === false ? 'not answered' : v === true ? 'yes' : v;
+  const liq = { lt15:'less than $15', '15':'$15-20', '20':'$20-30', '30':'$30+' }[d.liq];
+  return [
+    'You are a strict but kind trading mentor for an intraday gold trader (XAUUSD spot / MGC micro gold futures, $1 move = $10 per contract, trades 2 contracts).',
+    'Reply in short, simple Hinglish (Hindi written in Latin letters mixed with English), like a mentor talking to a student.',
+    'The trader follows ONLY these rules:',
+    '00 news: no USD high-impact news around the trade; key levels marked after the 5pm (New York) daily close.',
+    '01 liquidity: mark a 4H/Daily liquidity level; the next liquidity (target) must be at least $15 away, otherwise skip.',
+    '02 trend: 15m and 5m trend must point the same way as the trade; a 1m move against them is only a retracement.',
+    '03 entry: price retraces to the 4H level; entry when the FIRST rejection candle on 1m breaks (its low for a short, its high for a long).',
+    '04 exit: stop loss just beyond the retracement high (short) / low (long), $4-5 away, max $6, never moved; take profit fixed at $15; lot 2 MGC.',
+    'Day rules: stop after 2 wins or 2 losses; a level that failed today is not traded again.',
+    '',
+    'The trader answered the checklist like this:',
+    `direction: ${ans(d.dir)}; next liquidity distance: ${ans(liq)}; this level failed today: ${ans(d.fail)}; 15m trend: ${ans(d.t15)}; 5m trend: ${ans(d.t5)}; 1m move is only a retracement: ${ans(d.retr)}; price reached 4H level: ${ans(d.reached)}; first rejection candle broke: ${ans(d.broke)}; stop loss distance: ${d.sld ? '$' + d.sld : 'not answered'}.`,
+    '',
+    'The images are the trader\'s chart screenshots (timeframes may be shown on the chart). For each rule, check whether what is VISIBLE on the charts agrees with the trader\'s answers.',
+    '- ok: the chart clearly supports it. mismatch: the chart clearly contradicts it (say what you see). cant_tell: that timeframe or detail is not visible (news is usually cant_tell).',
+    '- Read prices only from the chart axes/labels; never invent numbers. If unsure, use cant_tell.',
+    '- Give one check per rule, in order: news, liquidity, trend, entry, sl_tp.',
+    '- verdict: take only if nothing is a mismatch and trend + entry are ok; wait if anything is a mismatch; otherwise unclear.'
+  ].join('\n');
+}
+async function askMentor(d){
+  const models = await loadAI();
+  const pref = LS.get('gtd.model');
+  const ordered = [...models].sort((a, b) => (b.name === pref) - (a.name === pref));
+  const images = await Promise.all(draftPhotos.map(async p => { let x = p.full; try { x = drawScaled(await loadImage(p.full), 1400, .75); } catch {} return { inlineData: { data: x.split(',')[1], mimeType: 'image/jpeg' } }; }));
+  let last;
+  for (const e of ordered) {
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      const r = await e.m.generateContent([mentorPrompt(d), ...images], { signal: ctrl.signal, timeout: 45000 });
+      const out = JSON.parse(r.response.text());
+      LS.set('gtd.model', e.name);
+      return out;
+    } catch (err) { last = err; } finally { clearTimeout(timer); }
+  }
+  throw last || new Error('no model');
+}
+function mentorView(m){
+  const w = document.createElement('div'); w.className = 'mentor';
+  const vt = { take:'Chart match ✓', wait:'Ruko', unclear:'Clear nahi' }[m.verdict] || m.verdict;
+  const icon = { ok:'✓', mismatch:'✗', cant_tell:'?' };
+  const checks = RULE_KEYS.map(k => (m.checks || []).find(c => c.rule === k)).filter(Boolean);
+  w.innerHTML = `<div class="mentor-head"><span class="verdict ${esc(m.verdict)}">Mentor · ${esc(vt)}</span></div>
+    <h3>${esc(m.headline || '')}</h3>
+    <ul class="mchecks">${checks.map(c => `<li><span class="ic ${esc(c.status)}">${icon[c.status] || '?'}</span><span><b>${esc(RULE_NAMES[c.rule] || c.rule)}:</b> ${esc(c.note || '')}</span></li>`).join('')}</ul>
+    ${m.tip ? `<p class="mtip">💡 ${esc(m.tip)}</p>` : ''}`;
+  return w;
+}
+function renderMentor(){
+  const out = $('mentor-out'); out.innerHTML = '';
+  if (mentorBusy) { out.innerHTML = '<div class="loading"><span class="spin"></span>Mentor chart dekh raha hai… (10–30 sec)</div>'; return; }
+  if (mentor && mentor.forPhotos === photoKey(draftPhotos)) out.appendChild(mentorView(mentor));
+  else if (mentor && draftPhotos.length) msgs(out, [['warn', 'Photos badal gayi. Mentor se dobara check karao.']]);
+}
+$('mentor-btn').addEventListener('click', async () => {
+  if (!draftPhotos.length || mentorBusy) return;
+  mentorBusy = true; renderPhotos(); renderMentor();
+  const key = photoKey(draftPhotos);
+  try { const m = await askMentor(readDraft()); mentor = Object.assign(m, { forPhotos: key, at: Date.now() }); mentorBusy = false; renderPhotos(); renderMentor(); }
+  catch (err) {
+    mentorBusy = false; renderPhotos(); renderMentor();
+    const offline = !navigator.onLine || /Load failed|Failed to fetch|network/i.test(err?.message || '');
+    msgs($('mentor-out'), [['bad', offline ? 'Internet nahi hai. Connect karke dobara try karo.' : 'Mentor abhi jawab nahi de paya. Thodi der baad dobara try karo. Tab tak checklist ke rules hi final hain.']]);
+  }
+});
 
 /* ---------- backup / restore ---------- */
 const acctMsg = (k, t) => msgs($('acct-msg'), [[k, t]]);
