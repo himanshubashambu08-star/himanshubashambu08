@@ -143,6 +143,19 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .stats .stat.wide{grid-column:1/-1}
 .stats .stat.wide b{font-size:18px}
 .prop{gap:12px}
+.acc-switch{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
+.acc-switch .lbl{flex:none}
+.acc-switch select{flex:1;min-width:0;font:600 15px var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.acc-switch select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.acc-list{display:flex;flex-direction:column;gap:8px}
+.acc-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.acc-row.on{border-color:var(--gold);background:var(--gold-soft)}
+.acc-row input[type=radio]{width:20px;height:20px;accent-color:var(--gold);margin:0}
+.acc-row .nm{display:flex;flex-direction:column;min-width:0}
+.acc-row .nm b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acc-row .nm small{color:var(--muted);font-size:12px}
+.acc-add{display:flex;gap:8px;flex-wrap:wrap}
+.acc-add input{flex:1 1 160px}
 details.set{display:block;padding:0}
 details.set>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:16px}
 details.set>summary::-webkit-details-marker{display:none}
@@ -272,6 +285,7 @@ details.tr summary::-webkit-details-marker{display:none}
 <div class="wrap" id="app" hidden>
 <header class="top">
   <div class="brand"><h1>Gold <span>Trade Gate</span></h1><span class="sym">XAUUSD · MGC</span></div>
+  <label class="acc-switch" for="acc-select"><span class="lbl">Account</span><select id="acc-select" aria-label="Account chuno"></select></label>
   <div class="tabs" role="tablist">
     <button id="tab-trade" role="tab" aria-selected="true">Trade</button>
     <button id="tab-journal" role="tab" aria-selected="false">Journal</button>
@@ -374,8 +388,20 @@ details.tr summary::-webkit-details-marker{display:none}
 </section>
 
 <section id="view-settings" class="wrap" hidden>
+  <details class="card set" id="acc-settings">
+    <summary><span class="set-ic" aria-hidden="true">🗂</span><span class="set-t"><b>Accounts</b><small>Naya account add karo, naam badlo, hatao</small></span></summary>
+    <div class="set-body">
+      <p class="save-note">Har account ka journal, prop limits, cooldown aur din ke lock alag chalte hain. Upar wale dropdown se account badlo.</p>
+      <div class="acc-list" id="acc-list"></div>
+      <div class="acc-add">
+        <input class="in" id="acc-new" placeholder="Jaise: Lucid 25K #2" maxlength="40" autocomplete="off">
+        <button class="btn" type="button" id="acc-add" style="width:auto">+ Account add karo</button>
+      </div>
+      <div class="msgs" id="acc-msg"></div>
+    </div>
+  </details>
   <details class="card set" id="prop-settings">
-    <summary><span class="set-ic" aria-hidden="true">🏦</span><span class="set-t"><b>Prop account</b><small>Daily loss, drawdown, target, consistency, dashboard sync</small></span></summary>
+    <summary><span class="set-ic" aria-hidden="true">🏦</span><span class="set-t"><b>Prop account</b><small id="prop-sub">Daily loss, drawdown, target, consistency, dashboard sync</small></span></summary>
     <div class="set-body">
     <p class="save-note">Apni prop firm ke rules ek baar bhar do. App daily loss aur drawdown track karega, aur limit ke paas aate hi trade lock kar dega.</p>
     <label class="chk"><input type="checkbox" id="p-on"><span>Prop account track karo</span></label>
@@ -480,7 +506,7 @@ details.tr summary::-webkit-details-marker{display:none}
       <input type="file" id="bk-file" accept=".json,application/json" hidden>
     </div>
     <button class="btn ghost" id="sign-out" type="button">Sign out</button>
-    <button class="btn ghost warn-text" id="reset-all" type="button">Poora journal reset karo</button>
+    <button class="btn ghost warn-text" id="reset-all" type="button"><span id="reset-label">Is account ka journal reset karo</span></button>
     <p class="reset-note">Ek trade hatana ho to neeche us trade ke 🗑 pe tap karo.</p>
     <div class="msgs" id="acct-msg"></div>
     </div>
@@ -768,7 +794,7 @@ async function startUser(user){
     const v = snap.exists ? snap.data() : null;
     if (v && v.statusToken) setStatusToken(v.statusToken, user.uid);
     else if (!snap.metadata.fromCache) { const tok = makeToken(); settingsDoc.set({ statusToken: tok }, { merge: true }).catch(() => {}); setStatusToken(tok, user.uid); }
-    if (v && (v.session || v.cooldown != null || v.prop)) { settings = Object.assign({}, settings, v.session ? { session: v.session } : {}, v.cooldown != null ? { cooldown: v.cooldown } : {}, v.prop ? { prop: v.prop } : {}); LS.set('gtd.settings', settings); syncSessionUI(); syncPropUI(); renderAll(); }
+    if (v && (v.session || v.cooldown != null || v.prop || v.accounts)) { settings = Object.assign({}, settings, v.session ? { session: v.session } : {}, v.cooldown != null ? { cooldown: v.cooldown } : {}, v.prop ? { prop: v.prop } : {}, Array.isArray(v.accounts) && v.accounts.length ? { accounts: v.accounts } : {}); LS.set('gtd.settings', settings); syncSessionUI(); syncPropUI(); renderAll(); }
   }, () => {});
   setNote('Connecting…'); renderAll();
   // move any trades saved only on this device into the account
@@ -819,11 +845,101 @@ async function boot(){
 const outcome = t => t.pnl > 0 ? 'win' : t.pnl < 0 ? 'loss' : 'be';
 /* ---------- prop account: daily loss limit, max drawdown, target ---------- */
 const MIN_RISK = 4 * PER; // smallest stop the rules allow ($4 x 2 MGC)
-function propState(){
+/* ---------- multiple accounts ---------- */
+// Trades carry accountId; ones saved before accounts existed belong to the first account ("main").
+const DEFAULT_ACC = 'main';
+function accounts(){
+  const a = settings.accounts;
+  if (Array.isArray(a) && a.length) return a;
   const P = settings.prop;
+  return [{ id: DEFAULT_ACC, name: P && P.size ? `Prop ${Math.round(P.size / 1000)}K` : 'Account 1', prop: P || null }];
+}
+const activeId = () => { const a = accounts(), want = LS.get('gtd.activeAccount'); return a.some(x => x.id === want) ? want : a[0].id; };
+const activeAcc = () => accounts().find(x => x.id === activeId());
+const accTrades = () => { const id = activeId(); return trades.filter(t => (t.accountId || DEFAULT_ACC) === id); };
+function saveAccounts(list){
+  settings = Object.assign({}, settings, { accounts: list }); LS.set('gtd.settings', settings);
+  if (settingsDoc) settingsDoc.set({ accounts: list }, { merge: true }).catch(() => {});
+}
+function setActive(id){
+  LS.set('gtd.activeAccount', id);
+  // a half-filled checklist belongs to the account it was started on
+  form.reset(); LS.set('gtd.draft', null); lastVerdict = null; draftPhotos = []; mentor = null; renderPhotos(); renderMentor();
+  syncPropUI(); renderAll();
+}
+function renderAccounts(){
+  const list = accounts(), id = activeId();
+  const sel = $('acc-select');
+  sel.innerHTML = list.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('') + '<option value="__add">＋ Naya account…</option>';
+  sel.value = id;
+  const box = $('acc-list'); box.innerHTML = '';
+  list.forEach(a => {
+    const n = trades.filter(t => (t.accountId || DEFAULT_ACC) === a.id && t.status === 'closed').length;
+    const row = document.createElement('div'); row.className = 'acc-row' + (a.id === id ? ' on' : '');
+    row.innerHTML = `<input type="radio" name="acc-pick" aria-label="Ye account chuno"><span class="nm"><b></b><small></small></span><span class="acct-btns" style="flex-wrap:nowrap"><button type="button" class="btn ghost" data-act="ren">Naam</button>${list.length > 1 ? '<button type="button" class="btn ghost warn-text" data-act="del">Hatao</button>' : ''}</span>`;
+    row.querySelector('b').textContent = a.name;
+    row.querySelector('small').textContent = `${n} trade${n === 1 ? '' : 's'}${a.prop && a.prop.on && a.prop.size ? ' · prop ' + money(a.prop.size) : ''}`;
+    const r = row.querySelector('input'); r.checked = a.id === id; r.addEventListener('change', () => setActive(a.id));
+    row.querySelector('[data-act=ren]').addEventListener('click', () => renameAccount(a));
+    const d = row.querySelector('[data-act=del]'); if (d) d.addEventListener('click', () => askDeleteAccount(a));
+    box.appendChild(row);
+  });
+  $('prop-sub').textContent = `${activeAcc().name}: daily loss, drawdown, target, consistency, sync`;
+  $('reset-label').textContent = `"${activeAcc().name}" ka journal reset karo`;
+}
+$('acc-select').addEventListener('change', e => {
+  if (e.target.value === '__add') { e.target.value = activeId(); show('settings'); const d = $('acc-settings'); d.open = true; d.scrollIntoView({ block: 'start' }); $('acc-new').focus(); return; }
+  setActive(e.target.value);
+});
+$('acc-add').addEventListener('click', () => {
+  const name = $('acc-new').value.trim();
+  if (!name) { msgs($('acc-msg'), [['bad', 'Account ka naam likho, jaise "Lucid 25K #2".']]); return; }
+  const id = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  saveAccounts(accounts().concat([{ id, name, prop: null }]));
+  $('acc-new').value = '';
+  setActive(id);
+  msgs($('acc-msg'), [['good', `"${name}" add ho gaya aur abhi chuna hua hai. Prop account section me iske rules bhar do.`]]);
+});
+function renameAccount(a){
+  const row = [...$('acc-list').children].find(r => r.querySelector('b').textContent === a.name);
+  const nm = row.querySelector('.nm');
+  nm.innerHTML = `<input class="in" maxlength="40" style="font-size:15px;padding:6px 8px">`;
+  const inp = nm.firstChild; inp.value = a.name; inp.focus(); inp.select();
+  const done = () => { const v = inp.value.trim(); if (v && v !== a.name) saveAccounts(accounts().map(x => x.id === a.id ? Object.assign({}, x, { name: v }) : x)); renderAccounts(); };
+  inp.addEventListener('blur', done);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } if (e.key === 'Escape') { inp.value = a.name; inp.blur(); } });
+}
+function askDeleteAccount(a){
+  const mine = trades.filter(t => (t.accountId || DEFAULT_ACC) === a.id);
+  pop('no', 'Account hatao', `"${a.name}" hatana hai?`, `${mine.length} trades, unki photos aur is account ki settings`, 'Ye wapas nahi aayega. Chaho to pehle Account & backup se backup le lo.', [
+    ['Haan, hatao', 'danger', async () => {
+      try { await deleteTrades(mine); } catch {}
+      const left = accounts().filter(x => x.id !== a.id);
+      saveAccounts(left);
+      if (activeId() === a.id || !left.some(x => x.id === LS.get('gtd.activeAccount'))) setActive(left[0].id); else renderAll();
+    }],
+    ['Rehne do', 'ghost']
+  ]);
+}
+async function deleteTrades(list){
+  if (!list.length) return;
+  if (col && photosCol) {
+    const ids = new Set(list.map(t => t.id));
+    const photos = await photosCol.get();
+    const refs = list.map(t => col.doc(t.id)).concat(photos.docs.filter(d => ids.has((d.data() || {}).tradeId)).map(d => d.ref));
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = firebase.firestore().batch();
+      refs.slice(i, i + 400).forEach(r => batch.delete(r));
+      await settle(batch.commit());
+    }
+  } else { const ids = new Set(list.map(t => t.id)); trades = trades.filter(t => !ids.has(t.id)); LS.set('gtd.trades', trades); }
+}
+
+function propState(){
+  const P = (activeAcc() || {}).prop;
   if (!P || !P.on || !(P.size > 0)) return null;
   const start = P.startDate || '0000-00-00', td = today();
-  const closed = trades.filter(t => t.status === 'closed' && t.date >= start);
+  const closed = accTrades().filter(t => t.status === 'closed' && t.date >= start);
   const todayPnl = closed.filter(t => t.date === td).reduce((s, t) => s + (t.pnl || 0), 0);
   const dd = +P.maxDD || 0;
   const S = P.sync && Number.isFinite(+P.sync.balance) ? P.sync : null;
@@ -879,7 +995,7 @@ function renderProp(){
   $('prop-bars').innerHTML = bars.join('');
 }
 function syncPropUI(){
-  const P = settings.prop || {};
+  const P = (activeAcc() || {}).prop || {};
   $('p-on').checked = !!P.on;
   $('p-size').value = P.size || ''; $('p-daily').value = P.daily || ''; $('p-dd').value = P.maxDD || ''; $('p-target').value = P.target || '';
   const t = document.querySelector(`input[name="p-type"][value="${P.type || 'eod'}"]`); if (t) t.checked = true;
@@ -889,14 +1005,14 @@ function syncPropUI(){
 }
 function saveProp(extra){
   const n = id => { const v = parseFloat(String($(id).value).replace(/[,$\s]/g, '')); return Number.isFinite(v) && v > 0 ? v : 0; };
-  const prev = settings.prop || {};
+  const prev = (activeAcc() || {}).prop || {};
   const prop = Object.assign({ adj: +prev.adj || 0 }, {
     on: $('p-on').checked, size: n('p-size'), daily: n('p-daily'), maxDD: n('p-dd'), target: n('p-target'), cons: Math.min(100, n('p-cons')), sync: prev.sync || null,
     type: (document.querySelector('input[name="p-type"]:checked') || {}).value || 'eod', startDate: $('p-start').value || today()
   }, extra || {});
   if (prop.on && !prop.size) { msgs($('p-msg'), [['bad', 'Account size daalo.']]); return false; }
-  settings = Object.assign({}, settings, { prop }); LS.set('gtd.settings', settings);
-  if (settingsDoc) settingsDoc.set({ prop }, { merge: true }).catch(() => {});
+  const id = activeId();
+  saveAccounts(accounts().map(a => a.id === id ? Object.assign({}, a, { prop }) : a));
   renderAll();
   return true;
 }
@@ -917,12 +1033,13 @@ $('p-sync').addEventListener('click', () => {
 const n0 = id => { const v = parseFloat(String($(id).value).replace(/[,$\s]/g, '')); return Number.isFinite(v) && v > 0 ? v : 0; };
 
 function dayInfo(){
-  const todays = trades.filter(t => t.date === today() && t.status !== 'skipped');
+  const mine = accTrades();
+  const todays = mine.filter(t => t.date === today() && t.status !== 'skipped');
   const closed = todays.filter(t => t.status === 'closed');
   const wins = closed.filter(t => outcome(t) === 'win').length;
   const losses = closed.filter(t => outcome(t) === 'loss').length;
   const pnl = closed.reduce((s,t) => s + (t.pnl||0), 0);
-  const open = trades.find(t => t.status === 'open');
+  const open = mine.find(t => t.status === 'open');
   let lock = null;
   if (wins >= 2) lock = ['Win + win = band', 'Aaj 2 win ho gaye. Profit bachao, platform band karo.'];
   else if (losses >= 2) lock = ['Do loss = band', 'Aaj 2 loss ho gaye. Revenge trade nahi. Kal fresh aao.'];
@@ -934,7 +1051,7 @@ function dayInfo(){
   let cooldownUntil = 0;
   const mins = +settings.cooldown || 0;
   if (!lock && mins) {
-    const lastLoss = trades.filter(t => t.status === 'closed' && t.pnl < 0 && t.closedAt).sort((a, b) => b.closedAt - a.closedAt)[0];
+    const lastLoss = mine.filter(t => t.status === 'closed' && t.pnl < 0 && t.closedAt).sort((a, b) => b.closedAt - a.closedAt)[0];
     if (lastLoss && Date.now() < lastLoss.closedAt + mins * 60e3) {
       cooldownUntil = lastLoss.closedAt + mins * 60e3;
       lock = ['Cooldown', `Loss ke baad ${mins} min ka break. Chart band karo, paani piyo, walk pe jao. Revenge trade yahin se shuru hota hai.`];
@@ -1026,7 +1143,7 @@ function resetPlan(){ confirmedAgainst = false; form.reset(); LS.set('gtd.draft'
 function logSkip(reason){
   const d = readDraft();
   if (!d.dir) return; // nothing was being set up yet (e.g. news or session block before choosing a side)
-  store.save({ id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), status: 'skipped',
+  store.save({ id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), status: 'skipped', accountId: activeId(),
     dir: d.dir, sld: d.sld && +d.sld <= 6 && +d.sld >= 4 ? +d.sld : null, liq: d.liq || null, reason, review: null }).catch(() => {});
 }
 function showNo(reason){
@@ -1063,7 +1180,7 @@ form.addEventListener('submit', async e => {
   const info = dayInfo(); if (!plan || info.open || info.lock) return;
   const mv = currentMentor();
   if (mv && mv.verdict === 'wait' && !confirmedAgainst) { showAgainst(mv); return; }
-  const t = Object.assign({ id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), lots: R.lots, status:'open' }, plan);
+  const t = Object.assign({ id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), lots: R.lots, status:'open', accountId: activeId() }, plan);
   t.photos = await savePhotos(t.id, 'setup', draftPhotos);
   if (mv) { const { forPhotos, ...m } = mv; t.mentor = m; }
   if (mv && mv.verdict === 'wait') t.againstMentor = true;
@@ -1121,14 +1238,14 @@ $('close-btn').addEventListener('click', async () => {
 
 /* ---------- journal ---------- */
 function renderJournal(){
-  const closed = trades.filter(t => t.status === 'closed').sort((a,b) => b.createdAt - a.createdAt);
+  const closed = accTrades().filter(t => t.status === 'closed').sort((a,b) => b.createdAt - a.createdAt);
   const wins = closed.filter(t => outcome(t) === 'win').length;
   const net = closed.reduce((s,t) => s + (t.pnl||0), 0);
   const clean = closed.filter(t => !(t.ruleBreaks||[]).length).length;
   const against = closed.filter(t => t.againstMentor);
   const againstPnl = against.reduce((s,t) => s + (t.pnl||0), 0);
   const extra = against.length ? [['Mentor ke against', `${against.length} · ${money(againstPnl)}`, againstPnl > 0 ? 'pos' : againstPnl < 0 ? 'neg' : '', 'wide']] : [];
-  const skips = trades.filter(t => t.status === 'skipped').sort((a,b) => b.createdAt - a.createdAt);
+  const skips = accTrades().filter(t => t.status === 'skipped').sort((a,b) => b.createdAt - a.createdAt);
   const saved = skips.filter(t => t.review === 'saved'), missed = skips.filter(t => t.review === 'missed');
   // estimate: a skip that would have lost saved its stop (or $5 if unknown); one that would have won cost the $15 target
   const est = saved.reduce((s,t) => s + (t.sld || 5) * PER, 0) - missed.length * R.tp * PER;
@@ -1209,6 +1326,7 @@ setInterval(() => {
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil); else renderAll();
 }, 1000);
 function renderAll(){
+  renderAccounts();
   const info = dayInfo();
   $('d-count').textContent = info.todays.length;
   $('d-win').textContent = info.wins;
@@ -1427,21 +1545,13 @@ function askDeleteTrade(t){
 }
 $('cancel-open').addEventListener('click', () => { const t = dayInfo().open; if (t) askDeleteTrade(t); });
 async function deleteEverything(){
-  if (col && photosCol) {
-    const [a, b] = await Promise.all([col.get(), photosCol.get()]);
-    const refs = [...a.docs, ...b.docs].map(d => d.ref);
-    for (let i = 0; i < refs.length; i += 400) {
-      const batch = firebase.firestore().batch();
-      refs.slice(i, i + 400).forEach(r => batch.delete(r));
-      await settle(batch.commit());
-    }
-  } else { trades = []; LS.set('gtd.trades', []); }
+  await deleteTrades(accTrades());
   LS.set('gtd.draft', null); draftPhotos = []; closePhotos = []; mentor = null;
   form.reset(); lastVerdict = null; renderPhotos(); renderMentor(); renderAll();
 }
 $('reset-all').addEventListener('click', () => {
-  const n = trades.length;
-  pop('no', 'Reset', 'Sab delete karna hai?', `${n} trade${n === 1 ? '' : 's'}, saari photos aur mentor notes`, 'Journal bilkul khaali ho jayega aur ye wapas nahi aayega. Chaho to pehle "Backup file save karo" kar lo.', [
+  const n = accTrades().length;
+  pop('no', 'Reset', `"${activeAcc().name}" reset karna hai?`, `Is account ke ${n} trade${n === 1 ? '' : 's'}, photos aur mentor notes. Baaki accounts ko kuch nahi hoga.`, 'Is account ka journal bilkul khaali ho jayega aur ye wapas nahi aayega. Chaho to pehle "Backup file save karo" kar lo.', [
     ['Haan, sab delete karo', 'danger', () => pop('no', 'Last check', 'Pakka?', 'Ye undo nahi hoga.', `${n} trades hamesha ke liye hat jayenge.`, [
       ['Haan, reset karo', 'danger', async () => { try { await deleteEverything(); pop('', 'Reset', 'Journal khaali', '', 'Fresh start. Ab sirf real trades record karna.', [['Theek hai', '']]); } catch { pop('no', 'Error', 'Reset nahi hua', '', 'Internet check karke dobara try karo.', [['Theek hai', '']]); } }],
       ['Rehne do', 'ghost']
@@ -1472,7 +1582,7 @@ $('bk-file').addEventListener('change', async e => {
     const arr = Array.isArray(obj) ? obj : obj.trades;
     const ok = (arr || []).filter(t => t && typeof t.id === 'string' && typeof t.date === 'string' && (t.status === 'open' || t.status === 'closed' || t.status === 'skipped'));
     if (!ok.length) { acctMsg('bad', 'Is file me koi trade nahi mila. Sahi backup file chuno.'); return; }
-    for (const t of ok) await store.save(t);
+    for (const t of ok) await store.save(Object.assign({ accountId: activeId() }, t));
     acctMsg('good', `${ok.length} trades restore ho gaye.`);
   } catch { acctMsg('bad', 'Ye file padh nahi paya. App se save ki hui .json backup file chuno.'); }
 });
