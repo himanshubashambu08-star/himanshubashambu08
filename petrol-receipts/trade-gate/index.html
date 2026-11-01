@@ -489,7 +489,7 @@ details.tr summary::-webkit-details-marker{display:none}
   </div>
   <div class="card" id="gs-check">
     <h2 id="gs-check-title">Aaj ka checklist</h2>
-    <p class="save-note">Jo app khud nahi dekh sakta, wo yahan tap karo. Baaki trades se apne aap bharta hai.</p>
+    <p class="save-note">Jo app khud nahi dekh sakta, wo yahan tap karo. Baaki trades se apne aap bharta hai. Galat tap hua to usi button pe dobara tap karo, selection hat jayega.</p>
     <div class="wrap" style="gap:10px" id="gs-manual"></div>
     <div class="gs-q"><span>Aaj app ke bahar koi trade liya?</span><div class="seg"><label><input type="radio" name="gs-untracked" value="1" class="t-bad"><span>Haan</span></label><label><input type="radio" name="gs-untracked" value="0" class="t-good"><span>Nahi</span></label></div></div>
     <div class="q"><label class="qlabel" for="gs-mistake">Aaj ki ek galti</label><input class="in" id="gs-mistake" maxlength="140" placeholder="Jaise: level se pehle entry li" style="font:400 15px var(--f-body)"></div>
@@ -1775,7 +1775,11 @@ function renderGrowth(){
     const row = document.createElement('div'); row.className = 'gs-q';
     row.innerHTML = `<span></span><div class="seg"><label><input type="radio" name="gsq-${esc(r.id)}" value="1" class="t-good" ${v === true ? 'checked' : ''}><span>Haan</span></label><label><input type="radio" name="gsq-${esc(r.id)}" value="0" class="t-bad" ${v === false ? 'checked' : ''}><span>Nahi</span></label></div>`;
     row.firstChild.textContent = `${r.label} (${r.pts})`;
-    row.querySelectorAll('input').forEach(i => i.addEventListener('change', () => patchToday({ manual: Object.assign({}, today.manual, { [r.id]: i.value === '1' }) })));
+    row.querySelectorAll('input').forEach(i => i.addEventListener('click', () => {
+      const val = i.value === '1', m = Object.assign({}, today.manual);
+      if (m[r.id] === val) delete m[r.id]; else m[r.id] = val;
+      patchToday({ manual: m });
+    }));
     man.appendChild(row);
   });
   if (document.activeElement !== $('gs-mistake')) $('gs-mistake').value = today.notes.mistake || '';
@@ -1807,7 +1811,10 @@ function renderGrowth(){
 }
 $('gs-mistake').addEventListener('change', e => { const t = computeDay(tradingDate(Date.now())); patchToday({ notes: Object.assign({}, t.notes, { mistake: e.target.value.trim() }) }); });
 $('gs-good').addEventListener('change', e => { const t = computeDay(tradingDate(Date.now())); patchToday({ notes: Object.assign({}, t.notes, { good: e.target.value.trim() }) }); });
-document.querySelectorAll('input[name="gs-untracked"]').forEach(i => i.addEventListener('change', () => patchToday({ untracked: i.value === '1' })));
+document.querySelectorAll('input[name="gs-untracked"]').forEach(i => i.addEventListener('click', () => {
+  const val = i.value === '1', cur = computeDay(tradingDate(Date.now())).untrackedAns;
+  patchToday({ untracked: cur === val ? null : val });
+}));
 $('gs-notrade').addEventListener('click', () => { const t = computeDay(tradingDate(Date.now())); if (t.trades) return; patchToday({ noTradeDay: !t.noTrade }); });
 
 /* ---- weekly report (Mon–Fri trading days; made on/after Sunday) ---- */
