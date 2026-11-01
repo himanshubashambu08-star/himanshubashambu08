@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Trade Gate">
 <title>Gold Trade Gate</title>
+<script>try{var a=JSON.parse(localStorage.getItem('gtd.look')||'{}');if(a.palette&&a.palette!=='navy')document.documentElement.dataset.palette=a.palette;if(a.mode==='light'||a.mode==='dark')document.documentElement.dataset.theme=a.mode;}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -32,6 +33,29 @@
   --gold:#E9B949; --gold-hi:#F7D57E; --gold-soft:#2E2817; --on-gold:#1A1300; --glow:rgba(233,185,73,.10);
   --good:#3FD69A; --good-soft:#12302A; --bad:#FF7A72; --bad-soft:#3A1C24; --warn:#F7B24A; --warn-soft:#3A2A14; color-scheme:dark}
 
+
+/* Appearance: palettes chosen in Settings (data-palette on <html>); light/dark follows data-theme or the system */
+:root[data-palette="emerald"]{--bg:#F1F6F3; --surface:#FFFFFF; --ink:#0E261F; --muted:#4C6A5F; --line:#D3E2DA; --gold:#8A6516; --gold-hi:#B88A2C; --on-gold:#FFFFFF; --gold-soft:color-mix(in srgb,#8A6516 13%,#FFFFFF); --glow:color-mix(in srgb,#8A6516 12%,transparent);}
+@media (prefers-color-scheme: dark){:root[data-palette="emerald"]:not([data-theme="light"]){--bg:#06150F; --surface:#0D211A; --ink:#E9F3EE; --muted:#8FB1A3; --line:#1D3A2F; --gold:#E2C07A; --gold-hi:#F2DBA6; --on-gold:#1A1407; --gold-soft:color-mix(in srgb,#E2C07A 18%,#0D211A); --glow:color-mix(in srgb,#E2C07A 12%,transparent); color-scheme:dark}}
+:root[data-palette="emerald"][data-theme="dark"]{--bg:#06150F; --surface:#0D211A; --ink:#E9F3EE; --muted:#8FB1A3; --line:#1D3A2F; --gold:#E2C07A; --gold-hi:#F2DBA6; --on-gold:#1A1407; --gold-soft:color-mix(in srgb,#E2C07A 18%,#0D211A); --glow:color-mix(in srgb,#E2C07A 12%,transparent); color-scheme:dark}
+:root[data-palette="amethyst"]{--bg:#F5F3FA; --surface:#FFFFFF; --ink:#1D1532; --muted:#5E5676; --line:#E0DAEC; --gold:#6B46C1; --gold-hi:#8A66E0; --on-gold:#FFFFFF; --gold-soft:color-mix(in srgb,#6B46C1 13%,#FFFFFF); --glow:color-mix(in srgb,#6B46C1 12%,transparent);}
+@media (prefers-color-scheme: dark){:root[data-palette="amethyst"]:not([data-theme="light"]){--bg:#100C1C; --surface:#1A142B; --ink:#EEEAF8; --muted:#A29BBF; --line:#2D2545; --gold:#B59CFF; --gold-hi:#D2C3FF; --on-gold:#160F2A; --gold-soft:color-mix(in srgb,#B59CFF 18%,#1A142B); --glow:color-mix(in srgb,#B59CFF 12%,transparent); color-scheme:dark}}
+:root[data-palette="amethyst"][data-theme="dark"]{--bg:#100C1C; --surface:#1A142B; --ink:#EEEAF8; --muted:#A29BBF; --line:#2D2545; --gold:#B59CFF; --gold-hi:#D2C3FF; --on-gold:#160F2A; --gold-soft:color-mix(in srgb,#B59CFF 18%,#1A142B); --glow:color-mix(in srgb,#B59CFF 12%,transparent); color-scheme:dark}
+:root[data-palette="sapphire"]{--bg:#F2F5FB; --surface:#FFFFFF; --ink:#0F1A33; --muted:#55617D; --line:#D8E0EE; --gold:#2551C9; --gold-hi:#3F6EEB; --on-gold:#FFFFFF; --gold-soft:color-mix(in srgb,#2551C9 13%,#FFFFFF); --glow:color-mix(in srgb,#2551C9 12%,transparent);}
+@media (prefers-color-scheme: dark){:root[data-palette="sapphire"]:not([data-theme="light"]){--bg:#080D1A; --surface:#111A2E; --ink:#EAF0FF; --muted:#8E9CBE; --line:#22304D; --gold:#7EA4FF; --gold-hi:#A9C3FF; --on-gold:#0A1430; --gold-soft:color-mix(in srgb,#7EA4FF 18%,#111A2E); --glow:color-mix(in srgb,#7EA4FF 12%,transparent); color-scheme:dark}}
+:root[data-palette="sapphire"][data-theme="dark"]{--bg:#080D1A; --surface:#111A2E; --ink:#EAF0FF; --muted:#8E9CBE; --line:#22304D; --gold:#7EA4FF; --gold-hi:#A9C3FF; --on-gold:#0A1430; --gold-soft:color-mix(in srgb,#7EA4FF 18%,#111A2E); --glow:color-mix(in srgb,#7EA4FF 12%,transparent); color-scheme:dark}
+:root[data-palette="rosegold"]{--bg:#F9F5F3; --surface:#FFFFFF; --ink:#241A18; --muted:#6E5F5B; --line:#EADFDA; --gold:#9E5636; --gold-hi:#C27852; --on-gold:#FFFFFF; --gold-soft:color-mix(in srgb,#9E5636 13%,#FFFFFF); --glow:color-mix(in srgb,#9E5636 12%,transparent);}
+@media (prefers-color-scheme: dark){:root[data-palette="rosegold"]:not([data-theme="light"]){--bg:#110E0E; --surface:#1B1717; --ink:#F4EEEB; --muted:#AB9F9B; --line:#2F2828; --gold:#E9A887; --gold-hi:#F5C9B1; --on-gold:#2A140A; --gold-soft:color-mix(in srgb,#E9A887 18%,#1B1717); --glow:color-mix(in srgb,#E9A887 12%,transparent); color-scheme:dark}}
+:root[data-palette="rosegold"][data-theme="dark"]{--bg:#110E0E; --surface:#1B1717; --ink:#F4EEEB; --muted:#AB9F9B; --line:#2F2828; --gold:#E9A887; --gold-hi:#F5C9B1; --on-gold:#2A140A; --gold-soft:color-mix(in srgb,#E9A887 18%,#1B1717); --glow:color-mix(in srgb,#E9A887 12%,transparent); color-scheme:dark}
+:root[data-palette="teal"]{--bg:#F1F7F7; --surface:#FFFFFF; --ink:#0E2426; --muted:#4E6668; --line:#D3E3E3; --gold:#0C7468; --gold-hi:#17998A; --on-gold:#FFFFFF; --gold-soft:color-mix(in srgb,#0C7468 13%,#FFFFFF); --glow:color-mix(in srgb,#0C7468 12%,transparent);}
+@media (prefers-color-scheme: dark){:root[data-palette="teal"]:not([data-theme="light"]){--bg:#081315; --surface:#102024; --ink:#E7F3F3; --muted:#89A6A8; --line:#21393E; --gold:#4CD3C0; --gold-hi:#8BE7DA; --on-gold:#05201C; --gold-soft:color-mix(in srgb,#4CD3C0 18%,#102024); --glow:color-mix(in srgb,#4CD3C0 12%,transparent); color-scheme:dark}}
+:root[data-palette="teal"][data-theme="dark"]{--bg:#081315; --surface:#102024; --ink:#E7F3F3; --muted:#89A6A8; --line:#21393E; --gold:#4CD3C0; --gold-hi:#8BE7DA; --on-gold:#05201C; --gold-soft:color-mix(in srgb,#4CD3C0 18%,#102024); --glow:color-mix(in srgb,#4CD3C0 12%,transparent); color-scheme:dark}
+.theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.theme-opt{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;border:2px solid var(--line);background:var(--bg);cursor:pointer;text-align:left;color:var(--ink);font:600 14px var(--f-body)}
+.theme-opt[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 25%,transparent)}
+.theme-opt:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.theme-sw{height:44px;border-radius:8px;display:flex;align-items:flex-end;gap:5px;padding:7px;border:1px solid rgba(127,127,127,.25)}
+.theme-sw i{width:14px;height:14px;border-radius:50%;display:block;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
 *{box-sizing:border-box}
 .card,fieldset.step,.daybar{box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px -16px rgba(0,0,0,.45)}
 [hidden]{display:none!important}
@@ -515,6 +539,20 @@ details.tr summary::-webkit-details-marker{display:none}
 </section>
 
 <section id="view-settings" class="wrap" hidden>
+  <details class="card set" id="look-settings">
+    <summary><span class="set-ic" aria-hidden="true">🎨</span><span class="set-t"><b>Appearance</b><small>App ka color theme aur light/dark</small></span></summary>
+    <div class="set-body">
+      <div class="q"><span class="qlabel">Mode</span>
+        <div class="seg" id="look-mode">
+          <label><input type="radio" name="look-mode" value="auto" id="look-auto"><span>Auto</span></label>
+          <label><input type="radio" name="look-mode" value="light" id="look-light"><span>☀️ Light</span></label>
+          <label><input type="radio" name="look-mode" value="dark" id="look-dark"><span>🌙 Dark</span></label>
+        </div>
+      </div>
+      <div class="q"><span class="qlabel">Color theme</span><div class="theme-grid" id="look-grid"></div></div>
+      <p class="save-note">Theme sirf is phone/device pe save hota hai.</p>
+    </div>
+  </details>
   <details class="card set" id="acc-settings">
     <summary><span class="set-ic" aria-hidden="true">🗂</span><span class="set-t"><b>Accounts</b><small>Add, naam badlo, hatao</small></span></summary>
     <div class="set-body">
@@ -2045,6 +2083,28 @@ $('fc-notify').addEventListener('change', async e => {
   msgs($('fc-msg'), [['good', e.target.checked ? `Notification ON: ${FC().notifyTime} ET pe aaj ka focus.` : 'Notification OFF.']]);
 });
 syncFocusUI();
+
+/* ---------- appearance ---------- */
+const LOOKS = [{"id": "navy", "name": "Navy Gold", "L": {"bg": "#F3F5FA", "surface": "#FFFFFF", "gold": "#946500", "hi": "#C8901A", "ink": "#141A2B"}, "D": {"bg": "#0B1020", "surface": "#141B2E", "gold": "#E9B949", "hi": "#F7D57E", "ink": "#ECEFF7"}}, {"id": "emerald", "name": "Emerald Royal", "L": {"bg": "#F1F6F3", "surface": "#FFFFFF", "ink": "#0E261F", "muted": "#4C6A5F", "line": "#D3E2DA", "gold": "#8A6516", "hi": "#B88A2C", "on": "#FFFFFF"}, "D": {"bg": "#06150F", "surface": "#0D211A", "ink": "#E9F3EE", "muted": "#8FB1A3", "line": "#1D3A2F", "gold": "#E2C07A", "hi": "#F2DBA6", "on": "#1A1407"}}, {"id": "amethyst", "name": "Royal Amethyst", "L": {"bg": "#F5F3FA", "surface": "#FFFFFF", "ink": "#1D1532", "muted": "#5E5676", "line": "#E0DAEC", "gold": "#6B46C1", "hi": "#8A66E0", "on": "#FFFFFF"}, "D": {"bg": "#100C1C", "surface": "#1A142B", "ink": "#EEEAF8", "muted": "#A29BBF", "line": "#2D2545", "gold": "#B59CFF", "hi": "#D2C3FF", "on": "#160F2A"}}, {"id": "sapphire", "name": "Midnight Sapphire", "L": {"bg": "#F2F5FB", "surface": "#FFFFFF", "ink": "#0F1A33", "muted": "#55617D", "line": "#D8E0EE", "gold": "#2551C9", "hi": "#3F6EEB", "on": "#FFFFFF"}, "D": {"bg": "#080D1A", "surface": "#111A2E", "ink": "#EAF0FF", "muted": "#8E9CBE", "line": "#22304D", "gold": "#7EA4FF", "hi": "#A9C3FF", "on": "#0A1430"}}, {"id": "rosegold", "name": "Onyx Rose Gold", "L": {"bg": "#F9F5F3", "surface": "#FFFFFF", "ink": "#241A18", "muted": "#6E5F5B", "line": "#EADFDA", "gold": "#9E5636", "hi": "#C27852", "on": "#FFFFFF"}, "D": {"bg": "#110E0E", "surface": "#1B1717", "ink": "#F4EEEB", "muted": "#AB9F9B", "line": "#2F2828", "gold": "#E9A887", "hi": "#F5C9B1", "on": "#2A140A"}}, {"id": "teal", "name": "Pearl Teal", "L": {"bg": "#F1F7F7", "surface": "#FFFFFF", "ink": "#0E2426", "muted": "#4E6668", "line": "#D3E3E3", "gold": "#0C7468", "hi": "#17998A", "on": "#FFFFFF"}, "D": {"bg": "#081315", "surface": "#102024", "ink": "#E7F3F3", "muted": "#89A6A8", "line": "#21393E", "gold": "#4CD3C0", "hi": "#8BE7DA", "on": "#05201C"}}];
+const getLook = () => Object.assign({ palette: 'navy', mode: 'auto' }, LS.get('gtd.look') || {});
+const isDark = mode => mode === 'dark' || (mode === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+function applyLook(){
+  const { palette, mode } = getLook(), root = document.documentElement;
+  if (palette === 'navy') delete root.dataset.palette; else root.dataset.palette = palette;
+  if (mode === 'auto') delete root.dataset.theme; else root.dataset.theme = mode;
+  const L = LOOKS.find(x => x.id === palette) || LOOKS[0];
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', (isDark(mode) ? L.D : L.L).bg));
+}
+function renderLookUI(){
+  const look = getLook(), dark = isDark(look.mode);
+  const r = document.querySelector(`input[name="look-mode"][value="${look.mode}"]`); if (r) r.checked = true;
+  $('look-grid').innerHTML = LOOKS.map(x => { const t = dark ? x.D : x.L;
+    return `<button type="button" class="theme-opt" data-id="${x.id}" aria-pressed="${x.id === look.palette}"><span class="theme-sw" style="background:linear-gradient(135deg,${t.bg} 0 55%,${t.surface} 55%)"><i style="background:${t.gold}"></i><i style="background:${t.hi}"></i><i style="background:${t.ink}"></i></span>${x.name}</button>`; }).join('');
+  $('look-grid').querySelectorAll('.theme-opt').forEach(b => b.addEventListener('click', () => { LS.set('gtd.look', Object.assign(getLook(), { palette: b.dataset.id })); applyLook(); renderLookUI(); }));
+}
+document.querySelectorAll('input[name="look-mode"]').forEach(i => i.addEventListener('change', () => { LS.set('gtd.look', Object.assign(getLook(), { mode: i.value })); applyLook(); renderLookUI(); }));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { applyLook(); renderLookUI(); });
+applyLook(); renderLookUI();
 
 function renderAll(){
   focusCache = todayFocus();
