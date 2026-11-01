@@ -143,6 +143,12 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .stats .stat.wide{grid-column:1/-1}
 .stats .stat.wide b{font-size:18px}
 .prop{gap:12px}
+.vault{display:flex;flex-direction:column;gap:10px}
+.vault-head{display:flex;align-items:center;gap:10px}
+.vault-head b{font-family:var(--f-display);font-size:19px;font-weight:700}
+.vcode{font:500 44px/1 var(--f-num);letter-spacing:.25em;text-align:center;padding:14px 0 10px;border-radius:10px;background:var(--bg);color:var(--ink)}
+.vcode.hide{color:var(--muted)}
+.vbar{height:4px;border-radius:999px;background:var(--gold);transition:width 1s linear}
 .acc-switch{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
 .acc-switch .lbl{flex:none}
 .acc-switch select{flex:1;min-width:0;font:600 15px var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
@@ -305,6 +311,13 @@ details.tr summary::-webkit-details-marker{display:none}
     <div><span class="lbl">Aaj P&amp;L</span><b id="d-pnl">$0</b></div>
   </div>
   <div id="status" class="status ok"><span class="dot"></span><span id="status-text">Loading…</span></div>
+  <div class="card vault" id="vault" hidden>
+    <div class="vault-head"><span aria-hidden="true">🔐</span><b>TradingView unlock code</b></div>
+    <p class="save-note" id="vault-note"></p>
+    <div class="vcode hide" id="vault-code" aria-live="polite">• • • •</div>
+    <div class="vbar" id="vault-bar" style="width:0"></div>
+    <button class="btn" type="button" id="vault-show">Code dikhao (30 sec)</button>
+  </div>
   <p class="save-note" id="save-note"></p>
 
   <!-- Post-trade: must be completed before any new trade -->
@@ -461,6 +474,26 @@ details.tr summary::-webkit-details-marker{display:none}
       <label><input type="radio" name="cool" value="60" id="cool-60"><span>1 ghanta</span></label>
     </div>
     <div class="msgs" id="cool-msg"></div>
+    </div>
+  </details>
+  <details class="card set" id="st-settings">
+    <summary><span class="set-ic" aria-hidden="true">🔐</span><span class="set-t"><b>Screen Time lock (TradingView)</b><small>Passcode sirf Trade Gate ke paas, lock me code nahi milega</small></span></summary>
+    <div class="set-body">
+      <p class="save-note">iPhone ka apna Screen Time TradingView ko roz 1 minute ke baad band kar dega. Aage kholne ke liye passcode chahiye, jo Trade Gate sirf tab dikhata hai jab trading allowed ho. Cooldown, 2-loss, prop limit ya session ke bahar code nahi milega.</p>
+      <label class="chk"><input type="checkbox" id="st-on"><span>Trade tab pe unlock code dikhao</span></label>
+      <details class="howto"><summary>Setup (ek baar, 3 min)</summary>
+        <ol>
+          <li>Neeche <b>"Setup code dikhao"</b> dabao. Ye 4 digit ka code hai. Isse yaad mat rakhna.</li>
+          <li>iPhone <b>Settings → Screen Time</b>. Off hai to <b>Turn On App &amp; Website Activity</b>.</li>
+          <li><b>Lock Screen Time Settings</b> (ya "Use Screen Time Passcode") → yahi 4 digit code daalo, do baar. Apple ID recovery pooche to <b>Cancel</b> dabao.</li>
+          <li><b>App Limits → Add Limit</b> → <b>Finance</b> (ya search) → <b>TradingView</b> ✓ → <b>Next</b>.</li>
+          <li>Time <b>1 min</b>, <b>Block at End of Limit</b> ON → <b>Add</b>.</li>
+          <li>Ab TradingView band hone pe: <b>Ask For More Time → Enter Screen Time Passcode</b> → Trade Gate wala code → <b>Approve for 15 Minutes</b> (ya 1 hour).</li>
+        </ol>
+        <div class="vcode hide" id="st-setup-code">• • • •</div>
+        <div class="acct-btns"><button class="btn ghost" type="button" id="st-setup">Setup code dikhao</button><button class="btn ghost warn-text" type="button" id="st-new">Naya code banao</button></div>
+      </details>
+      <div class="msgs" id="st-msg"></div>
     </div>
   </details>
   <details class="card set" id="shortcut-card">
@@ -794,6 +827,7 @@ async function startUser(user){
     const v = snap.exists ? snap.data() : null;
     if (v && v.statusToken) setStatusToken(v.statusToken, user.uid);
     else if (!snap.metadata.fromCache) { const tok = makeToken(); settingsDoc.set({ statusToken: tok }, { merge: true }).catch(() => {}); setStatusToken(tok, user.uid); }
+    if (v && v.screenTime && JSON.stringify(v.screenTime) !== JSON.stringify(settings.screenTime)) { settings = Object.assign({}, settings, { screenTime: v.screenTime }); LS.set('gtd.settings', settings); syncST(); renderAll(); }
     if (v && (v.session || v.cooldown != null || v.prop || v.accounts)) { settings = Object.assign({}, settings, v.session ? { session: v.session } : {}, v.cooldown != null ? { cooldown: v.cooldown } : {}, v.prop ? { prop: v.prop } : {}, Array.isArray(v.accounts) && v.accounts.length ? { accounts: v.accounts } : {}); LS.set('gtd.settings', settings); syncSessionUI(); syncPropUI(); renderAll(); }
   }, () => {});
   setNote('Connecting…'); renderAll();
@@ -1325,6 +1359,63 @@ setInterval(() => {
   const info = dayInfo();
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil); else renderAll();
 }, 1000);
+/* ---------- Screen Time passcode vault ---------- */
+// The code lives in the user's settings. It is shown on the Trade tab only while trading is allowed.
+const ST = () => settings.screenTime || {};
+function saveST(patch){
+  const screenTime = Object.assign({}, ST(), patch);
+  settings = Object.assign({}, settings, { screenTime }); LS.set('gtd.settings', settings);
+  if (settingsDoc) settingsDoc.set({ screenTime }, { merge: true }).catch(() => {});
+}
+const newCode = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return String(a[0] % 10000).padStart(4, '0'); };
+function syncST(){ $('st-on').checked = !!ST().on; }
+let vaultTimer = null, vaultUntil = 0;
+function vaultBlock(info){
+  if (info.open) return null; // a trade is running: TradingView is already approved
+  if (info.lock) return info.cooldownUntil ? `Cooldown: ${fmtLeft(info.cooldownUntil - Date.now())} baaki.` : `${info.lock[0]}. Aaj code nahi milega.`;
+  const ss = sessionState(); if (ss.state === 'out') return `Session ke bahar ho (${ss.label}).`;
+  const ns = newsState(); if (ns.state === 'blocked') return ns.msg;
+  return null;
+}
+function hideVault(){ clearInterval(vaultTimer); vaultTimer = null; vaultUntil = 0; $('vault-code').textContent = '• • • •'; $('vault-code').classList.add('hide'); $('vault-bar').style.width = '0'; }
+function renderVault(info){
+  const on = !!ST().on && !!ST().code;
+  $('vault').hidden = !on;
+  if (!on) return;
+  const block = vaultBlock(info);
+  $('vault-show').disabled = !!block;
+  $('vault-show').textContent = block ? '🔒 Abhi code band hai' : 'Code dikhao (30 sec)';
+  $('vault-note').textContent = block ? `${block} TradingView ka code tab milega jab lock khatam ho.` : 'Trading allowed hai. Code se TradingView 15 min ke liye kholo, phir checklist yahan follow karo.';
+  if (block && vaultUntil) hideVault();
+}
+$('vault-show').addEventListener('click', () => {
+  if (vaultBlock(dayInfo()) || !ST().code) return;
+  saveST({ reveals: (ST().reveals || 0) + 1, lastReveal: Date.now() });
+  $('vault-code').textContent = ST().code.split('').join(' ');
+  $('vault-code').classList.remove('hide');
+  vaultUntil = Date.now() + 30e3;
+  clearInterval(vaultTimer);
+  vaultTimer = setInterval(() => { const left = vaultUntil - Date.now(); if (left <= 0) hideVault(); else $('vault-bar').style.width = (left / 30e3 * 100) + '%'; }, 250);
+});
+$('st-on').addEventListener('change', e => {
+  if (e.target.checked && !ST().code) saveST({ code: newCode() });
+  saveST({ on: e.target.checked });
+  msgs($('st-msg'), [['good', e.target.checked ? 'On. Ab Setup steps follow karo.' : 'Band. Trade tab pe code nahi dikhega.']]);
+  renderAll();
+});
+$('st-setup').addEventListener('click', () => {
+  if (!ST().code) saveST({ code: newCode() });
+  const el = $('st-setup-code');
+  el.textContent = ST().code.split('').join(' '); el.classList.remove('hide');
+  setTimeout(() => { el.textContent = '• • • •'; el.classList.add('hide'); }, 60e3);
+});
+$('st-new').addEventListener('click', () => {
+  pop('no', 'Naya code', 'Code badalna hai?', 'Purana code iPhone Screen Time me laga hua hai.', 'Naya code banaya to Screen Time ka passcode bhi badalna padega (Settings → Screen Time → Change Screen Time Passcode).', [
+    ['Haan, naya banao', 'danger', () => { saveST({ code: newCode() }); $('st-setup').click(); }],
+    ['Rehne do', 'ghost']
+  ]);
+});
+
 function renderAll(){
   renderAccounts();
   const info = dayInfo();
@@ -1345,6 +1436,7 @@ function renderAll(){
   $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : 'Kal naya din. Checklist kal apne aap khul jayegi.';
   cooldownActive = !!info.cooldownUntil;
   renderProp();
+  renderVault(info);
   pushStatus(info); renderShortcut();
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil);
   if (info.open) openTradeView(info.open); else evaluate();
@@ -1592,6 +1684,8 @@ restoreDraft();
 syncSessionUI();
 syncPropUI();
 renderShortcut();
+syncST();
+setInterval(() => { if (ST().on) renderVault(dayInfo()); }, 15000);
 boot();
 loadNews();
 setInterval(() => { if (!form.hidden) evaluate(); else renderLive(); }, 60000);
