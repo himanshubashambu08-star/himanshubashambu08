@@ -191,6 +191,12 @@ pre.rules{font:500 11px/1.5 var(--f-num);background:var(--surface);border:1px so
 .btn.small{width:auto;padding:10px 14px;font-size:15px;flex:none}
 .set-t{flex:1}
 .pbar{display:flex;flex-direction:column;gap:4px}
+.room{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;background:var(--good-soft)}
+.room.warn{background:var(--warn-soft)} .room.bad{background:var(--bad-soft)}
+.room .lbl{color:var(--ink);opacity:.75}
+.room b{font:500 28px/1.1 var(--f-num);color:var(--good)}
+.room.warn b{color:var(--warn)} .room.bad b{color:var(--bad)}
+.room small{font-size:13px;color:var(--muted)}
 .pbar-top{display:flex;justify-content:space-between;gap:10px;font-size:13px;flex-wrap:wrap}
 .pbar-top b{font-weight:600}
 .pbar-top span{font-family:var(--f-num);font-size:12px;color:var(--muted)}
@@ -516,7 +522,8 @@ const STEPS = [
     qs:[ { k:'gate', t:'live' },
          { k:'newsManual', t:'tick', text:'Calendar khol ke dekha, abhi koi USD high-impact news nahi' },
          { k:'lvl5', t:'tick', text:'5pm close ke baad levels mark kiye' } ],
-    check: d => [ d.session === 'out' && ['bad', d.sessionMsg, 'hard'],
+    check: d => [ d.market === 'closed' && ['bad', d.marketMsg, 'hard'],
+                  d.session === 'out' && ['bad', d.sessionMsg, 'hard'],
                   d.news === 'blocked' && ['bad', d.newsMsg, 'hard'],
                   d.news === 'manual' && !d.newsManual && ['bad','News calendar check karo.'],
                   !d.lvl5 && ['bad','Levels mark karo.'] ] },
@@ -574,12 +581,22 @@ function sessionWindow(){
   const [a, b, name] = s.mode === 'custom' ? [s.start || '08:00', s.end || '11:00', 'Tumhara session'] : SESSIONS[s.mode] || [];
   return a ? { a: hm2min(a), b: hm2min(b), name } : null;
 }
+function marketState(at = new Date()){
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: ET, weekday: 'short' }).format(at);
+  const m = etMinutes(at), OPEN = 18 * 60, CLOSE = 17 * 60;
+  let why = '';
+  if (wd === 'Sat' || (wd === 'Sun' && m < OPEN) || (wd === 'Fri' && m >= CLOSE)) why = 'weekend';
+  else if (wd !== 'Sun' && wd !== 'Fri' && m >= CLOSE && m < OPEN) why = 'break';
+  return { closed: !!why, why,
+    msg: why === 'weekend' ? 'Market band hai (weekend). Gold futures Sunday 6:00 PM ET pe khulega.'
+       : why === 'break' ? 'Market ka daily break hai (5:00–6:00 PM ET). 6:00 PM ET ke baad trade.' : '' };
+}
 function sessionState(){
   const w = sessionWindow();
   if (!w) return { state: 'off', msg: '' };
   const now = etMinutes();
   const inside = w.a <= w.b ? now >= w.a && now < w.b : now >= w.a || now < w.b;
-  const label = `${w.name} ${minLabel(w.a)}–${minLabel(w.b)} ET`;
+  const label = `${w.name} ${minLabel(w.a)}–${minLabel(w.b)}${w.a > w.b ? ' (agle din)' : ''} ET`;
   return { state: inside ? 'in' : 'out', label, msg: `Session ke bahar ho (${label}). Abhi trade nahi.` };
 }
 
@@ -613,14 +630,16 @@ function newsState(){
 }
 function renderLive(){
   const box = $('live-box'); if (!box) return;
-  const ss = sessionState(), ns = newsState(), now = Date.now();
+  const ss = sessionState(), ns = newsState(), ms = marketState(), now = Date.now();
   const nowEt = minLabel(etMinutes());
+  const mkt = ms.closed ? `<span class="st-bad">✗ ${esc(ms.msg)}</span>` : `<span class="st-ok">✓ Market khula hai</span> · abhi ${nowEt} ET`;
   const sess = ss.state === 'off'
     ? `<span class="st-wait">Session set nahi hai.</span> <a href="#" data-goto="settings-card">Settings → Trading session</a> me apna time chuno.`
     : `${esc(ss.label)} · abhi ${nowEt} ET · ${ss.state === 'in' ? '<span class="st-ok">✓ andar ho</span>' : '<span class="st-bad">✗ bahar ho</span>'}`;
   let nw;
-  if (news.status === 'loading') nw = `<span class="st-wait">Aaj ki news la raha hoon…</span>`;
-  else if (news.status === 'failed') nw = `<span class="st-bad">News load nahi hui.</span> <a href="${CAL_URL}" target="_blank" rel="noopener">Forex Factory calendar kholo ↗</a>, phir neeche tick karo.`;
+  if (ms.closed && ms.why === 'weekend') nw = `<span class="st-wait">Weekend hai, news check ki zaroorat nahi.</span>`;
+  else if (news.status === 'loading') nw = `<span class="st-wait">Aaj ki news la raha hoon…</span>`;
+  else if (news.status === 'failed') nw = `<span class="st-wait">Calendar apne aap load nahi hua.</span> <a href="${CAL_URL}" target="_blank" rel="noopener">Forex Factory calendar kholo ↗</a>, dekh ke neeche tick karo.`;
   else {
     const todays = news.events.filter(e => etDate(e.t) === etDate());
     const list = todays.length ? `<ul class="nlist">${todays.map(e => {
@@ -629,7 +648,7 @@ function renderLive(){
     const head = ns.state === 'blocked' ? `<span class="st-bad">✗ News ka time hai</span>` : todays.length ? `<span class="st-ok">✓ Abhi news window nahi</span>` : `<span class="st-ok">✓ Aaj koi USD high-impact news nahi</span>`;
     nw = `${head} · <a href="${CAL_URL}" target="_blank" rel="noopener">Calendar ↗</a>${list}${news.stale ? '<span class="st-wait">Purani copy dikh rahi hai, internet check karo.</span>' : ''}`;
   }
-  box.innerHTML = `<div class="live-row"><b>🕐 Session</b><span>${sess}</span></div><div class="live-row"><b>📰 USD news (ET)</b><div>${nw}</div></div>`;
+  box.innerHTML = `<div class="live-row"><b>📈 Market (CME gold)</b><span>${mkt}</span></div><div class="live-row"><b>🕐 Session</b><span>${sess}</span></div><div class="live-row"><b>📰 USD news (ET)</b><div>${nw}</div></div>`;
 }
 function syncSessionUI(){
   const c = document.querySelector(`input[name="cool"][value="${settings.cooldown || 0}"]`); if (c) c.checked = true;
@@ -898,6 +917,12 @@ function renderProp(){
   const { P } = ps, bars = [];
   const lvl = used => used >= 80 ? 'bad' : used >= 50 ? 'warn' : '';
   $('prop-title').textContent = `Prop account · ${money(ps.balance)}`;
+  if (ps.room < Infinity) {
+    const room = Math.max(0, ps.room), per = 5 * PER, sls = Math.floor(room / per);
+    const which = ps.ddRoom <= ps.dailyRoom ? 'Max drawdown wali limit pehle aayegi' : 'Aaj ki daily limit pehle aayegi';
+    const lv = room <= 500 ? 'bad' : room <= 1000 ? 'warn' : '';
+    bars.push(`<div class="room ${lv}"><span class="lbl">Asli room · aaj itna hi loss ho sakta hai</span><b>${money(room)}</b><small>${which} · $5 SL pe sirf ${sls} loss ki doori</small></div>`);
+  }
   if (+P.daily) {
     const used = Math.max(0, -ps.todayPnl) / P.daily * 100;
     bars.push(propBar('Aaj ka loss limit', `${money(Math.min(0, ps.todayPnl))} / ${money(-P.daily)} · ${money(Math.max(0, ps.dailyRoom))} bacha`, used, lvl(used)));
@@ -990,9 +1015,10 @@ function readDraft(){
     if (q.t === 'tick') d[q.k] = $('q-' + q.k).checked;
     if (q.t === 'seg') d[q.k] = (form.querySelector(`input[name="${q.k}"]:checked`) || {}).value || null;
   }));
-  const ss = sessionState(), ns = newsState();
-  d.session = ss.state; d.sessionMsg = ss.msg; d.news = ns.state; d.newsMsg = ns.msg;
-  d.gate = ss.state === 'out' || ns.state === 'blocked';
+  const ss = sessionState(), ns = newsState(), ms = marketState();
+  d.session = ss.state; d.sessionMsg = ss.msg; d.news = ms.closed ? 'ok' : ns.state; d.newsMsg = ns.msg;
+  d.market = ms.closed ? 'closed' : 'open'; d.marketMsg = ms.msg;
+  d.gate = ms.closed || ss.state === 'out' || (!ms.closed && ns.state === 'blocked');
   return d;
 }
 function restoreDraft(){
@@ -1017,7 +1043,7 @@ const STEP_SUM = [
 ];
 function evaluate(fromUser){
   const d = readDraft();
-  const { session, sessionMsg, news: _n, newsMsg, gate, ...keep } = d;
+  const { session, sessionMsg, news: _n, newsMsg, gate, market, marketMsg, ...keep } = d;
   LS.set('gtd.draft', Object.assign({ _date: today() }, keep));
   STEPS.forEach(s => s.qs.forEach(q => { if (q.t === 'tick') $('qt-' + q.k).textContent = typeof q.text === 'function' ? q.text(d) : q.text; }));
   $('q-newsManual').closest('label').hidden = d.news !== 'manual';
@@ -1272,6 +1298,7 @@ function renderAll(){
   if (info.open) { st.className = 'status open'; $('status-text').textContent = 'Trade open hai. Close karke result bharo, tabhi agla trade khulega.'; }
   else if (info.cooldownUntil) { st.className = 'status lock'; $('status-text').textContent = `Cooldown: ${fmtLeft(info.cooldownUntil - Date.now())} baaki. Abhi trade nahi.`; }
   else if (info.lock) { st.className = 'status lock'; $('status-text').textContent = info.lock[0] + '. Aaj aur trade nahi.'; }
+  else if (marketState().closed) { st.className = 'status lock'; $('status-text').textContent = marketState().msg; }
   else { st.className = 'status ok'; $('status-text').textContent = 'Trading allowed. Upar se neeche tap karte jao.'; }
   $('open-card').hidden = !info.open;
   $('locked-card').hidden = !(info.lock && !info.open);
@@ -1529,6 +1556,8 @@ syncPropUI();
 boot();
 loadNews();
 setInterval(() => { if (!form.hidden) evaluate(); else renderLive(); }, 60000);
+let lastMarketClosed = marketState().closed;
+setInterval(() => { const c = marketState().closed; if (c !== lastMarketClosed) { lastMarketClosed = c; renderAll(); } }, 60000);
 setInterval(loadNews, 3600e3);
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('../sw.js').catch(() => {});
 let lastDay = today();
