@@ -67,6 +67,11 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .gs-msg{font-weight:600;font-size:15px}
 .gs-chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .gs-chip{font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--line)}
+.gs-chip.bad{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
+.gs-acc{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-size:15px}
+.gs-acc.on{border-color:var(--gold)}
+.gs-acc b{font-family:var(--f-num);font-size:20px;font-weight:500}
+.gs-acc small{color:var(--muted);font-size:12px;display:block}
 .gs-chip.gold{background:var(--gold-soft);color:var(--gold);border-color:var(--gold)}
 .gs-cat{display:grid;grid-template-columns:96px 1fr 64px;gap:10px;align-items:center;font-size:14px}
 .gs-cat span:last-child{font-family:var(--f-num);text-align:right}
@@ -455,10 +460,15 @@ details.tr summary::-webkit-details-marker{display:none}
     <div class="gs-msg" id="gs-msg"></div>
     <div class="gs-chips" id="gs-chips"></div>
   </div>
+  <div class="card" id="gs-acc-card" hidden>
+    <h2>Accounts · aaj</h2>
+    <div class="wrap" style="gap:8px" id="gs-acc-list"></div>
+  </div>
   <div class="card" id="gs-check">
-    <h2>Aaj ka checklist</h2>
+    <h2 id="gs-check-title">Aaj ka checklist</h2>
     <p class="save-note">Jo app khud nahi dekh sakta, wo yahan tap karo. Baaki trades se apne aap bharta hai.</p>
     <div class="wrap" style="gap:10px" id="gs-manual"></div>
+    <div class="gs-q"><span>Aaj app ke bahar koi trade liya?</span><div class="seg"><label><input type="radio" name="gs-untracked" value="1" class="t-bad"><span>Haan</span></label><label><input type="radio" name="gs-untracked" value="0" class="t-good"><span>Nahi</span></label></div></div>
     <div class="q"><label class="qlabel" for="gs-mistake">Aaj ki ek galti</label><input class="in" id="gs-mistake" maxlength="140" placeholder="Jaise: level se pehle entry li" style="font:400 15px var(--f-body)"></div>
     <div class="q"><label class="qlabel" for="gs-good">Aaj ki ek achhi baat</label><input class="in" id="gs-good" maxlength="140" placeholder="Jaise: SL move nahi kiya" style="font:400 15px var(--f-body)"></div>
     <button class="btn ghost" type="button" id="gs-notrade" style="width:100%">🧘 No valid setup today</button>
@@ -1600,13 +1610,15 @@ function computeDay(date, bucket = gsBucket()){
   const doc = scoreDocs[gsDocId(date, bucket)] || {};
   const manual = doc.manual || {}, notes = doc.notes || {};
   const list = dayTrades(date, bucket);
-  const noTrade = !!doc.noTradeDay && !list.length;
+  const untracked = doc.untracked === true;
+  const noTrade = !!doc.noTradeDay && !list.length && !untracked;
   const P = (accounts().find(a => bucket.endsWith(a.id)) || {}).prop || {};
   const dayPnl = list.reduce((s, t) => s + (t.pnl || 0), 0);
   const results = gsSettings.rules.map(r => {
     let frac = 0, how = 'manual';
     if (r.cat === 'exec' && (EXEC_CHECK[r.src] || r.src === 'manual')) {
-      if (noTrade) { frac = gsSettings.noTradeFull ? 1 : 0; how = 'patience'; }
+      if (untracked) { frac = 0; how = 'untracked'; }
+      else if (noTrade) { frac = gsSettings.noTradeFull ? 1 : 0; how = 'patience'; }
       else if (!list.length) { frac = 0; how = 'notrade'; }
       else if (EXEC_CHECK[r.src]) { frac = list.filter(EXEC_CHECK[r.src]).length / list.length; how = 'auto'; }
       else frac = manual[r.id] ? 1 : 0;
@@ -1620,7 +1632,7 @@ function computeDay(date, bucket = gsBucket()){
     return { id: r.id, cat: r.cat, label: r.label, pts: +r.pts || 0, earned, how };
   });
   const total = Math.round(results.reduce((s, x) => s + x.earned, 0));
-  return { date, bucket, total, results, trades: list.length, noTrade, manual, notes };
+  return { date, bucket, total, results, trades: list.length, noTrade, untracked, untrackedAns: doc.untracked, manual, notes };
 }
 function gsHistory(bucket = gsBucket()){
   const dates = new Set();
@@ -1629,6 +1641,20 @@ function gsHistory(bucket = gsBucket()){
   dates.add(tradingDate(Date.now()));
   return [...dates].sort().map(d => computeDay(d, bucket));
 }
+// a day counts for an account when it has trades or a saved score (today always counts for the account in use)
+function gsHasData(d, bucket){ return !!(d.trades || scoreDocs[gsDocId(d.date, bucket)] || (d.date === tradingDate(Date.now()) && bucket === gsBucket())); }
+// combined score: average of all real accounts that have data that day (test mode excluded)
+function combinedHistory(){
+  const byDate = {};
+  accounts().forEach(a => gsHistory(a.id).forEach(d => { if (gsHasData(d, a.id)) (byDate[d.date] = byDate[d.date] || []).push(Object.assign({ name: a.name, acc: a.id }, d)); }));
+  return Object.keys(byDate).sort().map(date => {
+    const list = byDate[date];
+    return { date, total: Math.round(list.reduce((s, d) => s + d.total, 0) / list.length), results: list.flatMap(d => d.results), accounts: list,
+      trades: list.reduce((s, d) => s + d.trades, 0), noTrade: list.every(d => d.noTrade), untracked: list.some(d => d.untracked) };
+  });
+}
+const growthSeries = () => testMode ? gsHistory().filter(d => gsHasData(d, gsBucket())) : combinedHistory();
+const weekKey = () => testMode ? gsBucket() : 'all';
 function persistToday(){
   if (!gsSettings.on) return;
   const today = tradingDate(Date.now()), r = computeDay(today), id = gsDocId(today);
@@ -1675,23 +1701,34 @@ function renderGrowth(){
   if (!gsSettings.on) { if (!$('view-growth').hidden) show('trade'); return; }
   persistToday();
   if ($('view-growth').hidden) return;
-  const hist = gsHistory(), today = hist[hist.length - 1], prev = hist.slice(0, -1).reverse().find(d => d.trades || scoreDocs[gsDocId(d.date)]);
+  const todayDate = tradingDate(Date.now()), today = computeDay(todayDate);
+  const series = growthSeries();
+  if (!series.length || series[series.length - 1].date !== todayDate) series.push(Object.assign({ accounts: [] }, today));
+  const hero = series[series.length - 1], prev = series[series.length - 2];
   const tgt = +gsSettings.target || 0;
-  $('gs-day-lbl').textContent = `Aaj ka discipline score · ${shortDate(today.date)}${testMode ? ' · 🧪 test' : ''}`;
-  $('gs-today').innerHTML = `${today.total}<small>/100</small>`;
-  $('gs-today').style.color = today.total >= tgt ? 'var(--good)' : today.total >= tgt - 15 ? 'var(--warn)' : 'var(--bad)';
+  $('gs-day-lbl').textContent = testMode ? `Aaj ka score · ${shortDate(hero.date)} · 🧪 test (combined me nahi)` : `Aaj ka combined score · ${shortDate(hero.date)}${accounts().length > 1 ? ` · ${(hero.accounts || []).length || 1} accounts` : ''}`;
+  $('gs-today').innerHTML = `${hero.total}<small>/100</small>`;
+  $('gs-today').style.color = hero.total >= tgt ? 'var(--good)' : hero.total >= tgt - 15 ? 'var(--warn)' : 'var(--bad)';
   if (prev) {
-    const diff = today.total - prev.total;
+    const diff = hero.total - prev.total;
     $('gs-vs').innerHTML = `Kal (${esc(shortDate(prev.date))}): ${prev.total} · <span class="${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '+' : '−'}${Math.abs(diff)}</span>`;
   } else $('gs-vs').textContent = 'Pehla din. Kal se compare hoga.';
-  const lowest = today.results.filter(r => r.pts > r.earned).sort((a, b) => (b.pts - b.earned) - (a.pts - a.earned))[0];
+  const lw = topMissed([hero], 1)[0], lowest = lw ? { label: lw[0] } : null;
   $('gs-msg').textContent = !prev ? (lowest ? `Fix: ${lowest.label}` : 'Perfect din ✅')
-    : today.total > prev.total ? 'Beat yesterday ✅' : today.total === prev.total ? (lowest ? `Kal ke barabar. Fix: ${lowest.label}` : 'Perfect, kal ke barabar ✅') : `Below yesterday — fix: ${lowest ? lowest.label : '—'}`;
+    : hero.total > prev.total ? 'Beat yesterday ✅' : hero.total === prev.total ? (lowest ? `Kal ke barabar. Fix: ${lowest.label}` : 'Perfect, kal ke barabar ✅') : `Below yesterday — fix: ${lowest ? lowest.label : '—'}`;
   // streak: consecutive scored days at or above target (days with no data, like weekends, are skipped)
-  const scored = hist.filter(d => d.trades || scoreDocs[gsDocId(d.date)]);
+  const scored = series;
   let streak = 0; for (let i = scored.length - 1; i >= 0; i--) { if (scored[i].total >= tgt) streak++; else break; }
   const last7 = scored.slice(-7), avg7 = last7.length ? Math.round(last7.reduce((s, d) => s + d.total, 0) / last7.length) : 0;
-  $('gs-chips').innerHTML = [`🔥 Streak ${streak} din`, `7-din avg ${avg7}`, `Target ${tgt}`].map(t => `<span class="gs-chip">${t}</span>`).join('') + (today.noTrade ? '<span class="gs-chip gold">🧘 Patience day</span>' : '');
+  $('gs-chips').innerHTML = [`🔥 Streak ${streak} din`, `7-din avg ${avg7}`, `Target ${tgt}`].map(t => `<span class="gs-chip">${t}</span>`).join('') + (today.noTrade ? '<span class="gs-chip gold">🧘 Patience day</span>' : '') + (today.untracked || hero.untracked ? '<span class="gs-chip bad">⚠ Untracked trade</span>' : '');
+  // per-account scores today
+  $('gs-acc-card').hidden = testMode;
+  if (!testMode) $('gs-acc-list').innerHTML = accounts().map(a => {
+    const d = computeDay(todayDate, a.id), on = a.id === activeId(), counted = gsHasData(d, a.id);
+    return `<div class="gs-acc${on ? ' on' : ''}"><span>${esc(a.name)}${on ? ' · abhi chuna hua' : ''}<small>${counted ? `${d.trades} trade${d.trades === 1 ? '' : 's'}${d.noTrade ? ' · patience' : ''}${d.untracked ? ' · untracked' : ''}` : 'aaj koi data nahi, combined me nahi gina'}</small></span><b>${counted ? d.total : '—'}</b></div>`;
+  }).join('');
+  $('gs-check-title').textContent = `Aaj ka checklist · ${testMode ? '🧪 test' : activeAcc().name}`;
+  document.querySelectorAll('input[name="gs-untracked"]').forEach(i => { i.checked = today.untrackedAns === (i.value === '1'); });
 
   // today's checklist: manual yes/no rules + notes + no-trade button
   const man = $('gs-manual'); man.innerHTML = '';
@@ -1706,9 +1743,9 @@ function renderGrowth(){
   if (document.activeElement !== $('gs-mistake')) $('gs-mistake').value = today.notes.mistake || '';
   if (document.activeElement !== $('gs-good')) $('gs-good').value = today.notes.good || '';
   const nt = $('gs-notrade');
-  nt.disabled = !!today.trades;
+  nt.disabled = !!today.trades || today.untracked;
   nt.textContent = today.noTrade ? '🧘 Patience day (tap karke hatao)' : '🧘 No valid setup today';
-  msgs($('gs-check-msg'), today.trades ? [] : today.noTrade ? [['good', gsSettings.noTradeFull ? 'Patience day: execution ke poore 50 points.' : 'Patience day mark hua.']] : [['warn', 'Aaj koi trade nahi hai. Setup hi nahi bana to "No valid setup today" dabao.']]);
+  msgs($('gs-check-msg'), today.untracked ? [['bad', 'Untracked trade: aaj ka execution 0. Har trade app se lo, tabhi score milega.']] : today.trades ? [] : today.noTrade ? [['good', gsSettings.noTradeFull ? 'Patience day: execution ke poore 50 points.' : 'Patience day mark hua.']] : [['warn', 'Aaj koi trade nahi hai. Setup hi nahi bana to "No valid setup today" dabao.']]);
 
   // breakdown
   const cats = {}; today.results.forEach(r => { cats[r.cat] = cats[r.cat] || [0, 0]; cats[r.cat][0] += r.earned; cats[r.cat][1] += r.pts; });
@@ -1718,7 +1755,7 @@ function renderGrowth(){
   }).join('');
   $('gs-rules-today').innerHTML = today.results.map(r => {
     const cls = r.earned >= r.pts ? 'ok' : r.earned > 0 ? 'part' : 'no', ic = cls === 'ok' ? '✓' : cls === 'part' ? '◐' : '✗';
-    return `<li><span class="${cls}">${ic}</span><span>${esc(r.label)}${r.how === 'notrade' ? ' <span class="pt">(aaj trade nahi)</span>' : ''}</span><span class="pt">${r.earned}/${r.pts}</span></li>`;
+    return `<li><span class="${cls}">${ic}</span><span>${esc(r.label)}${r.how === 'notrade' ? ' <span class="pt">(aaj trade nahi)</span>' : r.how === 'untracked' ? ' <span class="pt">(app ke bahar trade)</span>' : ''}</span><span class="pt">${r.earned}/${r.pts}</span></li>`;
   }).join('');
 
   // chart + most missed
@@ -1732,6 +1769,7 @@ function renderGrowth(){
 }
 $('gs-mistake').addEventListener('change', e => { const t = computeDay(tradingDate(Date.now())); patchToday({ notes: Object.assign({}, t.notes, { mistake: e.target.value.trim() }) }); });
 $('gs-good').addEventListener('change', e => { const t = computeDay(tradingDate(Date.now())); patchToday({ notes: Object.assign({}, t.notes, { good: e.target.value.trim() }) }); });
+document.querySelectorAll('input[name="gs-untracked"]').forEach(i => i.addEventListener('change', () => patchToday({ untracked: i.value === '1' })));
 $('gs-notrade').addEventListener('click', () => { const t = computeDay(tradingDate(Date.now())); if (t.trades) return; patchToday({ noTradeDay: !t.noTrade }); });
 
 /* ---- weekly report (Mon–Fri trading days; made on/after Sunday) ---- */
@@ -1749,14 +1787,14 @@ function weekStats(scored, mon){
 }
 let weeklyBusy = false;
 async function buildWeekly(scored, mon, force){
-  const id = `${gsBucket()}_${mon}`;
+  const id = `${weekKey()}_${mon}`;
   if (weeklyBusy || (!force && weeklyDocs[id])) return;
   const st = weekStats(scored, mon); if (!st) { if (force) msgs($('gs-week-body'), [['warn', 'Is hafte abhi koi score nahi hai.']]); return; }
   weeklyBusy = true; renderWeekly('Mentor tips likh raha hai…');
   let tips = [];
   try { tips = await weeklyTips(st); } catch {}
   weeklyBusy = false;
-  saveWeekly(Object.assign({ id, bucket: gsBucket(), createdAt: Date.now() }, st, { tips }));
+  saveWeekly(Object.assign({ id, bucket: weekKey(), createdAt: Date.now() }, st, { tips }));
   renderWeekly();
 }
 function maybeWeekly(scored){
@@ -1766,7 +1804,7 @@ function maybeWeekly(scored){
   buildWeekly(scored, addDays(lastSun, -6), false);
 }
 function renderWeekly(busy){
-  const mine = Object.values(weeklyDocs).filter(w => w.bucket === gsBucket()).sort((a, b) => (a.from < b.from ? 1 : -1));
+  const mine = Object.values(weeklyDocs).filter(w => w.bucket === weekKey()).sort((a, b) => (a.from < b.from ? 1 : -1));
   const w = mine[0], body = $('gs-week-body');
   if (busy) { body.innerHTML = `<div class="loading"><span class="spin"></span>${esc(busy)}</div>`; return; }
   if (!w) return;
@@ -1776,7 +1814,9 @@ function renderWeekly(busy){
     ${w.topBroken.length ? `<b style="font-size:14px">Sabse zyada toote rules</b><ul>${w.topBroken.map(b => `<li>${esc(b.label)} <span class="pt">(−${b.lost})</span></li>`).join('')}</ul>` : '<p class="save-note">Is hafte koi rule nahi toota. 🔥</p>'}
     ${(w.tips || []).length ? `<b style="font-size:14px">🧑‍🏫 Mentor tips</b><ul>${w.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '<p class="save-note">Mentor tips abhi nahi aaye (internet ya AI busy). "Report abhi banao" se dobara try karo.</p>'}`;
 }
-$('gs-week-now').addEventListener('click', () => { const scored = gsHistory().filter(d => d.trades || scoreDocs[gsDocId(d.date)]); buildWeekly(scored, mondayOf(tradingDate(Date.now())), true); });
+$('gs-week-now').addEventListener('click', () => buildWeekly(growthSeries(), mondayOf(tradingDate(Date.now())), true));
+// read-only hooks for the automated tests in /tests
+window.__tradeGate = Object.freeze({ tradingDate, mondayOf });
 async function weeklyTips(st){
   const base = `https://www.gstatic.com/firebasejs/${AI_VERSION}`;
   await loadAI(); // sets up the 'mentor' app with App Check
