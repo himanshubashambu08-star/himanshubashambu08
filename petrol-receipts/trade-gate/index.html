@@ -434,6 +434,8 @@ details.tr summary::-webkit-details-marker{display:none}
       <label for="p-dd">Max drawdown ($)<input class="in" id="p-dd" inputmode="numeric" placeholder="2000"></label>
       <label for="p-target">Profit target ($)<input class="in" id="p-target" inputmode="numeric" placeholder="3000"></label>
       <label for="p-cons">Consistency rule (%)<input class="in" id="p-cons" inputmode="numeric" placeholder="40 (nahi hai to khali)"></label>
+      <label for="p-mindays">Min trading days (pass ke liye)<input class="in" id="p-mindays" inputmode="numeric" placeholder="2"></label>
+      <label for="p-priordays">App se pehle kitne din trade kiye<input class="in" id="p-priordays" inputmode="numeric" placeholder="0"></label>
     </div>
     <div class="q"><span class="qlabel">Drawdown kaisa hai?</span>
       <div class="seg">
@@ -931,7 +933,8 @@ function renderProp(){
   const lvl = used => used >= 80 ? 'bad' : used >= 50 ? 'warn' : '';
   $('prop-title').textContent = `Prop account · ${P.phase === 'funded' ? 'FUNDED' : 'EVAL'} · ${money(ps.balance)}`;
   const eps = evalPassState(ps);
-  if (eps && !eps.passed) bars.push(`<div class="room warn"><span class="lbl">Target poora, par consistency baaki</span><b>${money(eps.need)}</b><small>Best din ${money(eps.best)} hai, isliye pass ke liye total profit itna chahiye</small></div>`);
+  if (eps && !eps.passed && eps.kind === 'cons') bars.push(`<div class="room warn"><span class="lbl">Target poora, par consistency baaki</span><b>${money(eps.need)}</b><small>Best din ${money(eps.best)} hai, isliye pass ke liye total profit itna chahiye</small></div>`);
+  if (eps && !eps.passed && eps.kind === 'days') bars.push(`<div class="room warn"><span class="lbl">Target poora, par trading days baaki</span><b>${eps.left} din aur</b><small>Abhi ${eps.days} din hue, pass ke liye ${P.minDays} chahiye. Profit bachao, chhota size rakho.</small></div>`);
   if (ps.room < Infinity) {
     const room = Math.max(0, ps.room), per = 5 * PER, sls = Math.floor(room / per);
     const which = ps.ddRoom <= ps.dailyRoom ? 'Max drawdown wali limit pehle aayegi' : 'Aaj ki daily limit pehle aayegi';
@@ -960,12 +963,14 @@ function renderProp(){
 function evalPassState(ps){
   const P = ps.P;
   if (P.phase === 'funded' || !(+P.target > 0) || ps.profit < P.target) return null;
+  const days = new Set(accTrades().filter(t => t.status === 'closed' && t.date >= (P.startDate || '0000')).map(t => t.date)).size + (+P.priorDays || 0);
+  if (+P.minDays && days < P.minDays) return { passed: false, kind: 'days', days, left: P.minDays - days };
   if (+P.cons) {
     // best single day may be at most cons% of total profit
     const byDay = {};
     accTrades().filter(t => t.status === 'closed' && t.date >= (P.startDate || '0000')).forEach(t => { byDay[t.date] = (byDay[t.date] || 0) + (t.pnl || 0); });
     const best = Math.max(0, ...Object.values(byDay));
-    if (best > P.cons / 100 * ps.profit) return { passed: false, need: Math.ceil(best / (P.cons / 100)), best };
+    if (best > P.cons / 100 * ps.profit) return { passed: false, kind: 'cons', need: Math.ceil(best / (P.cons / 100)), best };
   }
   return { passed: true };
 }
@@ -1016,6 +1021,7 @@ function syncPropUI(){
   const t = document.querySelector(`input[name="p-type"][value="${P.type || 'eod'}"]`); if (t) t.checked = true;
   $('p-start').value = P.startDate || today();
   $('p-cons').value = P.cons || '';
+  $('p-mindays').value = P.minDays || ''; $('p-priordays').value = P.priorDays || '';
   const F = P.funded || {};
   $('pf-on').checked = !!F.on; $('pf-daily').value = F.daily || ''; $('pf-dd').value = F.maxDD || ''; $('pf-cons').value = F.cons || ''; $('pf-target').value = F.target || '';
   const funded = P.phase === 'funded';
@@ -1027,7 +1033,7 @@ function saveProp(extra){
   const n = id => { const v = parseFloat(String($(id).value).replace(/[,$\s]/g, '')); return Number.isFinite(v) && v > 0 ? v : 0; };
   const prev = (activeAcc() || {}).prop || {};
   const prop = Object.assign({ adj: +prev.adj || 0 }, {
-    on: $('p-on').checked, size: n('p-size'), daily: n('p-daily'), maxDD: n('p-dd'), target: n('p-target'), cons: Math.min(100, n('p-cons')), sync: prev.sync || null,
+    on: $('p-on').checked, size: n('p-size'), daily: n('p-daily'), maxDD: n('p-dd'), target: n('p-target'), cons: Math.min(100, n('p-cons')), minDays: Math.round(n('p-mindays')), priorDays: Math.round(n('p-priordays')), sync: prev.sync || null,
     type: (document.querySelector('input[name="p-type"]:checked') || {}).value || 'eod', startDate: $('p-start').value || today(),
     phase: prev.phase || 'eval', evalBackup: prev.evalBackup || null, passedAt: prev.passedAt || null,
     funded: { on: $('pf-on').checked, daily: n('pf-daily'), maxDD: n('pf-dd'), cons: Math.min(100, n('pf-cons')), target: n('pf-target') }
