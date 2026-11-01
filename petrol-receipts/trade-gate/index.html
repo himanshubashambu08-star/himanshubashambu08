@@ -258,12 +258,13 @@ details.tr summary::-webkit-details-marker{display:none}
 .mentor{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:10px;background:var(--bg)}
 .mentor-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .verdict{font:700 13px var(--f-display);letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:999px}
-.verdict.take{background:var(--good-soft);color:var(--good)} .verdict.wait{background:var(--bad-soft);color:var(--bad)} .verdict.unclear{background:var(--warn-soft);color:var(--warn)}
+.verdict.take{background:var(--good-soft);color:var(--good)} .verdict.setup_ok{background:var(--gold-soft);color:var(--gold)} .verdict.wait{background:var(--bad-soft);color:var(--bad)} .verdict.unclear{background:var(--warn-soft);color:var(--warn)}
 .mentor h3{margin:0;font-size:16px;font-weight:600}
 .mchecks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .mchecks li{display:grid;grid-template-columns:22px 1fr;gap:8px;font-size:14px;align-items:start}
 .mchecks .ic{font-weight:700;text-align:center}
-.mchecks .ok{color:var(--good)} .mchecks .mismatch{color:var(--bad)} .mchecks .cant_tell{color:var(--muted)}
+.mchecks .ok{color:var(--good)} .mchecks .mismatch{color:var(--bad)} .mchecks .cant_tell{color:var(--muted)} .mchecks .wait{color:var(--gold)}
+.mstage{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
 .mchecks b{font-weight:600}
 .mtip{margin:0;font-size:14px;color:var(--muted)}
 .loading{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
@@ -385,7 +386,7 @@ details.tr summary::-webkit-details-marker{display:none}
       <div class="acct-btns">
         <label class="btn ghost" for="ph-in" tabindex="0">+ Screenshot daalo</label>
         <input type="file" id="ph-in" accept="image/*" multiple hidden>
-        <button class="btn ghost" type="button" id="mentor-btn" disabled>Mentor se check karao</button>
+        <button class="btn ghost" type="button" id="mentor-btn" disabled>Setup check karao</button>
       </div>
       <div id="mentor-out"></div>
     </div>
@@ -1128,6 +1129,8 @@ function evaluate(fromUser){
   LS.set('gtd.draft', Object.assign({ _date: today() }, keep));
   STEPS.forEach(s => s.qs.forEach(q => { if (q.t === 'tick') $('qt-' + q.k).textContent = typeof q.text === 'function' ? q.text(d) : q.text; }));
   $('q-newsManual').closest('label').hidden = d.news !== 'manual';
+  $('mentor-btn').textContent = stageOf(d) === 'entry' ? 'Entry check karao' : 'Setup check karao';
+  if (mentor && !mentorBusy) renderMentor();
   renderLive();
   const risk = $('ro-risk');
   if (d.sld) { const n = +d.sld; risk.className = 'ro ' + (n < 4 || n > 6 ? 'bad' : n === 6 ? 'warn' : 'good'); risk.querySelector('b').textContent = `−$${d.sld}${n>6?'+':''} · ${money(-n*PER)}`; }
@@ -1206,7 +1209,7 @@ function showAgainst(mv){
 function showGo(d){
   const n = +d.sld;
   const mv = mentor && mentor.forPhotos === photoKey(draftPhotos) ? mentor : null;
-  const mline = !mv ? (draftPhotos.length ? ' · Mentor check abhi nahi hua' : '') : mv.verdict === 'take' ? ' · Mentor: chart match karta hai' : mv.verdict === 'wait' ? ' · ⚠ Mentor: ruko, chart match nahi karta' : ' · Mentor: chart clear nahi';
+  const mline = !mv ? (draftPhotos.length ? ' · Mentor check abhi nahi hua' : '') : mv.stage === 'setup' ? ' · Mentor ne sirf setup dekha, entry check nahi hua' : mv.verdict === 'take' ? ' · Mentor: chart match karta hai' : mv.verdict === 'wait' ? ' · ⚠ Mentor: ruko, chart match nahi karta' : ' · Mentor: chart clear nahi';
   pop('go', 'Sab rules pass', 'Trade lo', `${d.dir.toUpperCase()} · SL $${n} · TP $15 · Risk ${money(-n*PER)} · 2 MGC${mline}`, pick('go'), [['Trade le liya, save karo', '', () => form.requestSubmit()], ['Abhi nahi', 'ghost']]);
 }
 function showResult(t){
@@ -1222,11 +1225,11 @@ form.addEventListener('submit', async e => {
   e.preventDefault(); evaluate();
   const info = dayInfo(); if (!plan || info.open || info.lock) return;
   const mv = currentMentor();
-  if (mv && mv.verdict === 'wait' && !confirmedAgainst) { showAgainst(mv); return; }
+  if (mv && mv.stage !== 'setup' && mv.verdict === 'wait' && !confirmedAgainst) { showAgainst(mv); return; }
   const t = Object.assign({ id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), lots: R.lots, status:'open', accountId: activeId() }, plan);
   t.photos = await savePhotos(t.id, 'setup', draftPhotos);
   if (mv) { const { forPhotos, ...m } = mv; t.mentor = m; }
-  if (mv && mv.verdict === 'wait') t.againstMentor = true;
+  if (mv && mv.stage !== 'setup' && mv.verdict === 'wait') t.againstMentor = true;
   confirmedAgainst = false;
   $('go').disabled = true;
   try { await store.save(t); form.reset(); LS.set('gtd.draft', null); draftPhotos = []; mentor = null; renderPhotos(); renderMentor(); renderAll(); window.scrollTo({ top: 0 }); }
@@ -1443,6 +1446,7 @@ function photoStrip(el, list){
 function renderPhotos(){
   photoStrip($('ph-list'), draftPhotos); photoStrip($('cph-list'), closePhotos);
   $('mentor-btn').disabled = !draftPhotos.length || mentorBusy;
+  $('mentor-btn').textContent = stageOf(readDraft()) === 'entry' ? 'Entry check karao' : 'Setup check karao';
 }
 async function savePhotos(tradeId, kind, list){
   const out = [];
@@ -1472,11 +1476,11 @@ const RULE_NAMES = { news:'00 News & levels', liquidity:'01 Liquidity $15+', tre
 const MENTOR_SCHEMA = {
   type: 'object',
   properties: {
-    verdict: { type: 'string', enum: ['take','wait','unclear'], description: 'take = charts support the trade under the rules; wait = at least one rule clearly fails on the chart; unclear = charts do not show enough.' },
+    verdict: { type: 'string', enum: ['take','setup_ok','wait','unclear'], description: 'take = everything incl. entry supports the trade; setup_ok = setup stage only: setup rules fine, entry trigger not yet; wait = at least one rule clearly fails on the chart; unclear = charts do not show enough.' },
     headline: { type: 'string', description: 'One short Hinglish sentence, the main message.' },
     checks: { type: 'array', items: { type: 'object', properties: {
       rule: { type: 'string', enum: RULE_KEYS },
-      status: { type: 'string', enum: ['ok','mismatch','cant_tell'] },
+      status: { type: 'string', enum: ['ok','mismatch','cant_tell','wait'] },
       note: { type: 'string', description: 'Short Hinglish reason based only on what is visible.' } }, required: ['rule','status','note'] } },
     tip: { type: 'string', description: 'One practical Hinglish tip for this setup.' }
   },
@@ -1503,6 +1507,7 @@ function loadAI(){
   }
   return aiPromise;
 }
+const stageOf = d => d.reached && d.broke ? 'entry' : 'setup';
 function mentorPrompt(d){
   const ans = v => v == null || v === false ? 'not answered' : v === true ? 'yes' : v;
   const liq = { lt15:'less than $15', '15':'$15-20', '20':'$20-30', '30':'$30+' }[d.liq];
@@ -1525,7 +1530,17 @@ function mentorPrompt(d){
     '- ok: the chart clearly supports it. mismatch: the chart clearly contradicts it (say what you see). cant_tell: that timeframe or detail is not visible (news is usually cant_tell).',
     '- Read prices only from the chart axes/labels; never invent numbers. If unsure, use cant_tell.',
     '- Give one check per rule, in order: news, liquidity, trend, entry, sl_tp.',
-    '- verdict: take only if nothing is a mismatch and trend + entry are ok; wait if anything is a mismatch; otherwise unclear.'
+    ...(stageOf(d) === 'setup' ? [
+      '',
+      'STAGE: SETUP CHECK. Price has not yet given the entry trigger; the trader is waiting at or near the 4H level and has not taken a trade.',
+      '- Judge only news, liquidity and trend (and whether price is at or approaching the 4H level).',
+      '- For entry and sl_tp use status "wait" (never mismatch just because the trigger has not happened). In the note say exactly what to wait for, e.g. "1m pe pehli rejection candle ka high toote tab entry" for a long, or its low for a short, and where the stop would go.',
+      '- verdict: setup_ok if news, liquidity and trend have no mismatch; wait (= stop, setup is wrong) if any of them is a mismatch; unclear if the charts do not show enough. Never use take at this stage.'
+    ] : [
+      '',
+      'STAGE: ENTRY CHECK. The trader says price reached the level and the first rejection candle broke; check every rule including entry and sl_tp.',
+      '- verdict: take only if nothing is a mismatch and trend + entry are ok; wait if anything is a mismatch; otherwise unclear. Do not use setup_ok at this stage.'
+    ])
   ].join('\n');
 }
 async function askMentor(d){
@@ -1547,10 +1562,10 @@ async function askMentor(d){
 }
 function mentorView(m){
   const w = document.createElement('div'); w.className = 'mentor';
-  const vt = { take:'Chart match ✓', wait:'Ruko', unclear:'Clear nahi' }[m.verdict] || m.verdict;
-  const icon = { ok:'✓', mismatch:'✗', cant_tell:'?' };
+  const vt = { take:'Chart match ✓', setup_ok:'Setup sahi · entry ka wait', wait:'Ruko', unclear:'Clear nahi' }[m.verdict] || m.verdict;
+  const icon = { ok:'✓', mismatch:'✗', cant_tell:'?', wait:'⏳' };
   const checks = RULE_KEYS.map(k => (m.checks || []).find(c => c.rule === k)).filter(Boolean);
-  w.innerHTML = `<div class="mentor-head"><span class="verdict ${esc(m.verdict)}">Mentor · ${esc(vt)}</span></div>
+  w.innerHTML = `<div class="mentor-head"><span class="verdict ${esc(m.verdict)}">Mentor · ${esc(vt)}</span><span class="mstage">${m.stage === 'setup' ? 'Setup check' : 'Entry check'}</span></div>
     <h3>${esc(m.headline || '')}</h3>
     <ul class="mchecks">${checks.map(c => `<li><span class="ic ${esc(c.status)}">${icon[c.status] || '?'}</span><span><b>${esc(RULE_NAMES[c.rule] || c.rule)}:</b> ${esc(c.note || '')}</span></li>`).join('')}</ul>
     ${m.tip ? `<p class="mtip">💡 ${esc(m.tip)}</p>` : ''}`;
@@ -1559,14 +1574,17 @@ function mentorView(m){
 function renderMentor(){
   const out = $('mentor-out'); out.innerHTML = '';
   if (mentorBusy) { out.innerHTML = '<div class="loading"><span class="spin"></span>Mentor chart dekh raha hai… (10–30 sec)</div>'; return; }
-  if (mentor && mentor.forPhotos === photoKey(draftPhotos)) out.appendChild(mentorView(mentor));
+  if (mentor && mentor.forPhotos === photoKey(draftPhotos)) {
+    out.appendChild(mentorView(mentor));
+    if (mentor.stage === 'setup' && stageOf(readDraft()) === 'entry') { const n = document.createElement('div'); n.className = 'msgs'; out.appendChild(n); msgs(n, [['warn', 'Ab entry ka time hai. 1m ka naya screenshot daalo aur "Entry check karao" dabao.']]); }
+  }
   else if (mentor && draftPhotos.length) msgs(out, [['warn', 'Photos badal gayi. Mentor se dobara check karao.']]);
 }
 $('mentor-btn').addEventListener('click', async () => {
   if (!draftPhotos.length || mentorBusy) return;
   mentorBusy = true; renderPhotos(); renderMentor();
   const key = photoKey(draftPhotos);
-  try { const m = await askMentor(readDraft()); mentor = Object.assign(m, { forPhotos: key, at: Date.now() }); mentorBusy = false; renderPhotos(); renderMentor(); }
+  try { const dd = readDraft(); const m = await askMentor(dd); mentor = Object.assign(m, { forPhotos: key, at: Date.now(), stage: stageOf(dd) }); mentorBusy = false; renderPhotos(); renderMentor(); }
   catch (err) {
     mentorBusy = false; renderPhotos(); renderMentor();
     const offline = !navigator.onLine || /Load failed|Failed to fetch|network/i.test(err?.message || '');
