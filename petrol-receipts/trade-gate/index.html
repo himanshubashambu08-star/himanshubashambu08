@@ -466,31 +466,30 @@ details.tr summary::-webkit-details-marker{display:none}
   <details class="card set" id="shortcut-card">
     <summary><span class="set-ic" aria-hidden="true">📱</span><span class="set-t"><b>TradingView lock (iPhone)</b><small>Lock ke time TradingView band karo</small></span></summary>
     <div class="set-body">
-    <p class="save-note">Cooldown ya lock chal raha ho aur tum TradingView kholo, to iPhone tumhe wapas Home Screen pe bhej dega aur batayega kitni der baaki hai. Ek baar setup karna hai.</p>
+    <p class="save-note">Lock ya cooldown chal raha ho aur tum TradingView kholo, to iPhone tumhe turant Home Screen pe wapas bhej dega. Ek baar 3 minute ka setup.</p>
     <div class="msgs" id="sc-status"></div>
-    <div class="q"><span class="qlabel">Tumhara status link (secret hai, kisi ko mat dena)</span>
-      <code class="url" id="sc-url">Sign in ke baad link yahan aayega…</code>
+    <div class="q"><span class="qlabel">Tumhara chhota link (type karna aasan hai)</span>
+      <code class="url" id="sc-short">Sign in ke baad link yahan aayega…</code>
       <div class="acct-btns"><button class="btn ghost" type="button" id="sc-copy">Link copy karo</button><a class="btn ghost" id="sc-open" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">Link test karo ↗</a></div>
     </div>
-    <details class="howto"><summary>Step 1 · Firebase rules update (ek baar, 2 min)</summary>
+    <details class="howto" open><summary>Shortcut banao (4 chhote actions)</summary>
+      <ol>
+        <li><b>Shortcuts</b> app → neeche <b>Automation</b> → upar <b>+</b> → <b>App</b>.</li>
+        <li><b>Choose</b> → <b>TradingView</b> → Done. <b>Is Opened</b> ✓ · <b>Run Immediately</b> → <b>Next</b> → <b>New Blank Automation</b>.</li>
+        <li><b>Add Action</b> → search <b>Get Contents of URL</b>. "URL" pe tap karke upar wala chhota link <b>type</b> kar do (paste ki zaroorat nahi).</li>
+        <li>Search <b>Get Text from Input</b> → add karo (ye link ka jawab text bana deta hai).</li>
+        <li>Search <b>If</b> → add karo. Condition: <b>Text</b> · <b>contains</b> · likho <code>STOPTRADING</code>.</li>
+        <li>If ke andar (Otherwise se upar) search <b>Go to Home Screen</b> → add karo. Chaho to uske upar <b>Show Notification</b> bhi: "Trade Gate lock hai".</li>
+        <li><b>Done</b>. Test: cooldown me TradingView kholo, turant band hona chahiye.</li>
+      </ol>
+      <p class="save-note" style="margin-top:8px">Lock ka time khatam hone ke baad bhi TradingView band ho, to Trade Gate ek baar khol lo. App status update kar dega aur TradingView khulne lagega.</p>
+    </details>
+    <details class="howto"><summary>Link test me error aaye to (Firebase rules)</summary>
       <ol>
         <li><a href="https://console.firebase.google.com/project/recite-66f60/firestore/rules" target="_blank" rel="noopener">Firebase console → Firestore → Rules</a> kholo.</li>
-        <li>Wahan jo likha hai sab hata ke neeche wala paste karo, phir <b>Publish</b> dabao.
+        <li>Sab hata ke ye paste karo, phir <b>Publish</b>.
           <pre class="rules" id="sc-rules"></pre>
           <div class="acct-btns" style="margin-top:6px"><button class="btn ghost" type="button" id="sc-rules-copy">Rules copy karo</button></div></li>
-        <li>Wapas aao aur upar "Link test karo" dabao. <code>lockUntil</code> wala text dikhe to rules sahi lage.</li>
-      </ol>
-    </details>
-    <details class="howto"><summary>Step 2 · iPhone Shortcut banao (5 min)</summary>
-      <ol>
-        <li><b>Shortcuts</b> app → neeche <b>Automation</b> → <b>+</b> → <b>App</b>.</li>
-        <li>App: <b>TradingView</b> chuno, <b>Is Opened</b> tick karo, <b>Run Immediately</b> chuno → <b>Next</b> → <b>New Blank Automation</b>.</li>
-        <li>Action add karo: <b>Get Contents of URL</b>. URL me upar wala status link paste karo.</li>
-        <li>Action: <b>Get Dictionary Value</b> → Key me likho <code>fields.lockUntil.stringValue</code>.</li>
-        <li>Action: <b>Get Dates from Input</b> (input: Dictionary Value).</li>
-        <li>Action: <b>If</b> → <b>Dates</b> <b>is after</b> <b>Current Date</b>.</li>
-        <li>If ke andar: <b>Get Dictionary Value</b> → Key <code>fields.message.stringValue</code> from <b>Contents of URL</b>, phir <b>Show Notification</b> (Dictionary Value), phir <b>Go to Home Screen</b>.</li>
-        <li><b>End If</b> ke baad kuch nahi. Done dabao. Ab cooldown me TradingView kholo, wo band ho jayega.</li>
       </ol>
     </details>
     </div>
@@ -718,6 +717,7 @@ function showAuth(){
 // so a Shortcut can read it when TradingView opens. It holds only the lock state, never trades.
 let statusRef = null, statusUid = null, statusToken = null, lastStatusKey = '', statusErr = '';
 const makeToken = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return Array.from(a, b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join(''); };
+const shortUrl = tok => `https://${(window.FIREBASE_CONFIG || {}).projectId}.web.app/s/${tok}`;
 const statusUrl = tok => `https://firestore.googleapis.com/v1/projects/${(window.FIREBASE_CONFIG || {}).projectId}/databases/(default)/documents/gateStatus/${tok}`;
 const RULES = `rules_version = '2';
 service cloud.firestore {
@@ -757,17 +757,17 @@ function pushStatus(info){
   lastStatusKey = key;
   const untilText = new Date(st.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   statusRef.set({
-    uid: statusUid, locked: st.locked, reason: st.reason,
+    uid: statusUid, state: st.locked ? 'STOPTRADING' : 'GO', reason: st.reason,
     lockUntil: new Date(st.until).toISOString(), untilText,
-    message: st.locked ? `🔒 Trade Gate: ${st.reason}. ${untilText} tak trade nahi.` : 'Trade Gate: trading allowed.',
+    message: st.locked ? `Trade Gate: ${st.reason}. ${untilText} tak trade nahi.` : 'Trade Gate: trading allowed.',
     updatedAt: new Date().toISOString()
   }).then(() => { statusErr = ''; renderShortcut(); })
     .catch(err => { statusErr = (err && err.code) || 'error'; lastStatusKey = ''; renderShortcut(); });
 }
 function renderShortcut(){
   const has = !!statusToken && !!statusRef;
-  $('sc-url').textContent = has ? statusUrl(statusToken) : 'Sign in ke baad link yahan aayega…';
-  $('sc-open').href = has ? statusUrl(statusToken) : '#';
+  $('sc-short').textContent = has ? shortUrl(statusToken).replace('https://', '') : 'Sign in ke baad link yahan aayega…';
+  $('sc-open').href = has ? shortUrl(statusToken) : '#';
   $('sc-rules').textContent = RULES;
   if (!has) { msgs($('sc-status'), []); return; }
   if (statusErr === 'permission-denied') msgs($('sc-status'), [['bad', 'Status save nahi ho raha. Pehle Step 1 (Firebase rules) karo.']]);
@@ -778,7 +778,7 @@ async function copyText(text, btn){
   try { await navigator.clipboard.writeText(text); const o = btn.textContent; btn.textContent = 'Copy ho gaya ✓'; setTimeout(() => btn.textContent = o, 1500); }
   catch { const r = document.createRange(); r.selectNodeContents(btn.closest('.q, li').querySelector('.url, pre')); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
 }
-$('sc-copy').addEventListener('click', e => { if (statusToken) copyText(statusUrl(statusToken), e.currentTarget); });
+$('sc-copy').addEventListener('click', e => { if (statusToken) copyText(shortUrl(statusToken), e.currentTarget); });
 $('sc-rules-copy').addEventListener('click', e => copyText(RULES, e.currentTarget));
 
 async function startUser(user){
