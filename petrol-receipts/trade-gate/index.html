@@ -153,6 +153,7 @@ textarea.in{font:400 15px var(--f-body);padding:10px 12px;border-radius:8px;bord
 .stats .stat.wide{grid-column:1/-1}
 .stats .stat.wide b{font-size:18px}
 .prop{gap:12px}
+.test-banner{background:repeating-linear-gradient(135deg,var(--warn-soft) 0 12px,color-mix(in srgb,var(--warn-soft) 60%,var(--bg)) 12px 24px);color:var(--warn);border:1px solid var(--warn);border-radius:10px;padding:8px 12px;font-weight:600;font-size:14px;text-align:center}
 .acc-switch{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 12px}
 .acc-switch .lbl{flex:none}
 .acc-switch select{flex:1;min-width:0;font:600 15px var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
@@ -313,6 +314,7 @@ details.tr summary::-webkit-details-marker{display:none}
     <button id="tab-journal" role="tab" aria-selected="false">Journal</button>
     <button id="tab-settings" role="tab" aria-selected="false">⚙ Settings</button>
   </div>
+  <div class="test-banner" id="test-banner" hidden>🧪 TEST MODE · market, session aur news check band · trades asli journal me nahi jayenge</div>
 </header>
 
 <section id="view-trade" class="wrap">
@@ -503,6 +505,15 @@ details.tr summary::-webkit-details-marker{display:none}
     <div class="msgs" id="cool-msg"></div>
     </div>
   </details>
+  <details class="card set" id="test-settings">
+    <summary><span class="set-ic" aria-hidden="true">🧪</span><span class="set-t"><b>Test mode</b><small>Market band ho tab bhi app test karo</small></span></summary>
+    <div class="set-body">
+      <p class="save-note">Test mode me market band, session aur news ke time wale check off ho jaate hain. Baaki sab asli jaisa chalta hai: checklist, pop-ups, mentor, cooldown, prop limits. Test ke trades alag test journal me jaate hain, asli journal aur prop balance pe koi asar nahi.</p>
+      <label class="chk"><input type="checkbox" id="test-on"><span>Test mode ON</span></label>
+      <button class="btn ghost warn-text" type="button" id="test-clear">Test trades saaf karo</button>
+      <div class="msgs" id="test-msg"></div>
+    </div>
+  </details>
   <details class="card set" id="acct">
     <summary><span class="set-ic" aria-hidden="true">👤</span><span class="set-t"><b>Account & backup</b><small>Sign out, backup, reset</small></span></summary>
     <div class="set-body">
@@ -597,6 +608,7 @@ function sessionWindow(){
   return a ? { a: hm2min(a), b: hm2min(b), name } : null;
 }
 function marketState(at = new Date()){
+  if (testMode) return { closed: false, why: '', msg: '' };
   const wd = new Intl.DateTimeFormat('en-US', { timeZone: ET, weekday: 'short' }).format(at);
   const m = etMinutes(at), OPEN = 18 * 60, CLOSE = 17 * 60;
   let why = '';
@@ -607,6 +619,7 @@ function marketState(at = new Date()){
        : why === 'break' ? 'Market ka daily break hai (5:00–6:00 PM ET). 6:00 PM ET ke baad trade.' : '' };
 }
 function sessionState(){
+  if (testMode) return { state: 'off', msg: '', test: true };
   const w = sessionWindow();
   if (!w) return { state: 'off', msg: '' };
   const now = etMinutes();
@@ -637,6 +650,7 @@ async function loadNews(){
   renderLive(); evaluate();
 }
 function newsState(){
+  if (testMode) return { state: 'ok', msg: '' };
   if (news.status !== 'ok') return { state: 'manual', msg: '' };
   const now = Date.now();
   const hit = news.events.find(e => now >= e.t - NEWS_BEFORE * 60e3 && now <= e.t + NEWS_AFTER * 60e3);
@@ -647,7 +661,7 @@ function renderLive(){
   const box = $('live-box'); if (!box) return;
   const ss = sessionState(), ns = newsState(), ms = marketState(), now = Date.now();
   const nowEt = minLabel(etMinutes());
-  const sess = ss.state === 'off'
+  const sess = ss.test ? `<span class="st-wait">🧪 Test mode: session aur news check band.</span>` : ss.state === 'off'
     ? `<span class="st-wait">Session set nahi hai.</span> <a href="#" data-goto="settings-card">Settings → Trading session</a> me apna time chuno.`
     : `${esc(ss.label)} · abhi ${nowEt} ET · ${ss.state === 'in' ? '<span class="st-ok">✓ andar ho</span>' : '<span class="st-bad">✗ bahar ho</span>'}`;
   let nw;
@@ -811,7 +825,10 @@ function accounts(){
 }
 const activeId = () => { const a = accounts(), want = LS.get('gtd.activeAccount'); return a.some(x => x.id === want) ? want : a[0].id; };
 const activeAcc = () => accounts().find(x => x.id === activeId());
-const accTrades = () => { const id = activeId(); return trades.filter(t => (t.accountId || DEFAULT_ACC) === id); };
+// Test mode keeps its trades in a separate bucket per account, so the real journal and prop balance stay clean.
+let testMode = !!LS.get('gtd.test');
+const tradeAccId = () => testMode ? '__test_' + activeId() : activeId();
+const accTrades = () => { const id = tradeAccId(); return trades.filter(t => (t.accountId || DEFAULT_ACC) === id); };
 function saveAccounts(list){
   settings = Object.assign({}, settings, { accounts: list }); LS.set('gtd.settings', settings);
   if (settingsDoc) settingsDoc.set({ accounts: list }, { merge: true }).catch(() => {});
@@ -1187,7 +1204,7 @@ function resetPlan(){ confirmedAgainst = false; form.reset(); LS.set('gtd.draft'
 function logSkip(reason){
   const d = readDraft();
   if (!d.dir) return; // nothing was being set up yet (e.g. news or session block before choosing a side)
-  store.save({ id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), status: 'skipped', accountId: activeId(),
+  store.save({ id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), status: 'skipped', accountId: tradeAccId(),
     dir: d.dir, sld: d.sld && +d.sld <= 6 && +d.sld >= 4 ? +d.sld : null, liq: d.liq || null, reason, review: null }).catch(() => {});
 }
 function showNo(reason){
@@ -1224,7 +1241,7 @@ form.addEventListener('submit', async e => {
   const info = dayInfo(); if (!plan || info.open || info.lock) return;
   const mv = currentMentor();
   if (mv && mv.stage !== 'setup' && mv.verdict === 'wait' && !confirmedAgainst) { showAgainst(mv); return; }
-  const t = Object.assign({ id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), lots: R.lots, status:'open', accountId: activeId() }, plan);
+  const t = Object.assign({ id: 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), createdAt: Date.now(), lots: R.lots, status:'open', accountId: tradeAccId() }, plan);
   t.photos = await savePhotos(t.id, 'setup', draftPhotos);
   if (mv) { const { forPhotos, ...m } = mv; t.mentor = m; }
   if (mv && mv.stage !== 'setup' && mv.verdict === 'wait') t.againstMentor = true;
@@ -1369,6 +1386,21 @@ setInterval(() => {
   const info = dayInfo();
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil); else renderAll();
 }, 1000);
+$('test-on').checked = testMode;
+$('test-on').addEventListener('change', e => {
+  testMode = e.target.checked; LS.set('gtd.test', testMode);
+  form.reset(); LS.set('gtd.draft', null); lastVerdict = null; draftPhotos = []; mentor = null; renderPhotos(); renderMentor();
+  renderAll(); renderLive();
+  msgs($('test-msg'), [['good', testMode ? 'Test mode ON. Trade tab pe jao aur poora flow try karo.' : 'Test mode OFF. Ab sab asli hai.']]);
+});
+$('test-clear').addEventListener('click', async () => {
+  const id = '__test_' + activeId();
+  const list = trades.filter(t => t.accountId === id);
+  if (!list.length) { msgs($('test-msg'), [['good', 'Koi test trade nahi hai.']]); return; }
+  try { await deleteTrades(list); msgs($('test-msg'), [['good', `${list.length} test trades saaf ho gaye.`]]); renderAll(); }
+  catch { msgs($('test-msg'), [['bad', 'Saaf nahi hua. Internet check karo.']]); }
+});
+
 function renderAll(){
   renderAccounts();
   const info = dayInfo();
@@ -1390,7 +1422,8 @@ function renderAll(){
   $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : 'Kal naya din. Checklist kal apne aap khul jayegi.';
   cooldownActive = !!info.cooldownUntil;
   renderProp();
-  checkEvalPass();
+  if (!testMode) checkEvalPass();
+  $('test-banner').hidden = !testMode;
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil);
   if (info.open) openTradeView(info.open); else evaluate();
   renderJournal();
