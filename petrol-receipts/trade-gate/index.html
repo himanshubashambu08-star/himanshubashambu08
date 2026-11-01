@@ -632,7 +632,6 @@ function renderLive(){
   const box = $('live-box'); if (!box) return;
   const ss = sessionState(), ns = newsState(), ms = marketState(), now = Date.now();
   const nowEt = minLabel(etMinutes());
-  const mkt = ms.closed ? `<span class="st-bad">✗ ${esc(ms.msg)}</span>` : `<span class="st-ok">✓ Market khula hai</span> · abhi ${nowEt} ET`;
   const sess = ss.state === 'off'
     ? `<span class="st-wait">Session set nahi hai.</span> <a href="#" data-goto="settings-card">Settings → Trading session</a> me apna time chuno.`
     : `${esc(ss.label)} · abhi ${nowEt} ET · ${ss.state === 'in' ? '<span class="st-ok">✓ andar ho</span>' : '<span class="st-bad">✗ bahar ho</span>'}`;
@@ -648,7 +647,7 @@ function renderLive(){
     const head = ns.state === 'blocked' ? `<span class="st-bad">✗ News ka time hai</span>` : todays.length ? `<span class="st-ok">✓ Abhi news window nahi</span>` : `<span class="st-ok">✓ Aaj koi USD high-impact news nahi</span>`;
     nw = `${head} · <a href="${CAL_URL}" target="_blank" rel="noopener">Calendar ↗</a>${list}${news.stale ? '<span class="st-wait">Purani copy dikh rahi hai, internet check karo.</span>' : ''}`;
   }
-  box.innerHTML = `<div class="live-row"><b>📈 Market (CME gold)</b><span>${mkt}</span></div><div class="live-row"><b>🕐 Session</b><span>${sess}</span></div><div class="live-row"><b>📰 USD news (ET)</b><div>${nw}</div></div>`;
+  box.innerHTML = `<div class="live-row"><b>🕐 Session</b><span>${sess}</span></div><div class="live-row"><b>📰 USD news (ET)</b><div>${nw}</div></div>`;
 }
 function syncSessionUI(){
   const c = document.querySelector(`input[name="cool"][value="${settings.cooldown || 0}"]`); if (c) c.checked = true;
@@ -1302,7 +1301,7 @@ function renderAll(){
   else { st.className = 'status ok'; $('status-text').textContent = 'Trading allowed. Upar se neeche tap karte jao.'; }
   $('open-card').hidden = !info.open;
   $('locked-card').hidden = !(info.lock && !info.open);
-  form.hidden = !!(info.open || info.lock);
+  form.hidden = !!(info.open || info.lock || marketState().closed);
   if (info.lock) { $('locked-title').textContent = info.lock[0]; $('locked-text').textContent = info.lock[1]; }
   $('locked-timer').hidden = !info.cooldownUntil;
   $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : 'Kal naya din. Checklist kal apne aap khul jayegi.';
