@@ -442,6 +442,20 @@ details.tr summary::-webkit-details-marker{display:none}
       </div>
     </div>
     <label class="field" for="p-start" style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)">Account kab shuru hua<input class="in" type="date" id="p-start"></label>
+    <details class="howto" id="p-funded-box"><summary>Pass hone ke baad: Funded rules</summary>
+      <div class="wrap" style="gap:12px;margin-top:10px">
+        <p class="save-note" id="p-phase"></p>
+        <label class="chk"><input type="checkbox" id="pf-on"><span>Eval pass hote hi ye rules apne aap lagao</span></label>
+        <div class="pgrid">
+          <label for="pf-daily">Daily loss limit ($)<input class="in" id="pf-daily" inputmode="numeric" placeholder="600"></label>
+          <label for="pf-dd">Max drawdown ($)<input class="in" id="pf-dd" inputmode="numeric" placeholder="1000"></label>
+          <label for="pf-cons">Consistency (%)<input class="in" id="pf-cons" inputmode="numeric" placeholder="nahi hai to khali"></label>
+          <label for="pf-target">Payout target ($)<input class="in" id="pf-target" inputmode="numeric" placeholder="khali"></label>
+        </div>
+        <p class="save-note">Pass tab maana jayega jab profit target poora ho aur consistency rule bhi theek ho. Funded start pe balance account size se aur MLL (size − drawdown) se shuru hoga.</p>
+        <button class="btn ghost warn-text" type="button" id="p-back-eval" hidden>Galti hui? Wapas Eval rules pe jao</button>
+      </div>
+    </details>
     <button class="btn" type="button" id="p-save">Save karo</button>
     <div class="q"><span class="qlabel">Dashboard se sync karo (purana peak, fees, commission sab match ho jayega)</span>
       <div class="pgrid">
@@ -915,7 +929,9 @@ function renderProp(){
   if (!ps) return;
   const { P } = ps, bars = [];
   const lvl = used => used >= 80 ? 'bad' : used >= 50 ? 'warn' : '';
-  $('prop-title').textContent = `Prop account · ${money(ps.balance)}`;
+  $('prop-title').textContent = `Prop account · ${P.phase === 'funded' ? 'FUNDED' : 'EVAL'} · ${money(ps.balance)}`;
+  const eps = evalPassState(ps);
+  if (eps && !eps.passed) bars.push(`<div class="room warn"><span class="lbl">Target poora, par consistency baaki</span><b>${money(eps.need)}</b><small>Best din ${money(eps.best)} hai, isliye pass ke liye total profit itna chahiye</small></div>`);
   if (ps.room < Infinity) {
     const room = Math.max(0, ps.room), per = 5 * PER, sls = Math.floor(room / per);
     const which = ps.ddRoom <= ps.dailyRoom ? 'Max drawdown wali limit pehle aayegi' : 'Aaj ki daily limit pehle aayegi';
@@ -940,6 +956,59 @@ function renderProp(){
   }
   $('prop-bars').innerHTML = bars.join('');
 }
+/* ---------- eval -> funded ---------- */
+function evalPassState(ps){
+  const P = ps.P;
+  if (P.phase === 'funded' || !(+P.target > 0) || ps.profit < P.target) return null;
+  if (+P.cons) {
+    // best single day may be at most cons% of total profit
+    const byDay = {};
+    accTrades().filter(t => t.status === 'closed' && t.date >= (P.startDate || '0000')).forEach(t => { byDay[t.date] = (byDay[t.date] || 0) + (t.pnl || 0); });
+    const best = Math.max(0, ...Object.values(byDay));
+    if (best > P.cons / 100 * ps.profit) return { passed: false, need: Math.ceil(best / (P.cons / 100)), best };
+  }
+  return { passed: true };
+}
+function switchToFunded(P){
+  const F = P.funded || {};
+  const backup = { daily: P.daily, maxDD: P.maxDD, cons: P.cons, target: P.target, type: P.type, startDate: P.startDate, sync: P.sync || null, adj: P.adj || 0 };
+  const now = Date.now(), dd = +F.maxDD || +P.maxDD || 0;
+  const prop = Object.assign({}, P, {
+    phase: 'funded', passedAt: now, evalBackup: backup,
+    daily: +F.daily || 0, maxDD: dd, cons: +F.cons || 0, target: +F.target || 0,
+    startDate: today(), adj: 0, sync: { at: now, date: today(), balance: P.size, mll: dd ? P.size - dd : null }
+  });
+  const id = activeId();
+  saveAccounts(accounts().map(a => a.id === id ? Object.assign({}, a, { prop }) : a));
+  syncPropUI(); renderAll();
+  pop('go', 'Eval pass 🎉', 'Funded rules lag gaye', `Daily ${F.daily ? money(F.daily) : 'off'} · Max loss ${dd ? money(dd) : 'off'} · Consistency ${F.cons ? F.cons + '%' : 'nahi'}`,
+    'Mubarak ho! Funded pe bhi wahi discipline. Lucid dashboard se balance aur MLL ek baar sync kar lena.', [
+      ['Theek hai', ''],
+      ['Galti hui, wapas Eval', 'ghost', backToEval]
+    ]);
+}
+function backToEval(){
+  const P = (activeAcc() || {}).prop; if (!P || !P.evalBackup) return;
+  const prop = Object.assign({}, P, P.evalBackup, { phase: 'eval', passedAt: null, evalBackup: null, evalDismissedCount: accTrades().filter(t => t.status === 'closed').length });
+  const id = activeId();
+  saveAccounts(accounts().map(a => a.id === id ? Object.assign({}, a, { prop }) : a));
+  syncPropUI(); renderAll();
+  msgs($('p-msg'), [['good', 'Wapas Eval rules pe aa gaye.']]);
+}
+$('p-back-eval').addEventListener('click', backToEval);
+let passChecking = false;
+function checkEvalPass(){
+  const ps = propState(); if (!ps || passChecking) return;
+  const P = ps.P, F = P.funded || {};
+  if (!F.on) return;
+  const st = evalPassState(ps);
+  if (!st || !st.passed) return;
+  // after an undo, wait for a new trade before switching again
+  if (P.evalDismissedCount != null && accTrades().filter(t => t.status === 'closed').length <= P.evalDismissedCount) return;
+  passChecking = true;
+  setTimeout(() => { passChecking = false; switchToFunded(P); }, 50);
+}
+
 function syncPropUI(){
   const P = (activeAcc() || {}).prop || {};
   $('p-on').checked = !!P.on;
@@ -947,6 +1016,11 @@ function syncPropUI(){
   const t = document.querySelector(`input[name="p-type"][value="${P.type || 'eod'}"]`); if (t) t.checked = true;
   $('p-start').value = P.startDate || today();
   $('p-cons').value = P.cons || '';
+  const F = P.funded || {};
+  $('pf-on').checked = !!F.on; $('pf-daily').value = F.daily || ''; $('pf-dd').value = F.maxDD || ''; $('pf-cons').value = F.cons || ''; $('pf-target').value = F.target || '';
+  const funded = P.phase === 'funded';
+  $('p-phase').textContent = funded ? `Abhi: FUNDED${P.passedAt ? ' · pass ' + new Date(P.passedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''}` : 'Abhi: EVAL';
+  $('p-back-eval').hidden = !(funded && P.evalBackup);
   $('p-synced').textContent = P.sync ? `Last sync: ${new Date(P.sync.at).toLocaleString(undefined, { day:'numeric', month:'short', hour:'numeric', minute:'2-digit' })} · balance ${money(+P.sync.balance)}${Number.isFinite(+P.sync.mll) ? ' · MLL ' + money(+P.sync.mll) : ''}` : '';
 }
 function saveProp(extra){
@@ -954,7 +1028,9 @@ function saveProp(extra){
   const prev = (activeAcc() || {}).prop || {};
   const prop = Object.assign({ adj: +prev.adj || 0 }, {
     on: $('p-on').checked, size: n('p-size'), daily: n('p-daily'), maxDD: n('p-dd'), target: n('p-target'), cons: Math.min(100, n('p-cons')), sync: prev.sync || null,
-    type: (document.querySelector('input[name="p-type"]:checked') || {}).value || 'eod', startDate: $('p-start').value || today()
+    type: (document.querySelector('input[name="p-type"]:checked') || {}).value || 'eod', startDate: $('p-start').value || today(),
+    phase: prev.phase || 'eval', evalBackup: prev.evalBackup || null, passedAt: prev.passedAt || null,
+    funded: { on: $('pf-on').checked, daily: n('pf-daily'), maxDD: n('pf-dd'), cons: Math.min(100, n('pf-cons')), target: n('pf-target') }
   }, extra || {});
   if (prop.on && !prop.size) { msgs($('p-msg'), [['bad', 'Account size daalo.']]); return false; }
   const id = activeId();
@@ -1307,6 +1383,7 @@ function renderAll(){
   $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : 'Kal naya din. Checklist kal apne aap khul jayegi.';
   cooldownActive = !!info.cooldownUntil;
   renderProp();
+  checkEvalPass();
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil);
   if (info.open) openTradeView(info.open); else evaluate();
   renderJournal();
