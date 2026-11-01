@@ -48,7 +48,7 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .brand h1 span{background:linear-gradient(180deg,var(--gold-hi),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
 .sym{font-family:var(--f-num);font-size:12px;color:var(--muted);letter-spacing:.04em}
 .tabs{display:flex;gap:6px}
-.tabs button{flex:1;white-space:nowrap;font:600 15px var(--f-body);padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button{flex:1;white-space:nowrap;font:600 14px var(--f-body);padding:9px 4px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
 .tabs button[aria-selected="true"]{background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:var(--on-gold);border-color:transparent;box-shadow:0 4px 14px -6px var(--gold)}
 
 .daybar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -59,6 +59,37 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .status.ok{background:var(--good-soft);color:var(--good)}
 .status.lock{background:var(--bad-soft);color:var(--bad)}
 .status.open{background:var(--gold-soft);color:var(--gold)}
+.gs-hero{display:flex;flex-direction:column;gap:6px;text-align:center;padding:18px 16px}
+.gs-big{font:500 64px/1 var(--f-num);letter-spacing:-.02em}
+.gs-big small{font-size:22px;color:var(--muted)}
+.gs-vs{font-family:var(--f-num);font-size:15px;color:var(--muted)}
+.gs-vs .up{color:var(--good)} .gs-vs .down{color:var(--bad)}
+.gs-msg{font-weight:600;font-size:15px}
+.gs-chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.gs-chip{font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--line)}
+.gs-chip.gold{background:var(--gold-soft);color:var(--gold);border-color:var(--gold)}
+.gs-cat{display:grid;grid-template-columns:96px 1fr 64px;gap:10px;align-items:center;font-size:14px}
+.gs-cat span:last-child{font-family:var(--f-num);text-align:right}
+.gs-q{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;font-size:14px}
+.gs-q .seg{flex-wrap:nowrap}
+.gs-q .seg label{min-width:64px}
+.gs-q .seg span{padding:8px 4px;font-size:14px}
+.gs-rlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.gs-rlist li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:start}
+.gs-rlist .pt{font-family:var(--f-num);color:var(--muted)}
+.gs-rlist .ok{color:var(--good)} .gs-rlist .part{color:var(--warn)} .gs-rlist .no{color:var(--bad)}
+.gs-chart{width:100%;height:auto;display:block}
+.gs-rules{display:flex;flex-direction:column;gap:8px}
+.gs-rule{display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.gs-rule .row2{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.gs-rule select,.gs-rule input{font:500 14px var(--f-body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px}
+.gs-rule .lbl-in{width:100%}
+.gs-rule .pts-in{width:64px;font-family:var(--f-num)}
+.gs-rule .tag{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.gs-rule .mini{padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;font-size:14px}
+.gs-week dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:14px}
+.gs-week dt{color:var(--muted)} .gs-week dd{margin:0;font-family:var(--f-num)}
+.gs-week ul{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:4px}
 .st-col{display:flex;flex-direction:column;gap:2px;min-width:0}
 #status-sub{font-family:var(--f-num);font-weight:500;font-size:14px;opacity:.9}
 .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
@@ -314,6 +345,7 @@ details.tr summary::-webkit-details-marker{display:none}
   <div class="tabs" role="tablist">
     <button id="tab-trade" role="tab" aria-selected="true">Trade</button>
     <button id="tab-journal" role="tab" aria-selected="false">Journal</button>
+    <button id="tab-growth" role="tab" aria-selected="false">Growth</button>
     <button id="tab-settings" role="tab" aria-selected="false">⚙ Settings</button>
   </div>
   <div class="test-banner" id="test-banner" hidden>🧪 TEST MODE · market, session aur news check band · trades asli journal me nahi jayenge</div>
@@ -415,6 +447,40 @@ details.tr summary::-webkit-details-marker{display:none}
   <div id="journal" class="wrap"></div>
 </section>
 
+<section id="view-growth" class="wrap" hidden>
+  <div class="card gs-hero">
+    <span class="lbl" id="gs-day-lbl">Aaj ka discipline score</span>
+    <div class="gs-big" id="gs-today">—<small>/100</small></div>
+    <div class="gs-vs" id="gs-vs"></div>
+    <div class="gs-msg" id="gs-msg"></div>
+    <div class="gs-chips" id="gs-chips"></div>
+  </div>
+  <div class="card" id="gs-check">
+    <h2>Aaj ka checklist</h2>
+    <p class="save-note">Jo app khud nahi dekh sakta, wo yahan tap karo. Baaki trades se apne aap bharta hai.</p>
+    <div class="wrap" style="gap:10px" id="gs-manual"></div>
+    <div class="q"><label class="qlabel" for="gs-mistake">Aaj ki ek galti</label><input class="in" id="gs-mistake" maxlength="140" placeholder="Jaise: level se pehle entry li" style="font:400 15px var(--f-body)"></div>
+    <div class="q"><label class="qlabel" for="gs-good">Aaj ki ek achhi baat</label><input class="in" id="gs-good" maxlength="140" placeholder="Jaise: SL move nahi kiya" style="font:400 15px var(--f-body)"></div>
+    <button class="btn ghost" type="button" id="gs-notrade" style="width:100%">🧘 No valid setup today</button>
+    <div class="msgs" id="gs-check-msg"></div>
+  </div>
+  <div class="card">
+    <h2>Aaj ka breakdown</h2>
+    <div class="wrap" style="gap:10px" id="gs-cats"></div>
+    <details class="howto"><summary>Har rule ke points</summary><ul class="gs-rlist" id="gs-rules-today" style="margin-top:10px"></ul></details>
+  </div>
+  <div class="card">
+    <h2>Last 30 din</h2>
+    <div id="gs-chart"></div>
+    <p class="save-note" id="gs-missed"></p>
+  </div>
+  <div class="card gs-week" id="gs-week">
+    <h2>Weekly report</h2>
+    <div id="gs-week-body"><p class="save-note">Sunday ko pichle hafte ki report apne aap banegi.</p></div>
+    <button class="btn ghost" type="button" id="gs-week-now" style="width:100%">Is hafte ki report abhi banao</button>
+  </div>
+</section>
+
 <section id="view-settings" class="wrap" hidden>
   <details class="card set" id="acc-settings">
     <summary><span class="set-ic" aria-hidden="true">🗂</span><span class="set-t"><b>Accounts</b><small>Add, naam badlo, hatao</small></span></summary>
@@ -505,6 +571,24 @@ details.tr summary::-webkit-details-marker{display:none}
       <label><input type="radio" name="cool" value="60" id="cool-60"><span>1 ghanta</span></label>
     </div>
     <div class="msgs" id="cool-msg"></div>
+    </div>
+  </details>
+  <details class="card set" id="gs-settings">
+    <summary><span class="set-ic" aria-hidden="true">📈</span><span class="set-t"><b>Daily Growth Score</b><small>Roz ka discipline score, 100 me se</small></span></summary>
+    <div class="set-body">
+      <label class="chk"><input type="checkbox" id="gs-on"><span>Daily Growth Score ON</span></label>
+      <p class="save-note">Rules aur points. Total 100 hona chahiye. Auto wale trades se bharte hain, yes/no wale Growth tab me tap karne hote hain.</p>
+      <div class="gs-rules" id="gs-rules"></div>
+      <div class="acct-btns"><button class="btn ghost" type="button" id="gs-add">+ Rule add karo</button><button class="btn ghost" type="button" id="gs-defaults">Default rules wapas</button></div>
+      <div class="msgs" id="gs-total"></div>
+      <label class="chk"><input type="checkbox" id="gs-ntf"><span>No-trade day = full execution marks</span></label>
+      <div class="pgrid">
+        <label for="gs-reset">Day reset (ET)<input class="in" type="time" id="gs-reset"></label>
+        <label for="gs-target">Daily target score<input class="in" id="gs-target" inputmode="numeric"></label>
+        <label for="gs-wstart">Trading window start (ET)<input class="in" type="time" id="gs-wstart"></label>
+        <label for="gs-wend">Window end (ET)<input class="in" type="time" id="gs-wend"></label>
+      </div>
+      <div class="msgs" id="gs-set-msg"></div>
     </div>
   </details>
   <details class="card set" id="test-settings">
@@ -790,6 +874,7 @@ function loadScript(src){
 function showAuth(){
   if (unsub) { unsub(); unsub = null; }
   if (unsubSettings) { unsubSettings(); unsubSettings = null; } settingsDoc = null;
+  growthStop();
   col = null; photosCol = null; trades = [];
   $('app').hidden = true; $('auth').hidden = false;
 }
@@ -801,6 +886,7 @@ async function startUser(user){
   col = firebase.firestore().collection('users').doc(user.uid).collection('trades');
   photosCol = firebase.firestore().collection('users').doc(user.uid).collection('tradePhotos');
   settingsDoc = firebase.firestore().collection('users').doc(user.uid).collection('meta').doc('tradeGate');
+  growthStart(firebase.firestore().collection('users').doc(user.uid));
   if (unsubSettings) unsubSettings();
   unsubSettings = settingsDoc.onSnapshot(snap => {
     const v = snap.exists ? snap.data() : null;
@@ -1443,6 +1529,316 @@ $('test-clear').addEventListener('click', async () => {
   catch { msgs($('test-msg'), [['bad', 'Saaf nahi hua. Internet check karo.']]); }
 });
 
+/* ================= Daily Growth Score ================= */
+// Process score out of 100 per trading day. Stored in users/{uid}/dailyScores/{bucket}_{date};
+// settings in users/{uid}/meta/growthScoreSettings; weekly reports in users/{uid}/weeklyReports.
+const GS_CATS = { prep: 'Prep', exec: 'Execution', mgmt: 'Day management', review: 'Review' };
+const GS_DEFAULT_RULES = [
+  { id: 'levels', cat: 'prep', label: 'Levels 5 PM close ke baad, session se pehle mark kiye', pts: 10, src: 'manual' },
+  { id: 'news', cat: 'prep', label: 'USD high-impact news check ki', pts: 10, src: 'manual' },
+  { id: 'gate', cat: 'exec', label: 'Trade gate checklist pass karke liya (liquidity, trend, sweep, first candle break)', pts: 15, src: 'gate' },
+  { id: 'lot', cat: 'exec', label: 'Lot size = 2 MGC', pts: 10, src: 'lot' },
+  { id: 'sl', cat: 'exec', label: 'SL $4–6 aur kabhi move nahi', pts: 10, src: 'sl' },
+  { id: 'target', cat: 'exec', label: 'Fixed $15 target, next liquidity chase nahi', pts: 10, src: 'target' },
+  { id: 'reentry', cat: 'exec', label: 'Fail hue level pe re-entry nahi', pts: 5, src: 'reentry' },
+  { id: 'stops', cat: 'mgmt', label: 'Din ke stop rules: W+W stop, W+L ek aur max, 2 loss stop', pts: 10, src: 'stops' },
+  { id: 'window', cat: 'mgmt', label: 'Sirf trading window ke andar trade', pts: 5, src: 'window' },
+  { id: 'dll', cat: 'mgmt', label: 'Lucid daily loss limit respect', pts: 5, src: 'dll' },
+  { id: 'shots', cat: 'review', label: 'Har trade screenshot ke saath journal', pts: 5, src: 'shots' },
+  { id: 'eod', cat: 'review', label: 'Din ka note: ek galti + ek achhi baat', pts: 5, src: 'eod' }
+];
+const GS_AUTO = { gate: 1, lot: 1, sl: 1, target: 1, reentry: 1, stops: 1, window: 1, dll: 1, shots: 1, eod: 1 };
+const defaultGS = () => ({ on: true, noTradeFull: true, reset: '18:00', winStart: '20:00', winEnd: '12:00', target: 90, rules: GS_DEFAULT_RULES.map(r => Object.assign({}, r)) });
+let gsSettings = Object.assign(defaultGS(), LS.get('gtd.gs') || {});
+let scoreDocs = LS.get('gtd.scores') || {};
+let weeklyDocs = LS.get('gtd.weekly') || {};
+let gsScoresCol = null, gsRef = null, gsWeeklyCol = null, gsUnsubs = [];
+
+function growthStart(userDoc){
+  growthStop();
+  gsScoresCol = userDoc.collection('dailyScores');
+  gsWeeklyCol = userDoc.collection('weeklyReports');
+  gsRef = userDoc.collection('meta').doc('growthScoreSettings');
+  gsUnsubs.push(gsRef.onSnapshot(sn => { if (sn.exists) { gsSettings = Object.assign(defaultGS(), sn.data()); LS.set('gtd.gs', gsSettings); syncGSUI(); renderGrowth(); } }, () => {}));
+  gsUnsubs.push(gsScoresCol.onSnapshot(sn => { scoreDocs = {}; sn.docs.forEach(d => { scoreDocs[d.id] = d.data(); }); LS.set('gtd.scores', scoreDocs); renderGrowth(); }, () => {}));
+  gsUnsubs.push(gsWeeklyCol.onSnapshot(sn => { weeklyDocs = {}; sn.docs.forEach(d => { weeklyDocs[d.id] = d.data(); }); LS.set('gtd.weekly', weeklyDocs); renderGrowth(); }, () => {}));
+}
+function growthStop(){ gsUnsubs.forEach(u => u()); gsUnsubs = []; gsScoresCol = gsRef = gsWeeklyCol = null; }
+function saveGS(){ LS.set('gtd.gs', gsSettings); if (gsRef) gsRef.set(gsSettings).catch(() => {}); }
+function saveScoreDoc(doc){ scoreDocs[doc.id] = doc; LS.set('gtd.scores', scoreDocs); if (gsScoresCol) gsScoresCol.doc(doc.id).set(doc).catch(() => {}); }
+function saveWeekly(doc){ weeklyDocs[doc.id] = doc; LS.set('gtd.weekly', weeklyDocs); if (gsWeeklyCol) gsWeeklyCol.doc(doc.id).set(doc).catch(() => {}); }
+
+// trading day: after the reset time (default 6 PM ET) it is already the next day's session
+function tradingDate(ms){ const d = new Date(ms); const day = etDate(d); return etMinutes(d) >= hm2min(gsSettings.reset || '18:00') ? nextDate(day) : day; }
+const prevDate = d => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - 1); return x.toISOString().slice(0, 10); };
+const shortDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+function inGsWindow(ms){ const m = etMinutes(new Date(ms)), a = hm2min(gsSettings.winStart || '20:00'), b = hm2min(gsSettings.winEnd || '12:00'); return a <= b ? m >= a && m < b : m >= a || m < b; }
+const gsBucket = () => tradeAccId();
+const gsDocId = (date, bucket = gsBucket()) => `${bucket}_${date}`;
+function dayTrades(date, bucket = gsBucket()){
+  return trades.filter(t => (t.accountId || DEFAULT_ACC) === bucket && t.status === 'closed' && tradingDate(t.createdAt || 0) === date).sort((a, b) => a.createdAt - b.createdAt);
+}
+function stopsFollowed(list){
+  let w = 0, l = 0, extra = null;
+  for (const t of list) {
+    if (w >= 2 || l >= 2) return false;
+    if (extra !== null) { if (extra <= 0) return false; extra--; }
+    const o = outcome(t); if (o === 'win') w++; else if (o === 'loss') l++;
+    if (w >= 1 && l >= 1 && extra === null) extra = 1;
+  }
+  return true;
+}
+// per-trade checks for the execution rules (fraction of trades that pass)
+const EXEC_CHECK = {
+  gate: t => !!(t.dir && t.t15 && t.t5 && t.sld),
+  lot: t => +t.lots === 2,
+  sl: t => +t.sld >= 4 && +t.sld <= 6 && !(t.ruleBreaks || []).includes('SL moved'),
+  target: t => t.result !== 'manual',
+  reentry: t => t.liq !== 'lt15' && t.fail !== 'yes'
+};
+function computeDay(date, bucket = gsBucket()){
+  const doc = scoreDocs[gsDocId(date, bucket)] || {};
+  const manual = doc.manual || {}, notes = doc.notes || {};
+  const list = dayTrades(date, bucket);
+  const noTrade = !!doc.noTradeDay && !list.length;
+  const P = (accounts().find(a => bucket.endsWith(a.id)) || {}).prop || {};
+  const dayPnl = list.reduce((s, t) => s + (t.pnl || 0), 0);
+  const results = gsSettings.rules.map(r => {
+    let frac = 0, how = 'manual';
+    if (r.cat === 'exec' && (EXEC_CHECK[r.src] || r.src === 'manual')) {
+      if (noTrade) { frac = gsSettings.noTradeFull ? 1 : 0; how = 'patience'; }
+      else if (!list.length) { frac = 0; how = 'notrade'; }
+      else if (EXEC_CHECK[r.src]) { frac = list.filter(EXEC_CHECK[r.src]).length / list.length; how = 'auto'; }
+      else frac = manual[r.id] ? 1 : 0;
+    } else if (r.src === 'stops') { frac = stopsFollowed(list) ? 1 : 0; how = 'auto'; }
+    else if (r.src === 'window') { frac = list.every(t => inGsWindow(t.createdAt || 0)) ? 1 : 0; how = 'auto'; }
+    else if (r.src === 'dll') { frac = !(+P.daily) || dayPnl > -P.daily ? 1 : 0; how = 'auto'; }
+    else if (r.src === 'shots') { frac = list.every(t => (t.photos || []).length > 0) ? 1 : 0; how = 'auto'; }
+    else if (r.src === 'eod') { frac = notes.mistake && notes.good ? 1 : 0; how = 'note'; }
+    else frac = manual[r.id] ? 1 : 0;
+    const earned = Math.round((+r.pts || 0) * frac * 10) / 10;
+    return { id: r.id, cat: r.cat, label: r.label, pts: +r.pts || 0, earned, how };
+  });
+  const total = Math.round(results.reduce((s, x) => s + x.earned, 0));
+  return { date, bucket, total, results, trades: list.length, noTrade, manual, notes };
+}
+function gsHistory(bucket = gsBucket()){
+  const dates = new Set();
+  Object.values(scoreDocs).forEach(d => { if (d.bucket === bucket) dates.add(d.date); });
+  trades.forEach(t => { if ((t.accountId || DEFAULT_ACC) === bucket && t.status === 'closed') dates.add(tradingDate(t.createdAt || 0)); });
+  dates.add(tradingDate(Date.now()));
+  return [...dates].sort().map(d => computeDay(d, bucket));
+}
+function persistToday(){
+  if (!gsSettings.on) return;
+  const today = tradingDate(Date.now()), r = computeDay(today), id = gsDocId(today);
+  const old = scoreDocs[id] || {};
+  const results = r.results.map(x => ({ id: x.id, cat: x.cat, label: x.label, pts: x.pts, earned: x.earned }));
+  if (old.total === r.total && JSON.stringify(old.results) === JSON.stringify(results)) return;
+  saveScoreDoc(Object.assign({}, old, { id, bucket: gsBucket(), accountId: activeId(), test: testMode, date: today, total: r.total, results, noTradeDay: !!old.noTradeDay, manual: old.manual || {}, notes: old.notes || {}, updatedAt: Date.now() }));
+}
+function patchToday(patch){
+  const today = tradingDate(Date.now()), id = gsDocId(today), old = scoreDocs[id] || {};
+  scoreDocs[id] = Object.assign({ id, bucket: gsBucket(), accountId: activeId(), test: testMode, date: today, manual: {}, notes: {} }, old, patch, { updatedAt: Date.now() });
+  persistToday(); saveScoreDoc(scoreDocs[id]); renderGrowth();
+}
+
+/* ---- Growth tab ---- */
+function chartSVG(days){
+  const W = 340, H = 150, L = 28, R = 8, T = 10, B = 22;
+  if (!days.length) return '<p class="save-note">Abhi data nahi hai.</p>';
+  const x = i => L + (days.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (days.length - 1));
+  const y = v => T + (100 - v) * (H - T - B) / 100;
+  const tgt = +gsSettings.target || 0;
+  const pts = days.map((d, i) => `${x(i).toFixed(1)},${y(d.total).toFixed(1)}`).join(' ');
+  const grid = [0, 50, 100].map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="var(--muted)">${v}</text>`).join('');
+  const area = `${x(0).toFixed(1)},${y(0)} ${pts} ${x(days.length - 1).toFixed(1)},${y(0)}`;
+  const last = days[days.length - 1];
+  return `<svg class="gs-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Last ${days.length} days score chart">
+    ${grid}
+    <line x1="${L}" x2="${W - R}" y1="${y(tgt)}" y2="${y(tgt)}" stroke="var(--gold)" stroke-dasharray="4 4" stroke-width="1"/>
+    <text x="${W - R}" y="${y(tgt) - 4}" text-anchor="end" font-size="10" fill="var(--gold)">target ${tgt}</text>
+    <polygon points="${area}" fill="var(--gold)" fill-opacity=".10"/>
+    <polyline points="${pts}" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linejoin="round"/>
+    ${days.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(d.total).toFixed(1)}" r="${i === days.length - 1 ? 4 : 2.5}" fill="${d.total >= tgt ? 'var(--good)' : 'var(--bad)'}"/>`).join('')}
+    <text x="${L}" y="${H - 6}" font-size="10" fill="var(--muted)">${shortDate(days[0].date)}</text>
+    <text x="${W - R}" y="${H - 6}" text-anchor="end" font-size="10" fill="var(--muted)">${shortDate(last.date)}</text>
+  </svg>`;
+}
+function topMissed(days, n){
+  const lost = {};
+  days.forEach(d => d.results.forEach(r => { const k = r.label; lost[k] = (lost[k] || 0) + (r.pts - r.earned); }));
+  return Object.entries(lost).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, n);
+}
+function renderGrowth(){
+  $('tab-growth').hidden = !gsSettings.on;
+  if (!gsSettings.on) { if (!$('view-growth').hidden) show('trade'); return; }
+  persistToday();
+  if ($('view-growth').hidden) return;
+  const hist = gsHistory(), today = hist[hist.length - 1], prev = hist.slice(0, -1).reverse().find(d => d.trades || scoreDocs[gsDocId(d.date)]);
+  const tgt = +gsSettings.target || 0;
+  $('gs-day-lbl').textContent = `Aaj ka discipline score · ${shortDate(today.date)}${testMode ? ' · 🧪 test' : ''}`;
+  $('gs-today').innerHTML = `${today.total}<small>/100</small>`;
+  $('gs-today').style.color = today.total >= tgt ? 'var(--good)' : today.total >= tgt - 15 ? 'var(--warn)' : 'var(--bad)';
+  if (prev) {
+    const diff = today.total - prev.total;
+    $('gs-vs').innerHTML = `Kal (${esc(shortDate(prev.date))}): ${prev.total} · <span class="${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '+' : '−'}${Math.abs(diff)}</span>`;
+  } else $('gs-vs').textContent = 'Pehla din. Kal se compare hoga.';
+  const lowest = today.results.filter(r => r.pts > r.earned).sort((a, b) => (b.pts - b.earned) - (a.pts - a.earned))[0];
+  $('gs-msg').textContent = !prev ? (lowest ? `Fix: ${lowest.label}` : 'Perfect din ✅')
+    : today.total > prev.total ? 'Beat yesterday ✅' : today.total === prev.total ? (lowest ? `Kal ke barabar. Fix: ${lowest.label}` : 'Perfect, kal ke barabar ✅') : `Below yesterday — fix: ${lowest ? lowest.label : '—'}`;
+  // streak: consecutive scored days at or above target (days with no data, like weekends, are skipped)
+  const scored = hist.filter(d => d.trades || scoreDocs[gsDocId(d.date)]);
+  let streak = 0; for (let i = scored.length - 1; i >= 0; i--) { if (scored[i].total >= tgt) streak++; else break; }
+  const last7 = scored.slice(-7), avg7 = last7.length ? Math.round(last7.reduce((s, d) => s + d.total, 0) / last7.length) : 0;
+  $('gs-chips').innerHTML = [`🔥 Streak ${streak} din`, `7-din avg ${avg7}`, `Target ${tgt}`].map(t => `<span class="gs-chip">${t}</span>`).join('') + (today.noTrade ? '<span class="gs-chip gold">🧘 Patience day</span>' : '');
+
+  // today's checklist: manual yes/no rules + notes + no-trade button
+  const man = $('gs-manual'); man.innerHTML = '';
+  gsSettings.rules.filter(r => !GS_AUTO[r.src] && !(r.cat === 'exec' && (today.trades || today.noTrade))).forEach(r => {
+    const v = today.manual[r.id];
+    const row = document.createElement('div'); row.className = 'gs-q';
+    row.innerHTML = `<span></span><div class="seg"><label><input type="radio" name="gsq-${esc(r.id)}" value="1" class="t-good" ${v === true ? 'checked' : ''}><span>Haan</span></label><label><input type="radio" name="gsq-${esc(r.id)}" value="0" class="t-bad" ${v === false ? 'checked' : ''}><span>Nahi</span></label></div>`;
+    row.firstChild.textContent = `${r.label} (${r.pts})`;
+    row.querySelectorAll('input').forEach(i => i.addEventListener('change', () => patchToday({ manual: Object.assign({}, today.manual, { [r.id]: i.value === '1' }) })));
+    man.appendChild(row);
+  });
+  if (document.activeElement !== $('gs-mistake')) $('gs-mistake').value = today.notes.mistake || '';
+  if (document.activeElement !== $('gs-good')) $('gs-good').value = today.notes.good || '';
+  const nt = $('gs-notrade');
+  nt.disabled = !!today.trades;
+  nt.textContent = today.noTrade ? '🧘 Patience day (tap karke hatao)' : '🧘 No valid setup today';
+  msgs($('gs-check-msg'), today.trades ? [] : today.noTrade ? [['good', gsSettings.noTradeFull ? 'Patience day: execution ke poore 50 points.' : 'Patience day mark hua.']] : [['warn', 'Aaj koi trade nahi hai. Setup hi nahi bana to "No valid setup today" dabao.']]);
+
+  // breakdown
+  const cats = {}; today.results.forEach(r => { cats[r.cat] = cats[r.cat] || [0, 0]; cats[r.cat][0] += r.earned; cats[r.cat][1] += r.pts; });
+  $('gs-cats').innerHTML = Object.keys(GS_CATS).filter(c => cats[c]).map(c => {
+    const [e, t] = cats[c], pct = t ? e / t * 100 : 0;
+    return `<div class="gs-cat"><span>${GS_CATS[c]}</span><div class="track"><div class="fill ${pct >= 90 ? '' : pct >= 60 ? 'warn' : 'bad'}" style="width:${pct}%"></div></div><span>${Math.round(e)}/${t}</span></div>`;
+  }).join('');
+  $('gs-rules-today').innerHTML = today.results.map(r => {
+    const cls = r.earned >= r.pts ? 'ok' : r.earned > 0 ? 'part' : 'no', ic = cls === 'ok' ? '✓' : cls === 'part' ? '◐' : '✗';
+    return `<li><span class="${cls}">${ic}</span><span>${esc(r.label)}${r.how === 'notrade' ? ' <span class="pt">(aaj trade nahi)</span>' : ''}</span><span class="pt">${r.earned}/${r.pts}</span></li>`;
+  }).join('');
+
+  // chart + most missed
+  const last30 = scored.slice(-30);
+  $('gs-chart').innerHTML = chartSVG(last30.length ? last30 : [today]);
+  const miss = topMissed(last7.length ? last7 : [today], 1)[0];
+  $('gs-missed').textContent = miss ? `Last 7 din me sabse zyada chhoota: ${miss[0]} (−${Math.round(miss[1])} pts)` : 'Last 7 din me koi rule nahi chhoota. 🔥';
+
+  maybeWeekly(scored);
+  renderWeekly();
+}
+$('gs-mistake').addEventListener('change', e => { const t = computeDay(tradingDate(Date.now())); patchToday({ notes: Object.assign({}, t.notes, { mistake: e.target.value.trim() }) }); });
+$('gs-good').addEventListener('change', e => { const t = computeDay(tradingDate(Date.now())); patchToday({ notes: Object.assign({}, t.notes, { good: e.target.value.trim() }) }); });
+$('gs-notrade').addEventListener('click', () => { const t = computeDay(tradingDate(Date.now())); if (t.trades) return; patchToday({ noTradeDay: !t.noTrade }); });
+
+/* ---- weekly report (Mon–Fri trading days; made on/after Sunday) ---- */
+const mondayOf = d => { const x = new Date(d + 'T12:00:00Z'); const wd = (x.getUTCDay() + 6) % 7; x.setUTCDate(x.getUTCDate() - wd); return x.toISOString().slice(0, 10); };
+const addDays = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+function weekStats(scored, mon){
+  const days = scored.filter(d => d.date >= mon && d.date <= addDays(mon, 6));
+  if (!days.length) return null;
+  const avg = Math.round(days.reduce((s, d) => s + d.total, 0) / days.length);
+  const sorted = [...days].sort((a, b) => a.total - b.total);
+  const prevDays = scored.filter(d => d.date >= addDays(mon, -7) && d.date < mon);
+  const prevAvg = prevDays.length ? Math.round(prevDays.reduce((s, d) => s + d.total, 0) / prevDays.length) : null;
+  return { from: mon, to: addDays(mon, 4), days: days.length, avg, prevAvg, best: { date: sorted[sorted.length - 1].date, total: sorted[sorted.length - 1].total }, worst: { date: sorted[0].date, total: sorted[0].total },
+    topBroken: topMissed(days, 3).map(([label, lost]) => ({ label, lost: Math.round(lost) })) };
+}
+let weeklyBusy = false;
+async function buildWeekly(scored, mon, force){
+  const id = `${gsBucket()}_${mon}`;
+  if (weeklyBusy || (!force && weeklyDocs[id])) return;
+  const st = weekStats(scored, mon); if (!st) { if (force) msgs($('gs-week-body'), [['warn', 'Is hafte abhi koi score nahi hai.']]); return; }
+  weeklyBusy = true; renderWeekly('Mentor tips likh raha hai…');
+  let tips = [];
+  try { tips = await weeklyTips(st); } catch {}
+  weeklyBusy = false;
+  saveWeekly(Object.assign({ id, bucket: gsBucket(), createdAt: Date.now() }, st, { tips }));
+  renderWeekly();
+}
+function maybeWeekly(scored){
+  // the last finished week: its Sunday is today or earlier (ET)
+  const todayEt = etDate(new Date());
+  const lastSun = addDays(todayEt, -((new Date(todayEt + 'T12:00:00Z').getUTCDay()) % 7));
+  buildWeekly(scored, addDays(lastSun, -6), false);
+}
+function renderWeekly(busy){
+  const mine = Object.values(weeklyDocs).filter(w => w.bucket === gsBucket()).sort((a, b) => (a.from < b.from ? 1 : -1));
+  const w = mine[0], body = $('gs-week-body');
+  if (busy) { body.innerHTML = `<div class="loading"><span class="spin"></span>${esc(busy)}</div>`; return; }
+  if (!w) return;
+  const trend = w.prevAvg == null ? 'pichle hafte ka data nahi' : `${w.avg - w.prevAvg >= 0 ? '+' : '−'}${Math.abs(w.avg - w.prevAvg)} (pichla ${w.prevAvg})`;
+  body.innerHTML = `<p class="save-note">${esc(shortDate(w.from))} – ${esc(shortDate(w.to))} · ${w.days} din</p>
+    <dl><dt>Average</dt><dd>${w.avg}</dd><dt>Trend</dt><dd>${esc(trend)}</dd><dt>Best din</dt><dd>${esc(shortDate(w.best.date))} · ${w.best.total}</dd><dt>Worst din</dt><dd>${esc(shortDate(w.worst.date))} · ${w.worst.total}</dd></dl>
+    ${w.topBroken.length ? `<b style="font-size:14px">Sabse zyada toote rules</b><ul>${w.topBroken.map(b => `<li>${esc(b.label)} <span class="pt">(−${b.lost})</span></li>`).join('')}</ul>` : '<p class="save-note">Is hafte koi rule nahi toota. 🔥</p>'}
+    ${(w.tips || []).length ? `<b style="font-size:14px">🧑‍🏫 Mentor tips</b><ul>${w.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '<p class="save-note">Mentor tips abhi nahi aaye (internet ya AI busy). "Report abhi banao" se dobara try karo.</p>'}`;
+}
+$('gs-week-now').addEventListener('click', () => { const scored = gsHistory().filter(d => d.trades || scoreDocs[gsDocId(d.date)]); buildWeekly(scored, mondayOf(tradingDate(Date.now())), true); });
+async function weeklyTips(st){
+  const base = `https://www.gstatic.com/firebasejs/${AI_VERSION}`;
+  await loadAI(); // sets up the 'mentor' app with App Check
+  const [{ getApps }, { getAI, getGenerativeModel, GoogleAIBackend }] = await Promise.all([import(`${base}/firebase-app.js`), import(`${base}/firebase-ai.js`)]);
+  const ai = getAI(getApps().find(a => a.name === 'mentor'), { backend: new GoogleAIBackend() });
+  const schema = { type: 'object', properties: { tips: { type: 'array', items: { type: 'string' } } }, required: ['tips'] };
+  const prompt = ['You are a trading discipline mentor for an intraday gold (MGC) prop-firm trader. Reply in short Hinglish (Hindi in Latin letters + English).',
+    'Here is their weekly PROCESS score (out of 100 per day, rule-following, not profit):', JSON.stringify(st),
+    'Give 2 or 3 short, concrete improvement tips (max 20 words each) aimed at the most broken rules. No generic advice, no profit talk.'].join('\n');
+  let last;
+  for (const name of MODELS) {
+    try {
+      const m = getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema, temperature: 0.4 } });
+      const r = await m.generateContent(prompt);
+      return (JSON.parse(r.response.text()).tips || []).slice(0, 3);
+    } catch (e) { last = e; }
+  }
+  throw last;
+}
+
+/* ---- settings ---- */
+function syncGSUI(){
+  $('gs-on').checked = !!gsSettings.on; $('gs-ntf').checked = !!gsSettings.noTradeFull;
+  $('gs-reset').value = gsSettings.reset || '18:00'; $('gs-target').value = gsSettings.target ?? 90;
+  $('gs-wstart').value = gsSettings.winStart || '20:00'; $('gs-wend').value = gsSettings.winEnd || '12:00';
+  const box = $('gs-rules'); box.innerHTML = '';
+  gsSettings.rules.forEach((r, i) => {
+    const el = document.createElement('div'); el.className = 'gs-rule';
+    el.innerHTML = `<input class="lbl-in" aria-label="Rule"><div class="row2">
+      <select aria-label="Category">${Object.entries(GS_CATS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+      <input class="pts-in" inputmode="numeric" aria-label="Points">
+      <span class="tag">${r.src === 'eod' ? 'note' : GS_AUTO[r.src] ? 'auto' : 'yes/no'}</span>
+      <span style="margin-left:auto;display:flex;gap:4px"><button type="button" class="mini" data-a="up" aria-label="Upar">↑</button><button type="button" class="mini" data-a="down" aria-label="Neeche">↓</button><button type="button" class="mini" data-a="del" aria-label="Hatao">🗑</button></span></div>`;
+    const [lbl, cat, pts] = [el.querySelector('.lbl-in'), el.querySelector('select'), el.querySelector('.pts-in')];
+    lbl.value = r.label; cat.value = r.cat; pts.value = r.pts;
+    const upd = () => { gsSettings.rules[i] = Object.assign({}, r, { label: lbl.value.trim() || r.label, cat: cat.value, pts: Math.max(0, parseInt(pts.value, 10) || 0) }); saveGS(); gsTotalMsg(); renderGrowth(); };
+    lbl.addEventListener('change', upd); cat.addEventListener('change', upd); pts.addEventListener('change', upd);
+    el.querySelectorAll('.mini').forEach(b => b.addEventListener('click', () => {
+      const R = gsSettings.rules.slice(), a = b.dataset.a;
+      if (a === 'del') R.splice(i, 1);
+      if (a === 'up' && i > 0) [R[i - 1], R[i]] = [R[i], R[i - 1]];
+      if (a === 'down' && i < R.length - 1) [R[i + 1], R[i]] = [R[i], R[i + 1]];
+      gsSettings.rules = R; saveGS(); syncGSUI(); renderGrowth();
+    }));
+    box.appendChild(el);
+  });
+  gsTotalMsg();
+}
+function gsTotalMsg(){
+  const t = gsSettings.rules.reduce((s, r) => s + (+r.pts || 0), 0);
+  msgs($('gs-total'), [[t === 100 ? 'good' : 'warn', t === 100 ? 'Total 100 ✓' : `Total ${t} hai. 100 hona chahiye.`]]);
+}
+$('gs-on').addEventListener('change', e => { gsSettings.on = e.target.checked; saveGS(); renderGrowth(); });
+$('gs-ntf').addEventListener('change', e => { gsSettings.noTradeFull = e.target.checked; saveGS(); renderGrowth(); });
+['gs-reset', 'gs-wstart', 'gs-wend'].forEach(id => $(id).addEventListener('change', e => {
+  const k = { 'gs-reset': 'reset', 'gs-wstart': 'winStart', 'gs-wend': 'winEnd' }[id]; gsSettings[k] = e.target.value || defaultGS()[k]; saveGS(); renderGrowth();
+}));
+$('gs-target').addEventListener('change', e => { gsSettings.target = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)); saveGS(); renderGrowth(); });
+$('gs-add').addEventListener('click', () => { gsSettings.rules = gsSettings.rules.concat([{ id: 'c' + Date.now().toString(36), cat: 'prep', label: 'Naya rule', pts: 0, src: 'manual' }]); saveGS(); syncGSUI(); renderGrowth(); });
+$('gs-defaults').addEventListener('click', () => { gsSettings.rules = GS_DEFAULT_RULES.map(r => Object.assign({}, r)); saveGS(); syncGSUI(); renderGrowth(); msgs($('gs-set-msg'), [['good', 'Default rules wapas aa gaye.']]); });
+syncGSUI();
+
 function renderAll(){
   renderAccounts();
   const info = dayInfo();
@@ -1470,14 +1866,17 @@ function renderAll(){
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil);
   if (info.open) openTradeView(info.open); else evaluate();
   renderJournal();
+  renderGrowth();
 }
 
 /* ---------- tabs ---------- */
 function show(tab){
-  ['trade','journal','settings'].forEach(t => { $('tab-' + t).setAttribute('aria-selected', t === tab); $('view-' + t).hidden = t !== tab; });
+  if (tab === 'growth' && !gsSettings.on) tab = 'trade';
+  ['trade','journal','growth','settings'].forEach(t => { $('tab-' + t).setAttribute('aria-selected', t === tab); $('view-' + t).hidden = t !== tab; });
+  if (tab === 'growth') renderGrowth();
   window.scrollTo({ top: 0 });
 }
-['trade','journal','settings'].forEach(t => $('tab-' + t).addEventListener('click', () => show(t)));
+['trade','journal','growth','settings'].forEach(t => $('tab-' + t).addEventListener('click', () => show(t)));
 // links like "Settings → Trading session" in other screens open that section
 document.addEventListener('click', e => { const a = e.target.closest('[data-goto]'); if (!a) return; e.preventDefault(); show('settings'); const d = $(a.dataset.goto); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); } });
 
