@@ -95,6 +95,20 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .gs-week dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:14px}
 .gs-week dt{color:var(--muted)} .gs-week dd{margin:0;font-family:var(--f-num)}
 .gs-week ul{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.focus-start{position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:max(20px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(20px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));overflow-y:auto}
+.fs-card{max-width:440px;width:100%;display:flex;flex-direction:column;gap:16px}
+.fs-card h2{font:700 34px/1.05 var(--f-display);margin:0;letter-spacing:.01em}
+.fs-block{display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+.fs-block .lbl{color:var(--muted)}
+.fs-block b{font-size:18px;font-weight:600}
+.fs-focus{border-color:var(--gold);background:var(--gold-soft)}
+.fs-focus b{color:var(--gold);font-size:20px}
+.fs-repeat{color:var(--bad);font-weight:700;font-size:14px}
+.fs-note{font-style:italic;color:var(--ink);opacity:.85}
+.focus-box{border:1px solid var(--gold);background:var(--gold-soft);gap:6px;padding:12px 14px}
+.focus-box .lbl{color:var(--gold)}
+.focus-box b{font-size:16px}
+.focus-box small{color:var(--muted);font-size:13px}
 .st-col{display:flex;flex-direction:column;gap:2px;min-width:0}
 #status-sub{font-family:var(--f-num);font-weight:500;font-size:14px;opacity:.9}
 .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
@@ -419,6 +433,7 @@ details.tr summary::-webkit-details-marker{display:none}
 
   <!-- Pre-trade gate: built from STEPS in script -->
   <form id="plan" class="wrap" autocomplete="off">
+    <div class="card focus-box" id="focus-box" hidden></div>
     <div id="steps" class="wrap"></div>
     <div class="card" id="mentor-card">
       <h2>Chart &amp; mentor</h2>
@@ -444,6 +459,14 @@ details.tr summary::-webkit-details-marker{display:none}
 </section>
 
 <div id="viewer" class="viewer" hidden><img id="viewer-img" alt="Chart screenshot"><button type="button" id="viewer-close" aria-label="Close">×</button></div>
+<div id="focus-start" class="focus-start" hidden role="dialog" aria-modal="true" aria-labelledby="fs-title">
+  <div class="fs-card">
+    <span class="lbl" id="fs-date">Aaj ka focus</span>
+    <h2 id="fs-title">Naya trading din</h2>
+    <div id="fs-body" class="wrap" style="gap:12px"></div>
+    <button class="btn" type="button" id="fs-ok">Samajh gaya</button>
+  </div>
+</div>
 <div id="pop" class="pop" hidden role="dialog" aria-modal="true" aria-labelledby="pop-title"><div class="pop-card"><span class="pop-badge" id="pop-badge"></span><h2 id="pop-title"></h2><p class="pop-reason" id="pop-reason"></p><p class="pop-msg" id="pop-msg"></p><div class="pop-actions" id="pop-actions"></div></div></div>
 
 <section id="view-journal" class="wrap" hidden>
@@ -599,6 +622,14 @@ details.tr summary::-webkit-details-marker{display:none}
         <label for="gs-wend">Window end (ET)<input class="in" type="time" id="gs-wend"></label>
       </div>
       <div class="msgs" id="gs-set-msg"></div>
+      <h2 style="font-size:19px;margin-top:6px">🎯 Aaj ka Focus</h2>
+      <p class="save-note">Din ki shuruaat me kal ki sabse badi galti dikhata hai aur aaj usi pe focus karwata hai.</p>
+      <label class="chk"><input type="checkbox" id="fc-on"><span>Aaj ka Focus ON</span></label>
+      <label class="chk"><input type="checkbox" id="fc-tick"><span>Trade gate me "Aaj ka focus follow kar raha hun" tick zaroori</span></label>
+      <label class="chk"><input type="checkbox" id="fc-notify"><span>Notification trading window start pe</span></label>
+      <div class="pgrid"><label for="fc-time">Notification time (ET)<input class="in" type="time" id="fc-time"></label></div>
+      <p class="save-note">Notification tab aata hai jab app khula ho ya background me chal raha ho. App poori tarah band ho to phone tak bhejne ke liye server chahiye (Firebase ka paid plan), wo abhi nahi hai.</p>
+      <div class="msgs" id="fc-msg"></div>
     </div>
   </details>
   <details class="card set" id="test-settings">
@@ -645,12 +676,14 @@ const STEPS = [
   { idx:'00', title:'Pehle', tf:'Session · News · Levels', rule:'Apne session me hi trade. USD high-impact news ke 30 min pehle aur 30 min baad trade nahi. 5pm close ke baad levels mark karo.',
     qs:[ { k:'gate', t:'live' },
          { k:'newsManual', t:'tick', text:'Calendar khol ke dekha, abhi koi USD high-impact news nahi' },
+         { k:'focusOk', t:'tick', text:'Aaj ka focus follow kar raha hun' },
          { k:'lvl5', t:'tick', text:'5pm close ke baad levels mark kiye' } ],
     check: d => [ d.market === 'closed' && ['bad', d.marketMsg, 'hard'],
                   d.session === 'out' && ['bad', d.sessionMsg, 'hard'],
                   d.news === 'blocked' && ['bad', d.newsMsg, 'hard'],
                   d.news === 'manual' && !d.newsManual && ['bad','News calendar check karo.'],
-                  !d.lvl5 && ['bad','Levels mark karo.'] ] },
+                  !d.lvl5 && ['bad','Levels mark karo.'],
+                  focusTickNeeded() && !d.focusOk && ['bad','Aaj ka focus padho aur tick karo.'] ] },
   { idx:'01', title:'Liquidity', tf:'4H / Daily', rule:'Liquidity level mark karo. Next liquidity kam se kam $15 door ho, warna skip.',
     qs:[ { k:'dir', t:'seg', label:'Direction', opts:[['long','Long','t-good'],['short','Short','t-bad']] },
          { k:'liq', t:'seg', label:'Next liquidity kitni door?', opts:[['lt15','< $15','t-bad'],['15','$15–20'],['20','$20–30'],['30','$30+']] },
@@ -1281,6 +1314,7 @@ function evaluate(fromUser){
   LS.set('gtd.draft', Object.assign({ _date: today() }, keep));
   STEPS.forEach(s => s.qs.forEach(q => { if (q.t === 'tick') $('qt-' + q.k).textContent = typeof q.text === 'function' ? q.text(d) : q.text; }));
   $('q-newsManual').closest('label').hidden = d.news !== 'manual';
+  $('q-focusOk').closest('label').hidden = !focusTickNeeded();
   $('mentor-btn').textContent = stageOf(d) === 'entry' ? 'Entry check karao' : 'Setup check karao';
   if (mentor && !mentorBusy) renderMentor();
   renderLive();
@@ -1558,7 +1592,9 @@ const GS_DEFAULT_RULES = [
   { id: 'eod', cat: 'review', label: 'Din ka note: ek galti + ek achhi baat', pts: 5, src: 'eod' }
 ];
 const GS_AUTO = { gate: 1, lot: 1, sl: 1, target: 1, reentry: 1, stops: 1, window: 1, dll: 1, shots: 1, eod: 1 };
-const defaultGS = () => ({ on: true, noTradeFull: true, reset: '18:00', winStart: '20:00', winEnd: '12:00', target: 90, rules: GS_DEFAULT_RULES.map(r => Object.assign({}, r)) });
+const defaultGS = () => ({ on: true, noTradeFull: true, reset: '18:00', winStart: '20:00', winEnd: '12:00', target: 90, rules: GS_DEFAULT_RULES.map(r => Object.assign({}, r)),
+  focus: { on: true, gateTick: true, notify: false, notifyTime: '20:00' } });
+const FC = () => Object.assign({ on: true, gateTick: true, notify: false, notifyTime: '20:00' }, gsSettings.focus || {});
 let gsSettings = Object.assign(defaultGS(), LS.get('gtd.gs') || {});
 let scoreDocs = LS.get('gtd.scores') || {};
 let weeklyDocs = LS.get('gtd.weekly') || {};
@@ -1720,7 +1756,9 @@ function renderGrowth(){
   const scored = series;
   let streak = 0; for (let i = scored.length - 1; i >= 0; i--) { if (scored[i].total >= tgt) streak++; else break; }
   const last7 = scored.slice(-7), avg7 = last7.length ? Math.round(last7.reduce((s, d) => s + d.total, 0) / last7.length) : 0;
-  $('gs-chips').innerHTML = [`🔥 Streak ${streak} din`, `7-din avg ${avg7}`, `Target ${tgt}`].map(t => `<span class="gs-chip">${t}</span>`).join('') + (today.noTrade ? '<span class="gs-chip gold">🧘 Patience day</span>' : '') + (today.untracked || hero.untracked ? '<span class="gs-chip bad">⚠ Untracked trade</span>' : '');
+  $('gs-chips').innerHTML = [`🔥 Streak ${streak} din`, `7-din avg ${avg7}`, `Target ${tgt}`].map(t => `<span class="gs-chip">${t}</span>`).join('') + (today.noTrade ? '<span class="gs-chip gold">🧘 Patience day</span>' : '') + (today.untracked || hero.untracked ? '<span class="gs-chip bad">⚠ Untracked trade</span>' : '')
+    + (() => { if (!FC().on) return ''; const st = series.length > 1 ? fixStatus(hero, series[series.length - 2], series) : null; const fs = fixStreak(series);
+      return (st === 'fixed' ? '<span class="gs-chip gold">✅ Kal ki galti fix ki</span>' : st === 'broken' ? '<span class="gs-chip bad">✗ Focus phir toota</span>' : st === 'pending' ? '<span class="gs-chip">⏳ Focus abhi test nahi hua</span>' : '') + `<span class="gs-chip">🛠 Fix streak ${fs}</span>`; })();
   // per-account scores today
   $('gs-acc-card').hidden = testMode;
   if (!testMode) $('gs-acc-list').innerHTML = accounts().map(a => {
@@ -1839,6 +1877,7 @@ async function weeklyTips(st){
 
 /* ---- settings ---- */
 function syncGSUI(){
+  if (typeof syncFocusUI === 'function' && $('fc-on')) try { syncFocusUI(); } catch {}
   $('gs-on').checked = !!gsSettings.on; $('gs-ntf').checked = !!gsSettings.noTradeFull;
   $('gs-reset').value = gsSettings.reset || '18:00'; $('gs-target').value = gsSettings.target ?? 90;
   $('gs-wstart').value = gsSettings.winStart || '20:00'; $('gs-wend').value = gsSettings.winEnd || '12:00';
@@ -1879,7 +1918,131 @@ $('gs-add').addEventListener('click', () => { gsSettings.rules = gsSettings.rule
 $('gs-defaults').addEventListener('click', () => { gsSettings.rules = GS_DEFAULT_RULES.map(r => Object.assign({}, r)); saveGS(); syncGSUI(); renderGrowth(); msgs($('gs-set-msg'), [['good', 'Default rules wapas aa gaye.']]); });
 syncGSUI();
 
+/* ================= Aaj ka Focus ================= */
+// Yesterday's costliest rule becomes today's focus. Everything is derived from the score history,
+// so nothing extra is stored except which day's start card was already seen.
+const FOCUS_LINES = {
+  levels: '5 PM close ke baad, session se pehle levels mark karo',
+  news: 'Trade se pehle USD high-impact news check karo',
+  gate: 'Sirf checklist pass hone pe trade. Gate ke bina koi trade nahi',
+  lot: 'Lot sirf 2 MGC, na zyada na kam',
+  sl: 'SL $5 pe set karo aur move mat karo',
+  target: 'TP $15 fixed. Next liquidity chase mat karo',
+  reentry: 'Fail hue level pe dobara entry nahi',
+  stops: '2 win ya 2 loss = band. W+L ke baad sirf ek aur trade',
+  window: 'Sirf trading window ke andar trade',
+  dll: 'Daily loss limit se pehle ruk jao',
+  shots: 'Har trade ka screenshot lo, entry se pehle',
+  eod: 'Din ke end me ek galti + ek achhi baat likho'
+};
+const ruleBroken = (day, id) => (day.results || []).some(r => r.id === id && r.earned < r.pts);
+function focusFrom(prev, series){
+  if (!prev) return null;
+  if (prev.total >= 100 || prev.noTrade) return { perfect: true, prev };
+  const loss = {};
+  (prev.results || []).forEach(r => { loss[r.id] = (loss[r.id] || 0) + (r.pts - r.earned); });
+  // biggest loss first; on a tie prefer a rule the journal shows was broken over an unanswered yes/no
+  const srcOf = k => (gsSettings.rules.find(r => r.id === k) || {}).src;
+  const id = Object.keys(loss).filter(k => loss[k] > 0).sort((a, b) => (loss[b] - loss[a]) || ((srcOf(a) === 'manual') - (srcOf(b) === 'manual')))[0];
+  if (!id) return { perfect: true, prev };
+  const rule = gsSettings.rules.find(r => r.id === id) || { id, src: id, label: ((prev.results || []).find(r => r.id === id) || {}).label || id };
+  const notes = (prev.accounts && prev.accounts.length ? prev.accounts.map(a => (a.notes || {}).mistake) : [(prev.notes || {}).mistake]).filter(Boolean);
+  // repeat: days in the last 7 scored days (up to and including prev) where this rule lost points
+  const recent = series.filter(d => d.date <= prev.date).slice(-7);
+  const repeat = recent.filter(d => ruleBroken(d, id)).length;
+  return { perfect: false, prev, rule, lost: Math.round(loss[id]), line: FOCUS_LINES[rule.id] || FOCUS_LINES[rule.src] || `Ye rule follow karo: ${rule.label}`, notes, repeat };
+}
+let focusCache = null;
+function todayFocus(){
+  if (!gsSettings.on || !FC().on) return null;
+  const today = tradingDate(Date.now()), series = growthSeries();
+  const prev = series.filter(d => d.date < today).pop();
+  return focusFrom(prev, series);
+}
+const focusTickNeeded = () => !!(focusCache && FC().gateTick);
+// did the day fix the focus picked from the day before it? null = nothing to fix (prev was perfect or no prev)
+function fixStatus(day, prev, series){
+  const f = focusFrom(prev, series); if (!f || f.perfect) return null;
+  const r = (day.results || []).find(x => x.id === f.rule.id); if (!r) return null;
+  const passed = r.earned >= r.pts, isToday = day.date === tradingDate(Date.now());
+  // today, with no trade yet, only answered prep/notes rules can already count as fixed
+  if (isToday && !day.trades && !day.noTrade) return passed && (r.cat === 'prep' || r.id === 'eod') ? 'fixed' : 'pending';
+  return passed ? 'fixed' : 'broken';
+}
+function fixStreak(series){
+  let n = 0;
+  for (let i = series.length - 1; i >= 1; i--) {
+    const st = fixStatus(series[i], series[i - 1], series);
+    if (st === null || st === 'pending') continue;
+    if (st === 'fixed') n++; else break;
+  }
+  return n;
+}
+function renderFocusBox(){
+  const box = $('focus-box'), f = focusCache;
+  box.hidden = !f;
+  if (!f) return;
+  box.innerHTML = f.perfect
+    ? `<span class="lbl">🎯 Aaj ka focus</span><b>Kal perfect tha — wahi repeat karo</b>`
+    : `<span class="lbl">🎯 Aaj ka focus</span><b>${esc(f.line)}</b><small>Kal ki galti: ${esc(f.rule.label)} (−${f.lost})</small>${f.repeat >= 2 ? `<span class="fs-repeat">⚠ Repeat galti (${f.repeat}x is hafte)</span>` : ''}`;
+}
+function showFocusStart(force){
+  const f = todayFocus();
+  const key = (testMode ? 't' : 'r') + tradingDate(Date.now());
+  if (!f || (!force && LS.get('gtd.focusSeen') === key) || $('app').hidden) return;
+  $('fs-date').textContent = `Aaj ka focus · ${shortDate(tradingDate(Date.now()))}${testMode ? ' · 🧪 test' : ''}`;
+  if (f.perfect) {
+    $('fs-title').textContent = 'Kal perfect tha — wahi repeat karo';
+    $('fs-body').innerHTML = `<div class="fs-block"><span class="lbl">Kal ka score</span><b>${f.prev.total}/100${f.prev.noTrade ? ' · 🧘 Patience day' : ''}</b></div>`;
+  } else {
+    $('fs-title').textContent = 'Naya trading din';
+    $('fs-body').innerHTML = `<div class="fs-block"><span class="lbl">Kal ki galti (${esc(shortDate(f.prev.date))} · ${f.prev.total}/100)</span><b>${esc(f.rule.label)} <span style="color:var(--bad)">−${f.lost}</span></b>
+        ${f.repeat >= 2 ? `<span class="fs-repeat">⚠ Repeat galti (${f.repeat}x is hafte)</span>` : ''}
+        ${f.notes.length ? f.notes.map(n => `<span class="fs-note">“${esc(n)}”</span>`).join('') : ''}</div>
+      <div class="fs-block fs-focus"><span class="lbl">Aaj ka focus</span><b>${esc(f.line)}</b></div>`;
+  }
+  $('focus-start').hidden = false;
+  $('fs-ok').focus();
+}
+$('fs-ok').addEventListener('click', () => { LS.set('gtd.focusSeen', (testMode ? 't' : 'r') + tradingDate(Date.now())); $('focus-start').hidden = true; });
+// first open of a new trading day: wait a moment so trades and scores have loaded
+setInterval(() => showFocusStart(false), 60000);
+let focusStartTimer = null;
+function scheduleFocusStart(){ if (focusStartTimer) return; focusStartTimer = setTimeout(() => showFocusStart(false), 1500); }
+
+// optional notification at the trading-window start (only while the app is open or in the background)
+setInterval(() => {
+  const c = FC(); if (!gsSettings.on || !c.on || !c.notify || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const key = tradingDate(Date.now());
+  if (etMinutes() !== hm2min(c.notifyTime || '20:00') || LS.get('gtd.focusNotified') === key) return;
+  const f = todayFocus(); if (!f) return;
+  LS.set('gtd.focusNotified', key);
+  const body = f.perfect ? 'Kal perfect tha — wahi repeat karo' : f.line;
+  const show = reg => reg && reg.showNotification ? reg.showNotification('Gold Trade Gate · Aaj ka focus', { body, icon: 'icon.svg', tag: 'focus-' + key }) : new Notification('Gold Trade Gate · Aaj ka focus', { body });
+  (navigator.serviceWorker ? navigator.serviceWorker.getRegistration('../') : Promise.resolve(null)).then(show).catch(() => { try { show(null); } catch {} });
+}, 20000);
+
+// settings
+function syncFocusUI(){ const c = FC(); $('fc-on').checked = c.on; $('fc-tick').checked = c.gateTick; $('fc-notify').checked = c.notify; $('fc-time').value = c.notifyTime || gsSettings.winStart || '20:00'; }
+function saveFocus(patch){ gsSettings.focus = Object.assign(FC(), patch); saveGS(); renderAll(); }
+$('fc-on').addEventListener('change', e => saveFocus({ on: e.target.checked }));
+$('fc-tick').addEventListener('change', e => saveFocus({ gateTick: e.target.checked }));
+$('fc-time').addEventListener('change', e => saveFocus({ notifyTime: e.target.value || '20:00' }));
+$('fc-notify').addEventListener('change', async e => {
+  if (e.target.checked) {
+    if (!('Notification' in window)) { e.target.checked = false; msgs($('fc-msg'), [['bad', 'Is browser me notification nahi chalta. iPhone pe app ko Home Screen se kholo (iOS 16.4+).']]); return; }
+    const perm = await Notification.requestPermission().catch(() => 'denied');
+    if (perm !== 'granted') { e.target.checked = false; msgs($('fc-msg'), [['bad', 'Notification ki permission nahi mili. Phone settings me Trade Gate ko allow karo.']]); return; }
+  }
+  saveFocus({ notify: e.target.checked });
+  msgs($('fc-msg'), [['good', e.target.checked ? `Notification ON: ${FC().notifyTime} ET pe aaj ka focus.` : 'Notification OFF.']]);
+});
+syncFocusUI();
+
 function renderAll(){
+  focusCache = todayFocus();
+  renderFocusBox();
+  scheduleFocusStart();
   renderAccounts();
   const info = dayInfo();
   $('d-count').textContent = info.todays.length;
