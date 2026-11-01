@@ -59,6 +59,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .status.ok{background:var(--good-soft);color:var(--good)}
 .status.lock{background:var(--bad-soft);color:var(--bad)}
 .status.open{background:var(--gold-soft);color:var(--gold)}
+.st-col{display:flex;flex-direction:column;gap:2px;min-width:0}
+#status-sub{font-family:var(--f-num);font-weight:500;font-size:14px;opacity:.9}
 .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
 .save-note{font-size:13px;color:var(--muted);margin:0}
 
@@ -318,7 +320,7 @@ details.tr summary::-webkit-details-marker{display:none}
 </header>
 
 <section id="view-trade" class="wrap">
-  <div id="status" class="status ok"><span class="dot"></span><span id="status-text">Loading…</span></div>
+  <div id="status" class="status ok"><span class="dot"></span><span class="st-col"><span id="status-text">Loading…</span><small id="status-sub" hidden></small></span></div>
   <div class="card today">
     <div class="daybar">
       <div><span class="lbl">Aaj trades</span><b id="d-count">0</b></div>
@@ -607,16 +609,55 @@ function sessionWindow(){
   const [a, b, name] = s.mode === 'custom' ? [s.start || '08:00', s.end || '11:00', 'Tumhara session'] : SESSIONS[s.mode] || [];
   return a ? { a: hm2min(a), b: hm2min(b), name } : null;
 }
+// CME Globex gold: Sunday 6 PM to Friday 5 PM ET, daily break 5-6 PM ET.
+// Holidays (CME calendar; check cmegroup.com each year):
+//  full: closed from 5 PM ET the evening before until 6 PM ET that day
+//  early: trading halts at 1:30 PM ET and reopens 6 PM ET
+const HOLIDAYS_FULL = {
+  '2026-01-01':'New Year', '2026-04-03':'Good Friday', '2026-12-25':'Christmas',
+  '2027-01-01':'New Year', '2027-03-26':'Good Friday', '2027-12-24':'Christmas'
+};
+const HOLIDAYS_EARLY = {
+  '2026-01-19':'MLK Day', '2026-02-16':'Presidents Day', '2026-05-25':'Memorial Day', '2026-06-19':'Juneteenth',
+  '2026-07-03':'Independence Day', '2026-09-07':'Labor Day', '2026-11-26':'Thanksgiving',
+  '2027-01-18':'MLK Day', '2027-02-15':'Presidents Day', '2027-05-31':'Memorial Day', '2027-06-18':'Juneteenth',
+  '2027-07-05':'Independence Day', '2027-09-06':'Labor Day', '2027-11-25':'Thanksgiving'
+};
+const nextDate = d => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
+function rawMarket(at){
+  const wd = new Intl.DateTimeFormat('en-US', { timeZone: ET, weekday: 'short' }).format(at);
+  const m = etMinutes(at), d = etDate(at), OPEN = 18 * 60, CLOSE = 17 * 60;
+  if (HOLIDAYS_FULL[d] && m < OPEN) return { why: 'holiday', name: HOLIDAYS_FULL[d] };
+  if (HOLIDAYS_FULL[nextDate(d)] && m >= CLOSE) return { why: 'holiday', name: HOLIDAYS_FULL[nextDate(d)] };
+  if (wd === 'Sat' || (wd === 'Sun' && m < OPEN) || (wd === 'Fri' && m >= CLOSE)) return { why: 'weekend' };
+  if (HOLIDAYS_EARLY[d] && m >= 13 * 60 + 30 && m < OPEN) return { why: 'early', name: HOLIDAYS_EARLY[d] };
+  if (wd !== 'Sun' && wd !== 'Fri' && m >= CLOSE && m < OPEN) return { why: 'break' };
+  return { why: '' };
+}
+// next moment the market is open again: every open/close is on a :00 or :30 ET boundary
+let openCache = { from: 0, at: 0 };
+function nextOpen(now = Date.now()){
+  if (openCache.at > now && now - openCache.from < 60e3) return openCache.at;
+  let t = Math.floor(now / 1800e3) * 1800e3 + 1800e3;
+  for (let i = 0; i < 24 * 2 * 6; i++, t += 1800e3) if (!rawMarket(new Date(t)).why) { openCache = { from: now, at: t }; return t; }
+  return 0;
+}
 function marketState(at = new Date()){
   if (testMode) return { closed: false, why: '', msg: '' };
-  const wd = new Intl.DateTimeFormat('en-US', { timeZone: ET, weekday: 'short' }).format(at);
-  const m = etMinutes(at), OPEN = 18 * 60, CLOSE = 17 * 60;
-  let why = '';
-  if (wd === 'Sat' || (wd === 'Sun' && m < OPEN) || (wd === 'Fri' && m >= CLOSE)) why = 'weekend';
-  else if (wd !== 'Sun' && wd !== 'Fri' && m >= CLOSE && m < OPEN) why = 'break';
-  return { closed: !!why, why,
-    msg: why === 'weekend' ? 'Market band hai (weekend). Gold futures Sunday 6:00 PM ET pe khulega.'
-       : why === 'break' ? 'Market ka daily break hai (5:00–6:00 PM ET). 6:00 PM ET ke baad trade.' : '' };
+  const r = rawMarket(at);
+  const msg = r.why === 'weekend' ? 'Market band hai (weekend).'
+    : r.why === 'break' ? 'Market ka daily break hai (5:00–6:00 PM ET).'
+    : r.why === 'holiday' ? `Market band hai (holiday: ${r.name}).`
+    : r.why === 'early' ? `${r.name}: market aaj jaldi band ho gaya (1:30 PM ET).` : '';
+  return { closed: !!r.why, why: r.why, msg };
+}
+function openCountdown(){
+  const at = nextOpen(); if (!at) return '';
+  const left = Math.max(0, at - Date.now()), t = Math.floor(left / 1000);
+  const dd = Math.floor(t / 86400), hh = Math.floor(t % 86400 / 3600), mm = Math.floor(t % 3600 / 60), ss = t % 60;
+  const p2 = n => String(n).padStart(2, '0');
+  const when = new Date(at).toLocaleString('en-US', { timeZone: ET, weekday: 'long', hour: 'numeric', minute: '2-digit' });
+  return `Khulne me ${dd ? dd + 'd ' : ''}${p2(hh)}:${p2(mm)}:${p2(ss)} · ${when} ET`;
 }
 function sessionState(){
   if (testMode) return { state: 'off', msg: '', test: true };
@@ -1382,6 +1423,7 @@ function tickCooldown(until){
   $('status-text').textContent = `Cooldown: ${fmtLeft(left)} baaki. Abhi trade nahi.`;
 }
 setInterval(() => {
+  if (!$('status-sub').hidden && marketState().closed) $('status-sub').textContent = openCountdown();
   if (!cooldownActive) return;
   const info = dayInfo();
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil); else renderAll();
@@ -1409,10 +1451,11 @@ function renderAll(){
   $('d-loss').textContent = info.losses;
   $('d-pnl').textContent = money(info.pnl); $('d-pnl').className = info.pnl > 0 ? 'pos' : info.pnl < 0 ? 'neg' : '';
   const st = $('status');
+  $('status-sub').hidden = true;
   if (info.open) { st.className = 'status open'; $('status-text').textContent = 'Trade open hai. Close karke result bharo, tabhi agla trade khulega.'; }
   else if (info.cooldownUntil) { st.className = 'status lock'; $('status-text').textContent = `Cooldown: ${fmtLeft(info.cooldownUntil - Date.now())} baaki. Abhi trade nahi.`; }
   else if (info.lock) { st.className = 'status lock'; $('status-text').textContent = info.lock[0] + '. Aaj aur trade nahi.'; }
-  else if (marketState().closed) { st.className = 'status lock'; $('status-text').textContent = marketState().msg; }
+  else if (marketState().closed) { st.className = 'status lock'; $('status-text').textContent = marketState().msg; $('status-sub').textContent = openCountdown(); $('status-sub').hidden = false; }
   else { st.className = 'status ok'; $('status-text').textContent = 'Trading allowed. Upar se neeche tap karte jao.'; }
   $('open-card').hidden = !info.open;
   $('locked-card').hidden = !(info.lock && !info.open);
