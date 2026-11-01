@@ -64,10 +64,18 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .card h2{font-family:var(--f-display);font-size:22px;font-weight:700;margin:0;letter-spacing:.01em;text-wrap:balance}
 
 fieldset.step{margin:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;min-width:0;transition:opacity .2s}
-fieldset.step:disabled{opacity:.42}
+fieldset.step:disabled{opacity:.5;padding-block:12px}
+fieldset.step:disabled > :not(legend), fieldset.step.collapsed > :not(legend){display:none}
+fieldset.step{scroll-margin-top:170px}
+fieldset.step.collapsed{padding-block:12px}
+fieldset.step.done:not(:last-child) .shead{cursor:pointer}
+.ssum{display:none;flex-basis:100%;font-size:14px;color:var(--good);font-weight:500}
+fieldset.step.collapsed .ssum{display:block}
+.ssum::after{content:"  · badlo";color:var(--muted);font-weight:400}
 fieldset.step.done{border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
 fieldset.step.fail{border-color:color-mix(in srgb,var(--bad) 55%,var(--line))}
-legend{display:contents}
+legend.shead{float:left;width:100%;padding:0;margin:0}
+legend.shead + *{clear:both}
 .shead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .idx{font-family:var(--f-num);font-size:13px;color:var(--gold);background:var(--gold-soft);padding:2px 7px;border-radius:5px}
 .stitle{font-family:var(--f-display);font-size:21px;font-weight:700;letter-spacing:.01em}
@@ -180,8 +188,19 @@ details.howto summary{cursor:pointer;font-weight:600}
 details.howto ol{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px}
 details.howto code{font-family:var(--f-num);font-size:12px;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px;overflow-wrap:anywhere}
 pre.rules{font:500 11px/1.5 var(--f-num);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;overflow-x:auto;margin:8px 0 0;white-space:pre}
-.prop h2{font-size:19px}
-.pbar{display:flex;flex-direction:column;gap:5px}
+.prop h2{font-size:15px;font-family:var(--f-body);font-weight:600;letter-spacing:0}
+.today{padding:0;gap:0;overflow:hidden}
+.today .daybar{border:0;border-radius:0}
+.today .prop{border:0;border-top:1px solid var(--line);border-radius:0;padding:12px 14px;gap:10px}
+.vault{padding:12px 14px;gap:10px}
+.vault-row{display:flex;align-items:center;gap:12px}
+.vault-row .ic{font-size:22px;flex:none}
+.vault-t{display:flex;flex-direction:column;min-width:0;flex:1}
+.vault-t b{font-weight:600;font-size:15px}
+.vault-t small{color:var(--muted);font-size:13px}
+.btn.small{width:auto;padding:10px 14px;font-size:15px;flex:none}
+.set-t{flex:1}
+.pbar{display:flex;flex-direction:column;gap:4px}
 .pbar-top{display:flex;justify-content:space-between;gap:10px;font-size:13px;flex-wrap:wrap}
 .pbar-top b{font-weight:600}
 .pbar-top span{font-family:var(--f-num);font-size:12px;color:var(--muted)}
@@ -300,23 +319,23 @@ details.tr summary::-webkit-details-marker{display:none}
 </header>
 
 <section id="view-trade" class="wrap">
-  <div class="card prop" id="prop-card" hidden>
-    <h2 id="prop-title">Prop account</h2>
-    <div id="prop-bars" class="wrap" style="gap:12px"></div>
-  </div>
-  <div class="daybar">
-    <div><span class="lbl">Aaj trades</span><b id="d-count">0</b></div>
-    <div><span class="lbl">Win</span><b id="d-win">0</b></div>
-    <div><span class="lbl">Loss</span><b id="d-loss">0</b></div>
-    <div><span class="lbl">Aaj P&amp;L</span><b id="d-pnl">$0</b></div>
-  </div>
   <div id="status" class="status ok"><span class="dot"></span><span id="status-text">Loading…</span></div>
+  <div class="card today">
+    <div class="daybar">
+      <div><span class="lbl">Aaj trades</span><b id="d-count">0</b></div>
+      <div><span class="lbl">Win</span><b id="d-win">0</b></div>
+      <div><span class="lbl">Loss</span><b id="d-loss">0</b></div>
+      <div><span class="lbl">Aaj P&amp;L</span><b id="d-pnl">$0</b></div>
+    </div>
+    <div class="prop wrap" id="prop-card" hidden>
+      <h2 id="prop-title">Prop account</h2>
+      <div id="prop-bars" class="wrap" style="gap:10px"></div>
+    </div>
+  </div>
   <div class="card vault" id="vault" hidden>
-    <div class="vault-head"><span aria-hidden="true">🔐</span><b>TradingView unlock code</b></div>
-    <p class="save-note" id="vault-note"></p>
-    <div class="vcode hide" id="vault-code" aria-live="polite">• • • •</div>
-    <div class="vbar" id="vault-bar" style="width:0"></div>
-    <button class="btn" type="button" id="vault-show">Code dikhao (30 sec)</button>
+    <div class="vault-row"><span class="ic" aria-hidden="true">🔐</span><span class="vault-t"><b>TradingView code</b><small id="vault-note"></small></span><button class="btn small" type="button" id="vault-show">Dikhao</button></div>
+    <div class="vcode" id="vault-code" aria-live="polite" hidden>• • • •</div>
+    <div class="vbar" id="vault-bar" style="width:0" hidden></div>
   </div>
   <p class="save-note" id="save-note"></p>
 
@@ -402,7 +421,7 @@ details.tr summary::-webkit-details-marker{display:none}
 
 <section id="view-settings" class="wrap" hidden>
   <details class="card set" id="acc-settings">
-    <summary><span class="set-ic" aria-hidden="true">🗂</span><span class="set-t"><b>Accounts</b><small>Naya account add karo, naam badlo, hatao</small></span></summary>
+    <summary><span class="set-ic" aria-hidden="true">🗂</span><span class="set-t"><b>Accounts</b><small>Add, naam badlo, hatao</small></span></summary>
     <div class="set-body">
       <p class="save-note">Har account ka journal, prop limits, cooldown aur din ke lock alag chalte hain. Upar wale dropdown se account badlo.</p>
       <div class="acc-list" id="acc-list"></div>
@@ -445,7 +464,7 @@ details.tr summary::-webkit-details-marker{display:none}
     </div>
   </details>
   <details class="card set" id="settings-card">
-    <summary><span class="set-ic" aria-hidden="true">🕐</span><span class="set-t"><b>Trading session</b><small>Kis time trade karna allowed hai</small></span></summary>
+    <summary><span class="set-ic" aria-hidden="true">🕐</span><span class="set-t"><b>Trading session</b><small>Kis time trade allowed hai</small></span></summary>
     <div class="set-body">
     <p class="save-note">Checklist sirf isi time me trade hone degi. Time New York (ET) me hai, jo gold ka standard time hai.</p>
     <div class="tags" id="sess-opts">
@@ -463,7 +482,7 @@ details.tr summary::-webkit-details-marker{display:none}
     </div>
   </details>
   <details class="card set" id="cool-card">
-    <summary><span class="set-ic" aria-hidden="true">⏱</span><span class="set-t"><b>Loss ke baad cooldown</b><small>SL ke baad kitni der break</small></span></summary>
+    <summary><span class="set-ic" aria-hidden="true">⏱</span><span class="set-t"><b>Loss ke baad cooldown</b><small>SL ke baad break</small></span></summary>
     <div class="set-body">
     <p class="save-note">SL hit hone ke baad itni der naya trade band rahega, taaki revenge trade na ho.</p>
     <div class="tags" id="cool-opts">
@@ -477,7 +496,7 @@ details.tr summary::-webkit-details-marker{display:none}
     </div>
   </details>
   <details class="card set" id="st-settings">
-    <summary><span class="set-ic" aria-hidden="true">🔐</span><span class="set-t"><b>Screen Time lock (TradingView)</b><small>Passcode sirf Trade Gate ke paas, lock me code nahi milega</small></span></summary>
+    <summary><span class="set-ic" aria-hidden="true">🔐</span><span class="set-t"><b>TradingView lock</b><small>Lock ke time TradingView band rahe</small></span></summary>
     <div class="set-body">
       <p class="save-note">iPhone ka apna Screen Time TradingView ko roz 1 minute ke baad band kar dega. Aage kholne ke liye passcode chahiye, jo Trade Gate sirf tab dikhata hai jab trading allowed ho. Cooldown, 2-loss, prop limit ya session ke bahar code nahi milega.</p>
       <label class="chk"><input type="checkbox" id="st-on"><span>Trade tab pe unlock code dikhao</span></label>
@@ -493,12 +512,8 @@ details.tr summary::-webkit-details-marker{display:none}
         <div class="vcode hide" id="st-setup-code">• • • •</div>
         <div class="acct-btns"><button class="btn ghost" type="button" id="st-setup">Setup code dikhao</button><button class="btn ghost warn-text" type="button" id="st-new">Naya code banao</button></div>
       </details>
-      <div class="msgs" id="st-msg"></div>
-    </div>
-  </details>
-  <details class="card set" id="shortcut-card">
-    <summary><span class="set-ic" aria-hidden="true">📱</span><span class="set-t"><b>TradingView lock (iPhone)</b><small>Lock ke time TradingView band karo</small></span></summary>
-    <div class="set-body">
+      <details class="howto"><summary>Advanced: Shortcut se lock</summary>
+        <div class="set-body" style="padding:10px 0 0;border:0">
     <p class="save-note">Cooldown ya lock chal raha ho aur tum TradingView kholo, to iPhone tumhe wapas Home Screen pe bhej dega aur batayega kitni der baaki hai. Ek baar setup karna hai.</p>
     <div class="msgs" id="sc-status"></div>
     <div class="q"><span class="qlabel">Tumhara status link (secret hai, kisi ko mat dena)</span>
@@ -527,9 +542,12 @@ details.tr summary::-webkit-details-marker{display:none}
       </ol>
     </details>
     </div>
+      </details>
+      <div class="msgs" id="st-msg"></div>
+    </div>
   </details>
   <details class="card set" id="acct">
-    <summary><span class="set-ic" aria-hidden="true">👤</span><span class="set-t"><b>Account & backup</b><small>Sign out, backup, restore, reset</small></span></summary>
+    <summary><span class="set-ic" aria-hidden="true">👤</span><span class="set-t"><b>Account & backup</b><small>Sign out, backup, reset</small></span></summary>
     <div class="set-body">
     <div class="who"><img id="who-pic" alt="" hidden><div><b id="who-name"></b><small id="who-email"></small></div></div>
     <p class="save-note" id="acct-status">Checking…</p>
@@ -713,7 +731,7 @@ $('sess-end').addEventListener('change', saveSession);
 const stepsEl = $('steps');
 STEPS.forEach((s, i) => {
   const fs = document.createElement('fieldset'); fs.className = 'step'; fs.id = 's' + i;
-  let h = `<legend class="shead"><span class="idx">${s.idx}</span><span class="stitle">${s.title}</span><span class="tf">${s.tf}</span><span class="chip wait" id="c${i}">Pending</span></legend><p class="rule">${s.rule}</p>`;
+  let h = `<legend class="shead"><span class="idx">${s.idx}</span><span class="stitle">${s.title}</span><span class="tf">${s.tf}</span><span class="chip wait" id="c${i}">Pending</span><span class="ssum" id="sum${i}"></span></legend><p class="rule">${s.rule}</p>`;
   s.qs.forEach(q => {
     if (q.t === 'tick') h += `<label class="chk"><input type="checkbox" id="q-${q.k}" data-k="${q.k}"><span id="qt-${q.k}"></span></label>`;
     if (q.t === 'seg') h += `<div class="q"><span class="qlabel">${q.label}</span><div class="seg">` +
@@ -723,6 +741,13 @@ STEPS.forEach((s, i) => {
   });
   h += `<div class="msgs" id="m${i}"></div>`;
   fs.innerHTML = h; stepsEl.appendChild(fs);
+});
+stepsEl.addEventListener('click', e => {
+  const h = e.target.closest('.shead'); if (!h) return;
+  const fs = h.closest('fieldset'), i = +fs.id.slice(1);
+  if (!fs.classList.contains('done') || i === STEPS.length - 1) return;
+  if (expanded.has(i)) expanded.delete(i); else expanded.add(i);
+  evaluate();
 });
 $('tags').innerHTML = TAGS.map((t,i) => `<label><input type="checkbox" value="${esc(t)}" id="tag-${i}"><span>${esc(t)}</span></label>`).join('');
 
@@ -918,7 +943,7 @@ function renderAccounts(){
     const d = row.querySelector('[data-act=del]'); if (d) d.addEventListener('click', () => askDeleteAccount(a));
     box.appendChild(row);
   });
-  $('prop-sub').textContent = `${activeAcc().name}: daily loss, drawdown, target, consistency, sync`;
+  $('prop-sub').textContent = `${activeAcc().name}: limits, target, sync`;
   $('reset-label').textContent = `"${activeAcc().name}" ka journal reset karo`;
 }
 $('acc-select').addEventListener('change', e => {
@@ -1118,6 +1143,15 @@ function msgs(el, list){ el.innerHTML = ''; list.forEach(([k,t]) => { const p = 
 const touched = (s, d) => s.qs.some(q => d[q.k]);
 
 let plan = null, lastVerdict = null;
+const expanded = new Set();
+const LIQ_TXT = { lt15:'< $15', '15':'$15–20', '20':'$20–30', '30':'$30+' };
+const STEP_SUM = [
+  d => '✓ ' + [d.session === 'in' ? 'Session' : null, d.news === 'ok' ? 'News clear' : 'News checked', 'Levels'].filter(Boolean).join(' · '),
+  d => `✓ ${String(d.dir).toUpperCase()} · liquidity ${LIQ_TXT[d.liq] || ''} · level fresh`,
+  d => `✓ 15m ${d.t15 === 'up' ? '↑' : '↓'} · 5m ${d.t5 === 'up' ? '↑' : '↓'} · 1m retracement`,
+  () => '✓ Level tak aaya · rejection toota',
+  () => ''
+];
 function evaluate(fromUser){
   const d = readDraft();
   const { session, sessionMsg, news: _n, newsMsg, gate, ...keep } = d;
@@ -1129,13 +1163,17 @@ function evaluate(fromUser){
   if (d.sld) { const n = +d.sld; risk.className = 'ro ' + (n < 4 || n > 6 ? 'bad' : n === 6 ? 'warn' : 'good'); risk.querySelector('b').textContent = `−$${d.sld}${n>6?'+':''} · ${money(-n*PER)}`; }
   else { risk.className = 'ro'; risk.querySelector('b').textContent = '—'; }
 
-  let open = true, all = true, hard = null;
+  let open = true, all = true, hard = null, justDone = null;
   STEPS.forEach((s, i) => {
     const m = s.check(d).filter(Boolean);
     const ok = !m.some(x => x[0] === 'bad');
     const fs = $('s' + i), chip = $('c' + i), t = touched(s, d);
     fs.disabled = !open;
-    fs.classList.toggle('done', open && ok);
+    const wasDone = fs.classList.contains('done'), isDone = open && ok, last = i === STEPS.length - 1;
+    if (isDone && !wasDone && fromUser && !last) { expanded.delete(i); justDone = i; }
+    fs.classList.toggle('done', isDone);
+    fs.classList.toggle('collapsed', isDone && !last && !expanded.has(i));
+    $('sum' + i).textContent = isDone ? STEP_SUM[i](d) : '';
     fs.classList.toggle('fail', open && !ok && t);
     chip.className = 'chip ' + (!open ? 'wait' : ok ? 'pass' : t ? 'stop' : 'wait');
     chip.textContent = !open ? 'Locked' : ok ? 'Pass' : t ? 'Rule fail' : 'Pending';
@@ -1145,6 +1183,7 @@ function evaluate(fromUser){
     if (open && !hard) hard = m.find(x => x[2] === 'hard') || null;
     if (!ok) { open = false; all = false; }
   });
+  if (justDone != null && !hard) { const nx = $('s' + (justDone + 1)); if (nx) setTimeout(() => nx.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120); }
   $('go').disabled = !all;
   $('gatehint').textContent = all ? 'Sab rules pass. Order lagao aur yahan record karo.' : 'Har step pass hone par hi agla step khulega.';
   plan = all ? { dir:d.dir, liq:d.liq, t15:d.t15, t5:d.t5, sld:+d.sld } : null;
@@ -1377,22 +1416,22 @@ function vaultBlock(info){
   const ns = newsState(); if (ns.state === 'blocked') return ns.msg;
   return null;
 }
-function hideVault(){ clearInterval(vaultTimer); vaultTimer = null; vaultUntil = 0; $('vault-code').textContent = '• • • •'; $('vault-code').classList.add('hide'); $('vault-bar').style.width = '0'; }
+function hideVault(){ clearInterval(vaultTimer); vaultTimer = null; vaultUntil = 0; $('vault-code').hidden = true; $('vault-bar').hidden = true; $('vault-bar').style.width = '0'; }
 function renderVault(info){
   const on = !!ST().on && !!ST().code;
   $('vault').hidden = !on;
   if (!on) return;
   const block = vaultBlock(info);
   $('vault-show').disabled = !!block;
-  $('vault-show').textContent = block ? '🔒 Abhi code band hai' : 'Code dikhao (30 sec)';
-  $('vault-note').textContent = block ? `${block} TradingView ka code tab milega jab lock khatam ho.` : 'Trading allowed hai. Code se TradingView 15 min ke liye kholo, phir checklist yahan follow karo.';
+  $('vault-show').textContent = block ? '🔒 Band' : 'Dikhao';
+  $('vault-note').textContent = block ? block : 'Allowed. 30 sec ke liye code, TradingView 15 min kholo.';
   if (block && vaultUntil) hideVault();
 }
 $('vault-show').addEventListener('click', () => {
   if (vaultBlock(dayInfo()) || !ST().code) return;
   saveST({ reveals: (ST().reveals || 0) + 1, lastReveal: Date.now() });
   $('vault-code').textContent = ST().code.split('').join(' ');
-  $('vault-code').classList.remove('hide');
+  $('vault-code').hidden = false; $('vault-bar').hidden = false;
   vaultUntil = Date.now() + 30e3;
   clearInterval(vaultTimer);
   vaultTimer = setInterval(() => { const left = vaultUntil - Date.now(); if (left <= 0) hideVault(); else $('vault-bar').style.width = (left / 30e3 * 100) + '%'; }, 250);
