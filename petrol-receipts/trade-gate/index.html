@@ -562,9 +562,9 @@ const STEPS = [
                d.t15 && d.t5 && d.t15 !== d.t5 && ['bad','15m aur 5m ka trend alag side hai. Rule: dono same side.','hard'],
                d.t15 && d.t5 && d.t15 === d.t5 && d.t15 !== want && ['bad',`Trend ${d.t15} hai, tum ${d.dir} le rahe ho. Rule: trend ke saath hi trade.`,'hard'],
                !d.retr && ['bad','1m retracement confirm karo.'] ]; } },
-  { idx:'03', title:'Entry', tf:'1m', rule:'Retracement 4H level tak aaye. Pehli rejection candle ka low (short) / high (long) toote = entry.',
-    qs:[ { k:'reached', t:'tick', text:'Retracement 4H level tak aa gaya' },
-         { k:'broke', t:'tick', text: d => d.dir === 'short' ? 'Pehli rejection candle ka LOW toota' : d.dir === 'long' ? 'Pehli rejection candle ka HIGH toota' : 'Pehli rejection candle ka low/high toota' } ],
+  { idx:'03', title:'Entry', tf:'1m', rule:'Sell: 4H / previous daily HIGH pe pehli RED candle ka low toote. Buy: 4H / previous daily LOW pe pehli GREEN candle ka high toote.',
+    qs:[ { k:'reached', t:'tick', text: d => d.dir === 'short' ? '1m retracement 4H / previous daily HIGH tak aa gaya' : d.dir === 'long' ? '1m retracement 4H / previous daily LOW tak aa gaya' : 'Retracement 4H / previous daily level tak aa gaya' },
+         { k:'broke', t:'tick', text: d => d.dir === 'short' ? 'Level pe pehli RED candle ka LOW toota' : d.dir === 'long' ? 'Level pe pehli GREEN candle ka HIGH toota' : 'Level pe pehli rejection candle ka low/high toota' } ],
     check: d => [ !d.reached && ['bad','Level tak aane do. Wait.'], !d.broke && ['bad','Pehli rejection candle break hone do.'] ] },
   { idx:'04', title:'Exit', tf:'SL · TP · Lot', rule:'SL retracement high ke upar, $4–5 (max $6), kabhi move nahi. TP fixed $15. Lot 2 MGC.',
     qs:[ { k:'sld', t:'seg', label:'SL kitne $ ka? (retracement high/low ke paar)', opts:[['3','$3','t-bad'],['4','$4'],['5','$5'],['6','$6'],['7','$7+','t-bad']] },
@@ -1120,7 +1120,7 @@ const STEP_SUM = [
   d => '✓ ' + [d.session === 'in' ? 'Session' : null, d.news === 'ok' ? 'News clear' : 'News checked', 'Levels'].filter(Boolean).join(' · '),
   d => `✓ ${String(d.dir).toUpperCase()} · liquidity ${LIQ_TXT[d.liq] || ''} · level fresh`,
   d => `✓ 15m ${d.t15 === 'up' ? '↑' : '↓'} · 5m ${d.t5 === 'up' ? '↑' : '↓'} · 1m retracement`,
-  () => '✓ Level tak aaya · rejection toota',
+  d => d.dir === 'short' ? '✓ High pe aaya · red candle ka low toota' : '✓ Low pe aaya · green candle ka high toota',
   () => ''
 ];
 function evaluate(fromUser){
@@ -1518,7 +1518,10 @@ function mentorPrompt(d){
     '00 news: no USD high-impact news around the trade; key levels marked after the 5pm (New York) daily close.',
     '01 liquidity: mark a 4H/Daily liquidity level; the next liquidity (target) must be at least $15 away, otherwise skip.',
     '02 trend: 15m and 5m trend must point the same way as the trade; a 1m move against them is only a retracement.',
-    '03 entry: price retraces to the 4H level; entry when the FIRST rejection candle on 1m breaks (its low for a short, its high for a long).',
+    '03 entry (pullback into the level, trade WITH the 15m/5m trend):',
+    '   SELL: 15m+5m trend down; 1m retraces UP into a 4H high or the previous daily HIGH; the FIRST RED (bearish) 1m candle at that level forms; entry when price breaks BELOW that red candle\'s low.',
+    '   BUY: 15m+5m trend up; 1m retraces DOWN into a 4H low or the previous daily LOW; the FIRST GREEN (bullish) 1m candle at that level forms; entry when price breaks ABOVE that green candle\'s high.',
+    '   Wrong side (a sell at a low, a buy at a high), a later candle instead of the first one, or a trade against the 15m/5m trend is a mismatch.',
     '04 exit: stop loss just beyond the retracement high (short) / low (long), $4-5 away, max $6, never moved; take profit fixed at $15; lot 2 MGC.',
     'Day rules: stop after 2 wins or 2 losses; a level that failed today is not traded again.',
     '',
@@ -1533,8 +1536,13 @@ function mentorPrompt(d){
     ...(stageOf(d) === 'setup' ? [
       '',
       'STAGE: SETUP CHECK. Price has not yet given the entry trigger; the trader is waiting at or near the 4H level and has not taken a trade.',
-      '- Judge only news, liquidity and trend (and whether price is at or approaching the 4H level).',
-      '- For entry and sl_tp use status "wait" (never mismatch just because the trigger has not happened). In the note say exactly what to wait for, e.g. "1m pe pehli rejection candle ka high toote tab entry" for a long, or its low for a short, and where the stop would go.',
+      '- Judge only news, liquidity and trend, and whether the level is the right side (a high for a sell, a low for a buy).',
+      '- For entry and sl_tp use status "wait" (never mismatch just because the trigger has not happened). In the entry note say which of these the chart shows, reading prices from the axis:',
+      '   1) price has not reached the level yet: "Level abhi ~$X door hai, wait karo";',
+      '   2) level touched but no first red (sell) / green (buy) candle yet: "Level pe pehli red/green candle ka wait karo";',
+      '   3) that candle formed but its low (sell) / high (buy) is not broken: "Red candle ka low ~$X toote tab sell" / "Green candle ka high ~$X toote tab buy";',
+      '   4) already broken: say the trigger has happened and the trader should tick step 03 and run an entry check.',
+      '- In the sl_tp note say where the stop would go (beyond the retracement high for a sell, low for a buy) if visible.',
       '- verdict: setup_ok if news, liquidity and trend have no mismatch; wait (= stop, setup is wrong) if any of them is a mismatch; unclear if the charts do not show enough. Never use take at this stage.'
     ] : [
       '',
