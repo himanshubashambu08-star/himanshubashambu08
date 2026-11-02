@@ -137,6 +137,13 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .focus-box .lbl{color:var(--gold)}
 .focus-box b{font-size:16px}
 .focus-box small{color:var(--muted);font-size:13px}
+.vf-slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.vf-slot{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.vf-slot .btn{width:100%;text-align:center;font-size:13px;padding:10px 6px}
+.vf-slot img{width:100%;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.vf-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.vf-list li{display:grid;grid-template-columns:22px 1fr;gap:8px}
+.vf-list .ok{color:var(--good)} .vf-list .no{color:var(--bad)} .vf-list .wn{color:var(--warn)}
 .st-col{display:flex;flex-direction:column;gap:2px;min-width:0}
 #status-sub{font-family:var(--f-num);font-weight:500;font-size:14px;opacity:.9}
 .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
@@ -524,6 +531,16 @@ details.tr summary::-webkit-details-marker{display:none}
     <div class="q"><label class="qlabel" for="gs-good">Aaj ki ek achhi baat</label><input class="in" id="gs-good" maxlength="140" placeholder="Jaise: SL move nahi kiya" style="font:400 15px var(--f-body)"></div>
     <button class="btn ghost" type="button" id="gs-notrade" style="width:100%">🧘 No valid setup today</button>
     <div class="msgs" id="gs-check-msg"></div>
+  </div>
+  <div class="card" id="gs-verify">
+    <h2>Din ka verification</h2>
+    <p class="save-note">Din ke end me 2 screenshot daalo. AI broker ka data padh ke journal se milayega. Journal se zyada trade mile to "Untracked trade" lag jayega.</p>
+    <div class="vf-slots">
+      <div class="vf-slot"><label class="btn ghost" for="vf-dash" tabindex="0">📊 Lucid dashboard</label><input type="file" id="vf-dash" accept="image/*" hidden><img id="vf-dash-img" alt="Dashboard screenshot" hidden></div>
+      <div class="vf-slot"><label class="btn ghost" for="vf-hist" tabindex="0">📒 Aaj ka trade history</label><input type="file" id="vf-hist" accept="image/*" hidden><img id="vf-hist-img" alt="Trade history screenshot" hidden></div>
+    </div>
+    <button class="btn" type="button" id="vf-run" disabled>Verify karo</button>
+    <div id="vf-out"></div>
   </div>
   <div class="card">
     <h2>Aaj ka breakdown</h2>
@@ -1640,18 +1657,19 @@ const FC = () => Object.assign({ on: true, gateTick: true, notify: false, notify
 let gsSettings = Object.assign(defaultGS(), LS.get('gtd.gs') || {});
 let scoreDocs = LS.get('gtd.scores') || {};
 let weeklyDocs = LS.get('gtd.weekly') || {};
-let gsScoresCol = null, gsRef = null, gsWeeklyCol = null, gsUnsubs = [];
+let gsScoresCol = null, gsRef = null, gsWeeklyCol = null, gsProofCol = null, gsUnsubs = [];
 
 function growthStart(userDoc){
   growthStop();
   gsScoresCol = userDoc.collection('dailyScores');
   gsWeeklyCol = userDoc.collection('weeklyReports');
+  gsProofCol = userDoc.collection('eodProof');
   gsRef = userDoc.collection('meta').doc('growthScoreSettings');
   gsUnsubs.push(gsRef.onSnapshot(sn => { if (sn.exists) { gsSettings = Object.assign(defaultGS(), sn.data()); LS.set('gtd.gs', gsSettings); syncGSUI(); renderGrowth(); } }, () => {}));
   gsUnsubs.push(gsScoresCol.onSnapshot(sn => { scoreDocs = {}; sn.docs.forEach(d => { scoreDocs[d.id] = d.data(); }); LS.set('gtd.scores', scoreDocs); renderGrowth(); }, () => {}));
   gsUnsubs.push(gsWeeklyCol.onSnapshot(sn => { weeklyDocs = {}; sn.docs.forEach(d => { weeklyDocs[d.id] = d.data(); }); LS.set('gtd.weekly', weeklyDocs); renderGrowth(); }, () => {}));
 }
-function growthStop(){ gsUnsubs.forEach(u => u()); gsUnsubs = []; gsScoresCol = gsRef = gsWeeklyCol = null; }
+function growthStop(){ gsUnsubs.forEach(u => u()); gsUnsubs = []; gsScoresCol = gsRef = gsWeeklyCol = gsProofCol = null; }
 function saveGS(){ LS.set('gtd.gs', gsSettings); if (gsRef) gsRef.set(gsSettings).catch(() => {}); }
 function saveScoreDoc(doc){ scoreDocs[doc.id] = doc; LS.set('gtd.scores', scoreDocs); if (gsScoresCol) gsScoresCol.doc(doc.id).set(doc).catch(() => {}); }
 function saveWeekly(doc){ weeklyDocs[doc.id] = doc; LS.set('gtd.weekly', weeklyDocs); if (gsWeeklyCol) gsWeeklyCol.doc(doc.id).set(doc).catch(() => {}); }
@@ -1799,6 +1817,7 @@ function renderGrowth(){
   let streak = 0; for (let i = scored.length - 1; i >= 0; i--) { if (scored[i].total >= tgt) streak++; else break; }
   const last7 = scored.slice(-7), avg7 = last7.length ? Math.round(last7.reduce((s, d) => s + d.total, 0) / last7.length) : 0;
   $('gs-chips').innerHTML = [`🔥 Streak ${streak} din`, `7-din avg ${avg7}`, `Target ${tgt}`].map(t => `<span class="gs-chip">${t}</span>`).join('') + (today.noTrade ? '<span class="gs-chip gold">🧘 Patience day</span>' : '') + (today.untracked || hero.untracked ? '<span class="gs-chip bad">⚠ Untracked trade</span>' : '')
+    + (() => { const v = (scoreDocs[gsDocId(todayDate)] || {}).verify; if (v) return v.status === 'ok' ? '<span class="gs-chip gold">🔒 Broker se verified</span>' : '<span class="gs-chip bad">⚠ Broker mismatch</span>'; return today.trades || inGsWindow(Date.now()) === false ? '<span class="gs-chip">📸 Verification baaki</span>' : ''; })()
     + (() => { if (!FC().on) return ''; const st = series.length > 1 ? fixStatus(hero, series[series.length - 2], series) : null; const fs = fixStreak(series);
       return (st === 'fixed' ? '<span class="gs-chip gold">✅ Kal ki galti fix ki</span>' : st === 'broken' ? '<span class="gs-chip bad">✗ Focus phir toota</span>' : st === 'pending' ? '<span class="gs-chip">⏳ Focus abhi test nahi hua</span>' : '') + `<span class="gs-chip">🛠 Fix streak ${fs}</span>`; })();
   // per-account scores today
@@ -1850,6 +1869,7 @@ function renderGrowth(){
 
   maybeWeekly(scored);
   renderWeekly();
+  renderVerify();
 }
 $('gs-mistake').addEventListener('change', e => { const t = computeDay(tradingDate(Date.now())); patchToday({ notes: Object.assign({}, t.notes, { mistake: e.target.value.trim() }) }); });
 $('gs-good').addEventListener('change', e => { const t = computeDay(tradingDate(Date.now())); patchToday({ notes: Object.assign({}, t.notes, { good: e.target.value.trim() }) }); });
@@ -1904,6 +1924,104 @@ function renderWeekly(busy){
 $('gs-week-now').addEventListener('click', () => buildWeekly(growthSeries(), mondayOf(tradingDate(Date.now())), true));
 // read-only hooks for the automated tests in /tests
 window.__tradeGate = Object.freeze({ tradingDate, mondayOf });
+/* ---- end-of-day verification against broker screenshots ---- */
+let vfShots = { dash: null, hist: null };
+async function vfPick(kind, file){
+  if (!file) return;
+  try { vfShots[kind] = await compress(file); $(`vf-${kind}-img`).src = vfShots[kind].thumb; $(`vf-${kind}-img`).hidden = false; }
+  catch { msgs($('vf-out'), [['bad', 'Ye photo khul nahi payi. Screenshot dobara lo.']]); }
+  $('vf-run').disabled = !(vfShots.dash && vfShots.hist);
+}
+$('vf-dash').addEventListener('change', e => { vfPick('dash', e.target.files[0]); e.target.value = ''; });
+$('vf-hist').addEventListener('change', e => { vfPick('hist', e.target.files[0]); e.target.value = ''; });
+document.querySelectorAll('label[for="vf-dash"],label[for="vf-hist"]').forEach(l => l.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $(l.htmlFor).click(); } }));
+const VERIFY_SCHEMA = { type: 'object', properties: {
+  dashboard_found: { type: 'boolean', description: 'true if image 1 is a prop-firm account dashboard showing a balance' },
+  balance: { type: 'number', description: 'account balance shown on the dashboard, number only' },
+  history_found: { type: 'boolean', description: 'true if image 2 is a broker/platform trade history, fills, orders or performance list' },
+  dates_seen: { type: 'array', items: { type: 'string' }, description: 'every trade date visible in the history, as YYYY-MM-DD' },
+  trades: { type: 'array', items: { type: 'object', properties: { time: { type: 'string' }, side: { type: 'string' }, qty: { type: 'number' }, pnl: { type: 'number' } } }, description: 'one entry per ROUND-TRIP trade (position opened and closed), not per fill' },
+  day_pnl: { type: 'number', description: 'total realized P&L of the trades in the history for the day, if shown or computable' },
+  notes: { type: 'string' }
+}, required: ['dashboard_found', 'history_found', 'trades'] };
+async function readBroker(date){
+  const base = `https://www.gstatic.com/firebasejs/${AI_VERSION}`;
+  await loadAI();
+  const [{ getApps }, { getAI, getGenerativeModel, GoogleAIBackend }] = await Promise.all([import(`${base}/firebase-app.js`), import(`${base}/firebase-ai.js`)]);
+  const ai = getAI(getApps().find(a => a.name === 'mentor'), { backend: new GoogleAIBackend() });
+  const img = x => ({ inlineData: { data: x.full.split(',')[1], mimeType: 'image/jpeg' } });
+  const prompt = ['You read screenshots for a futures trader (micro gold MGC). Image 1 should be the prop firm dashboard (Lucid), image 2 the trade history from Tradovate, Tradesea or NinjaTrader.',
+    `The trading day being checked is ${date} (CME session: starts 6 PM ET the evening before).`,
+    'Report only what is visible. Count ROUND-TRIP trades (an entry and its exit together = 1 trade). Do not guess numbers you cannot read; leave them out.',
+    'List the dates you can see on the trades as YYYY-MM-DD.'].join('\n');
+  let last;
+  for (const name of MODELS) {
+    try {
+      const m = getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', responseJsonSchema: VERIFY_SCHEMA, temperature: 0 } });
+      const r = await m.generateContent([prompt, img(vfShots.dash), img(vfShots.hist)]);
+      return JSON.parse(r.response.text());
+    } catch (e) { last = e; }
+  }
+  throw last;
+}
+// compare what the broker shows with the journal; returns checks and whether trades are missing
+function compareBroker(b, date){
+  const list = dayTrades(date), jCount = list.length, jPnl = Math.round(list.reduce((s, t) => s + (t.pnl || 0), 0));
+  const bCount = (b.trades || []).length, bPnl = Number.isFinite(b.day_pnl) ? Math.round(b.day_pnl) : (b.trades || []).every(t => Number.isFinite(t.pnl)) ? Math.round((b.trades || []).reduce((s, t) => s + t.pnl, 0)) : null;
+  const checks = []; let missing = false;
+  if (!b.history_found) checks.push(['no', 'Trade history screenshot samajh nahi aaya. Tradovate/Tradesea ki aaj ki history ka screenshot do.']);
+  else {
+    const ok = !(b.dates_seen || []).length || b.dates_seen.some(d => d === date || d === prevDate(date));
+    checks.push(ok ? ['ok', `History ki date sahi hai${(b.dates_seen || []).length ? ` (${b.dates_seen.slice(0, 2).join(', ')})` : ''}`] : ['no', `Screenshot aaj ka nahi lagta (dates: ${b.dates_seen.join(', ')})`]);
+    if (!ok) missing = true;
+    if (bCount > jCount) { checks.push(['no', `Broker me ${bCount} trade, journal me sirf ${jCount}. ${bCount - jCount} trade log nahi hua.`]); missing = true; }
+    else if (bCount < jCount) checks.push(['wn', `Broker me ${bCount} trade dikhe, journal me ${jCount}. Screenshot me saare trades dikh rahe hain?`]);
+    else checks.push(['ok', `Trades match: ${jCount}`]);
+    if (bPnl != null) {
+      const diff = Math.abs(bPnl - jPnl);
+      if (diff > 50) { checks.push(['no', `P&L match nahi: broker ${money(bPnl)}, journal ${money(jPnl)}`]); missing = true; }
+      else checks.push([diff > 15 ? 'wn' : 'ok', `P&L: broker ${money(bPnl)}, journal ${money(jPnl)}${diff > 15 ? ' (fees/commission ka farak ho sakta hai)' : ''}`]);
+    }
+  }
+  if (!b.dashboard_found) checks.push(['wn', 'Dashboard screenshot me balance nahi padh paya.']);
+  else if (Number.isFinite(b.balance)) {
+    const ps = propState();
+    if (ps) { const d = Math.abs(b.balance - ps.balance); checks.push([d > 25 ? 'wn' : 'ok', `Balance: Lucid ${money(b.balance)}, app ${money(ps.balance)}${d > 25 ? ' · Settings → Prop account me sync kar lo' : ''}`]); }
+    else checks.push(['ok', `Lucid balance ${money(b.balance)}`]);
+  }
+  return { checks, missing, bCount, bPnl, jCount, jPnl, balance: Number.isFinite(b.balance) ? b.balance : null };
+}
+function renderVerify(){
+  const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify, out = $('vf-out');
+  if (!v) { if (!vfBusy) out.innerHTML = ''; return; }
+  const ic = { ok: '✓', no: '✗', wn: '!' };
+  out.innerHTML = `<div class="msgs"><p class="msg ${v.status === 'ok' ? 'good' : 'bad'}">${v.status === 'ok' ? '🔒 Verified: broker aur journal match karte hain.' : '⚠ Mismatch: journal aur broker alag hain.'}</p></div>
+    <ul class="vf-list" style="margin-top:8px">${(v.checks || []).map(([k, t]) => `<li><span class="${k}">${ic[k]}</span><span>${esc(t)}</span></li>`).join('')}</ul>
+    <p class="save-note" style="margin-top:6px">Checked ${new Date(v.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Naye screenshot daal ke dobara verify kar sakte ho.</p>`;
+}
+let vfBusy = false;
+$('vf-run').addEventListener('click', async () => {
+  if (vfBusy || !vfShots.dash || !vfShots.hist) return;
+  vfBusy = true; $('vf-run').disabled = true;
+  $('vf-out').innerHTML = '<div class="loading"><span class="spin"></span>AI screenshots padh raha hai… (10–30 sec)</div>';
+  const date = tradingDate(Date.now());
+  try {
+    const b = await readBroker(date);
+    const c = compareBroker(b, date);
+    const verify = { status: c.missing ? 'mismatch' : 'ok', checks: c.checks, brokerCount: c.bCount, brokerPnl: c.bPnl, journalCount: c.jCount, journalPnl: c.jPnl, balance: c.balance, at: Date.now() };
+    // keep the screenshots as proof (compressed, one doc each)
+    if (gsProofCol) ['dash', 'hist'].forEach(k => gsProofCol.doc(`${gsBucket()}_${date}_${k}`).set({ data: vfShots[k].full, date, bucket: gsBucket(), kind: k, at: Date.now() }).catch(() => {}));
+    vfBusy = false;
+    patchToday(c.missing ? { verify, untracked: true } : { verify });
+    if (c.missing) pop('no', 'Broker check', 'Untracked trade', c.checks.filter(x => x[0] === 'no').map(x => x[1]).join(' · '), 'Jo trade log nahi hua, uska execution score 0. Kal se har trade app ke through.', [['Theek hai', '']]);
+  } catch (err) {
+    vfBusy = false;
+    const offline = !navigator.onLine || /Load failed|Failed to fetch|network/i.test(err?.message || '');
+    msgs($('vf-out'), [['bad', offline ? 'Internet nahi hai. Connect karke dobara try karo.' : 'AI abhi screenshots nahi padh paya. Thodi der baad dobara try karo.']]);
+  }
+  $('vf-run').disabled = !(vfShots.dash && vfShots.hist);
+});
+
 async function weeklyTips(st){
   const base = `https://www.gstatic.com/firebasejs/${AI_VERSION}`;
   await loadAI(); // sets up the 'mentor' app with App Check
