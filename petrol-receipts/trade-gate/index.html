@@ -321,6 +321,8 @@ details.tr summary::-webkit-details-marker{display:none}
 .flag{font-size:13px;font-weight:600;color:var(--warn)}
 .flag.clean{color:var(--good)}
 .trbody{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.slfix{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.slfix .btn{width:auto;padding:6px 12px;font-size:13px;min-height:0}
 .lesson{margin:0;padding:8px 10px;background:var(--bg);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere}
 .empty{text-align:center;color:var(--muted);padding:28px 12px;border:1px dashed var(--line);border-radius:12px}
 @media (max-width:380px){.daybar{grid-template-columns:repeat(2,1fr)}}
@@ -1559,22 +1561,39 @@ function renderJournal(){
     j.appendChild(g);
   });
 }
+// chart SL (read by the mentor) vs the SL the trader picked; true when they differ by $1 or more
+const slOff = (seen, sld) => Number.isFinite(seen) && seen > 0 && +sld > 0 && Math.abs(seen - +sld) >= 0.75;
+// fix a wrongly entered SL on a closed trade; an SL hit's P&L follows the new SL
+async function fixSl(t, n){
+  if (n === +t.sld) return;
+  const upd = { sld: n, slFix: { from: t.slFix ? t.slFix.from : +t.sld, at: Date.now() } };
+  if (t.result === 'sl') { upd.pnl = -n * PER; upd.move = -n; }
+  await store.save(Object.assign({}, t, upd));
+}
+function askFixSl(t){
+  const why = t.result === 'sl' ? `SL hit tha, to P&L bhi naye SL se banega (abhi ${money(t.pnl)}).` : 'Sirf SL record badlega, P&L wahi rahega.';
+  const save = n => async () => { try { await fixSl(t, n); } catch { pop('no', 'Error', 'Save nahi hua', '', 'Internet check karke dobara try karo.', [['Theek hai', '']]); } };
+  pop('', 'Journal', 'Asli SL kitne $ ka tha?', `Abhi likha hai: $${t.sld}`, why + ' Chart screenshot me jo SL hai wahi chuno.',
+    [4, 5, 6].filter(n => n !== +t.sld).map(n => [`$${n} · ${money(-n * PER)}`, '', save(n)]).concat([['Rehne do', 'ghost']]));
+}
 function tradeRow(t){
   const el = document.createElement('details'); el.className = 'tr';
   const br = t.ruleBreaks || [];
   const resTxt = { tp:'TP hit', sl:'SL hit', manual:'Manual exit' }[t.result];
   const liqTxt = { '15':'$15–20', '20':'$20–30', '30':'$30+' }[t.liq] || '';
-  el.innerHTML = `<summary><span class="dir ${t.dir}">${t.dir}</span><span class="trmid"><span>${resTxt}</span><small>${new Date(t.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} · SL $${t.sld} · Liq ${liqTxt}</small></span><span class="trpnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${money(t.pnl)}</span><button type="button" class="trash" aria-label="Ye trade delete karo" title="Delete"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></summary>
+  el.innerHTML = `<summary><span class="dir ${t.dir}">${t.dir}</span><span class="trmid"><span>${resTxt}</span><small>${new Date(t.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} · SL $${t.sld}${t.slFix ? ` (pehle $${t.slFix.from})` : ''} · Liq ${liqTxt}</small></span><span class="trpnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${money(t.pnl)}</span><button type="button" class="trash" aria-label="Ye trade delete karo" title="Delete"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></summary>
     <div class="trbody"><span class="flag ${br.length ? '' : 'clean'}">${br.length ? 'Rule break: ' + esc(br.join(', ')) : 'Sab rules follow kiye'}</span>${t.againstMentor ? '<span class="flag">⚠ Mentor ke against liya</span>' : ''}
     <div class="tags">${(t.tags||[]).map(x => `<span>${esc(x)}</span>`).join('')}</div>
     ${t.note ? `<p class="lesson">${esc(t.note)}</p>` : ''}
     <div class="photos jph"></div>
     <div class="jmentor"></div>
+    ${t.status === 'closed' ? `<div class="slfix">${t.mentor && slOff(t.mentor.sl_seen, t.sld) ? `<span class="flag">⚠ Chart me SL ~$${t.mentor.sl_seen}, journal me $${t.sld}</span>` : '<span>SL galat likha tha?</span>'}<button type="button" class="btn ghost slfix-btn">SL theek karo</button></div>` : ''}
     </div>`;
   const jp = el.querySelector('.jph');
   (t.photos || []).forEach(p => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ph'; b.title = p.kind === 'exit' ? 'Exit chart' : 'Setup chart'; b.innerHTML = `<img alt="">`; b.firstChild.src = p.thumb; b.addEventListener('click', () => openPhoto(p)); jp.appendChild(b); });
   if (t.mentor) el.querySelector('.jmentor').appendChild(mentorView(t.mentor));
   el.querySelector('.trash').addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); askDeleteTrade(t); });
+  const fb = el.querySelector('.slfix-btn'); if (fb) fb.addEventListener('click', () => askFixSl(t));
   return el;
 }
 
@@ -2367,7 +2386,8 @@ const MENTOR_SCHEMA = {
       rule: { type: 'string', enum: RULE_KEYS },
       status: { type: 'string', enum: ['ok','mismatch','cant_tell','wait'] },
       note: { type: 'string', description: 'Short Hinglish reason based only on what is visible.' } }, required: ['rule','status','note'] } },
-    tip: { type: 'string', description: 'One practical Hinglish tip for this setup.' }
+    tip: { type: 'string', description: 'One practical Hinglish tip for this setup.' },
+    sl_seen: { type: 'number', description: 'Stop-loss distance in $ (price points) between entry and stop, read from a position/risk tool or SL line on the chart. Leave out if no stop is drawn.' }
   },
   required: ['verdict','headline','checks']
 };
@@ -2418,6 +2438,7 @@ function mentorPrompt(d){
     '- ok: the chart clearly supports it. mismatch: the chart clearly contradicts it (say what you see). cant_tell: that timeframe or detail is not visible (news is usually cant_tell).',
     '- Read prices only from the chart axes/labels; never invent numbers. If unsure, use cant_tell.',
     '- Give one check per rule, in order: news, liquidity, trend, entry, sl_tp.',
+    `- If a long/short position tool or stop-loss line is drawn, read the entry and stop prices and put their distance in sl_seen (e.g. 5 for $5). If it differs from the trader's stop loss distance (${d.sld ? '$' + d.sld : 'not answered'}) by $1 or more, mark sl_tp mismatch and say both numbers.`,
     ...(stageOf(d) === 'setup' ? [
       '',
       'STAGE: SETUP CHECK. Price has not yet given the entry trigger; the trader is waiting at or near the 4H level and has not taken a trade.',
@@ -2470,6 +2491,8 @@ function renderMentor(){
   if (mentorBusy) { out.innerHTML = '<div class="loading"><span class="spin"></span>Mentor chart dekh raha hai… (10–30 sec)</div>'; return; }
   if (mentor && mentor.forPhotos === photoKey(draftPhotos)) {
     out.appendChild(mentorView(mentor));
+    const sd = readDraft().sld;
+    if (sd && sd !== '7' && slOff(mentor.sl_seen, sd)) { const n = document.createElement('div'); n.className = 'msgs'; out.appendChild(n); msgs(n, [['bad', `Chart pe SL ~$${mentor.sl_seen} dikh raha hai, tumne $${sd} chuna. Step 04 me sahi SL select karo.`]]); }
     if (mentor.stage === 'setup' && stageOf(readDraft()) === 'entry') { const n = document.createElement('div'); n.className = 'msgs'; out.appendChild(n); msgs(n, [['warn', 'Ab entry ka time hai. 1m ka naya screenshot daalo aur "Entry check karao" dabao.']]); }
   }
   else if (mentor && draftPhotos.length) msgs(out, [['warn', 'Photos badal gayi. Mentor se dobara check karao.']]);
