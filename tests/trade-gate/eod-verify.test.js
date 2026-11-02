@@ -109,16 +109,25 @@ async function test(name, fn) { try { await fn(); console.log('ok   -', name); }
     assert.match(out, /AI abhi screenshots nahi padh paya/); assert.match(out, /Detail: \[400\] schema not supported/);
     await page.evaluate(() => { window.__vfFail = null; });
   });
-  await test('Lucid balance from the screenshot can be synced into the app', async () => {
-    await page.evaluate(() => { const $ = id => document.getElementById(id); $('p-on').checked = true; $('p-size').value = '25000'; $('p-dd').value = '1000'; $('p-start').value = '2026-11-01'; $('p-save').click(); });
-    await run({ dashboard_found: true, balance: 24547, history_found: true, dates_seen: ['2026-11-11'], trades: [{ pnl: 300 }] });
-    assert.match(await text(page, '#vf-out'), /App \$25,300 · Lucid \$24,547/);
+  await test('broker balance and P&L difference flow into the app everywhere', async () => {
+    await page.evaluate(() => { const $ = id => document.getElementById(id); $('p-on').checked = true; $('p-size').value = '25000'; $('p-dd').value = '1000'; $('p-daily').value = '600'; $('p-start').value = '2026-11-01'; $('p-save').click(); });
+    // one untracked −$28 trade at the broker; Lucid shows the balance after it
+    await run({ dashboard_found: true, balance: 25272, history_found: true, dates_seen: ['2026-11-11'], trades: [{ pnl: 300 }, { pnl: -28 }] });
+    await page.click('#pop-actions .btn'); // close the "Untracked trade" pop-up
+    const out = await text(page, '#vf-out');
+    assert.match(out, /balance \$25,300 → \$25,272/); assert.match(out, /aaj ka P&L −?-?\$28 farak/);
     await page.click('#vf-sync');
-    assert.match(await text(page, '#pop'), /Balance \$24,547 set karna hai/);
+    assert.match(await text(page, '#pop'), /Broker jaisa update karna hai/);
     await page.click('#pop-actions .btn:not(.ghost)');
-    assert.match(await text(page, '#vf-out'), /App balance Lucid se match: \$24,547/);
+    assert.match(await text(page, '#vf-out'), /App broker se match: balance \$25,272, aaj ka broker farak -?−?\$28/);
     assert.ok(!(await page.$('#vf-sync')));
-    assert.match(await text(page, '#prop-title'), /\$24,547/);
+    assert.match(await text(page, '#prop-title'), /\$25,272/);
+    assert.strictEqual(await text(page, '#d-pnl'), '$272');
+    assert.match(await text(page, '#prop-card'), /\$872 bacha/); // daily room 600 + 272
+    await page.click('#tab-journal');
+    const st = await text(page, '#stats');
+    assert.match(st, /Net P&L ?\$272/); assert.match(st, /Broker farak \(bina log trade \/ fees\) ?−\$28/);
+    await page.click('#tab-growth');
   });
   await test('no page errors', async () => assert.deepStrictEqual(errors, []));
 
