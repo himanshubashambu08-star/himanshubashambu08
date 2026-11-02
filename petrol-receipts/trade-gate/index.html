@@ -314,7 +314,7 @@ details.tr{background:var(--surface);border:1px solid var(--line);border-radius:
 details.tr summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:12px 14px}
 details.tr summary::-webkit-details-marker{display:none}
 .dir{font:700 13px var(--f-display);letter-spacing:.06em;padding:3px 8px;border-radius:5px;text-transform:uppercase}
-.dir.long{background:var(--good-soft);color:var(--good)} .dir.short{background:var(--bad-soft);color:var(--bad)}
+.dir.long{background:var(--good-soft);color:var(--good)} .dir.short{background:var(--bad-soft);color:var(--bad)} .dir.untracked{background:var(--bad-soft);color:var(--bad);font-size:11px}
 .trmid{display:flex;flex-direction:column;min-width:0;font-size:14px}
 .trmid small{color:var(--muted)}
 .trpnl{font-family:var(--f-num);font-variant-numeric:tabular-nums}
@@ -1586,8 +1586,13 @@ function askFixSl(t){
 function tradeRow(t){
   const el = document.createElement('details'); el.className = 'tr';
   const br = t.ruleBreaks || [];
-  const resTxt = { tp:'TP hit', sl:'SL hit', manual:'Manual exit' }[t.result];
+  const resTxt = { tp:'TP hit', sl:'SL hit', manual:'Manual exit', untracked:'Bina app ke trade' }[t.result];
   const liqTxt = { '15':'$15–20', '20':'$20–30', '30':'$30+' }[t.liq] || '';
+  if (t.untracked) {
+    el.innerHTML = `<summary><span class="dir untracked">untracked</span><span class="trmid"><span>${resTxt}${t.untrackedCount > 1 ? ` ×${t.untrackedCount}` : ''}</span><small>Broker check se auto-log · galti</small></span><span class="trpnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${money(t.pnl)}</span></summary>
+      <div class="trbody"><span class="flag">Rule break: ${esc((t.ruleBreaks || []).join(', '))}</span><p class="lesson">${esc(t.note || '')}</p></div>`;
+    return el;
+  }
   el.innerHTML = `<summary><span class="dir ${t.dir}">${t.dir}</span><span class="trmid"><span>${resTxt}</span><small>${new Date(t.createdAt).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})} · SL $${t.sld}${t.slFix ? ` (pehle $${t.slFix.from})` : ''} · Liq ${liqTxt}</small></span><span class="trpnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${money(t.pnl)}</span><button type="button" class="trash" aria-label="Ye trade delete karo" title="Delete"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button></summary>
     <div class="trbody"><span class="flag ${br.length ? '' : 'clean'}">${br.length ? 'Rule break: ' + esc(br.join(', ')) : 'Sab rules follow kiye'}</span>${t.againstMentor ? '<span class="flag">⚠ Mentor ke against liya</span>' : ''}
     <div class="tags">${(t.tags||[]).map(x => `<span>${esc(x)}</span>`).join('')}</div>
@@ -1745,7 +1750,7 @@ function computeDay(date, bucket = gsBucket()){
       else if (EXEC_CHECK[r.src]) { frac = list.filter(EXEC_CHECK[r.src]).length / list.length; how = 'auto'; }
       else frac = manual[r.id] ? 1 : 0;
     } else if (r.src === 'stops') { frac = stopsFollowed(list) ? 1 : 0; how = 'auto'; }
-    else if (r.src === 'window') { frac = list.every(t => inGsWindow(t.createdAt || 0)) ? 1 : 0; how = 'auto'; }
+    else if (r.src === 'window') { frac = list.filter(t => !t.untracked).every(t => inGsWindow(t.createdAt || 0)) ? 1 : 0; how = 'auto'; }
     else if (r.src === 'dll') { frac = !(+P.daily) || dayPnl > -P.daily ? 1 : 0; how = 'auto'; }
     else if (r.src === 'shots') { frac = list.every(t => (t.photos || []).length > 0) ? 1 : 0; how = 'auto'; }
     else if (r.src === 'eod') { frac = notes.mistake && notes.good ? 1 : 0; how = 'note'; }
@@ -2015,7 +2020,7 @@ async function readBroker(date){
 }
 // compare what the broker shows with the journal; returns checks and whether trades are missing
 function compareBroker(b, date){
-  const list = dayTrades(date), jCount = list.length, jPnl = Math.round(list.reduce((s, t) => s + (t.pnl || 0), 0));
+  const list = dayTrades(date).filter(t => !t.untracked), jCount = list.length, jPnl = Math.round(list.reduce((s, t) => s + (t.pnl || 0), 0));
   const bCount = (b.trades || []).length, bPnl = Number.isFinite(b.day_pnl) ? Math.round(b.day_pnl) : (b.trades || []).every(t => Number.isFinite(t.pnl)) ? Math.round((b.trades || []).reduce((s, t) => s + t.pnl, 0)) : null;
   const checks = []; let missing = false;
   if (!b.history_found) checks.push(['no', 'Trade history screenshot samajh nahi aaya. Tradovate/Tradesea ki aaj ki history ka screenshot do.']);
@@ -2040,6 +2045,24 @@ function compareBroker(b, date){
   }
   return { checks, missing, bCount, bPnl, jCount, jPnl, balance: Number.isFinite(b.balance) ? b.balance : null };
 }
+// log the trades the broker shows but the journal doesn't, as one 'untracked' entry for the day (a counted mistake)
+function vfUntracked(v, date = tradingDate(Date.now()), withUndo = true){
+  if (!v || v.undone || !dataReady() || !Number.isFinite(v.brokerCount)) return false;
+  const all = dayTrades(date), own = all.filter(t => !t.untracked), rec = all.find(t => t.untracked);
+  const n = v.brokerCount - own.length, jOwn = Math.round(own.reduce((x, t) => x + (t.pnl || 0), 0));
+  if (n <= 0) { if (rec) { store.remove(rec.id).catch(() => {}); return true; } return false; }
+  const pnl = Number.isFinite(v.brokerPnl) ? v.brokerPnl - jOwn : 0;
+  if (rec && rec.untrackedCount === n && rec.pnl === pnl) return false;
+  const at = rec ? rec.createdAt : Math.min(v.at || Date.now(), Date.now());
+  if (tradingDate(at) !== date) return false;
+  // remember the state before the first automatic change, for Undo
+  if (withUndo && !v.undo) { const P = (activeAcc() || {}).prop || {}; try { patchToday({ verify: Object.assign({}, v, { undo: { brokerAdj: Object.assign({}, P.brokerAdj || {}), sync: P.sync || null, adj: +P.adj || 0 } }) }); } catch {} }
+  store.save(Object.assign({}, rec || {}, { id: rec ? rec.id : `u_${tradeAccId()}_${date}`, accountId: tradeAccId(), date, createdAt: at, closedAt: at,
+    status: 'closed', untracked: true, untrackedCount: n, dir: 'untracked', result: 'untracked', pnl, lots: null, sld: null, liq: null,
+    ruleBreaks: ['App ke bahar trade (log nahi kiya)'], tags: [], photos: [],
+    note: `Broker me ${v.brokerCount} trade, app me ${own.length}. ${n} trade app ke bina liya gaya${Number.isFinite(v.brokerPnl) ? `: broker ${money(v.brokerPnl)} − journal ${money(jOwn)} = ${money(pnl)}` : ''}. Agli baar har trade app ke checklist se.` })).catch(() => {});
+  return true;
+}
 // what the broker check says the app should change: balance (Lucid) and today's P&L difference
 function vfPlan(v){
   const ps = propState(); if (!ps || !v) return null;
@@ -2051,7 +2074,7 @@ function vfPlan(v){
 }
 function vfSyncHTML(v){
   const x = vfPlan(v); if (!x) return '';
-  if (!x.balOff && !x.adjOff && v.applied && v.undo) return `<div class="slfix" style="margin-top:8px"><span style="color:var(--good)">✓ Broker ke hisaab se app update ho gaya: balance ${money(x.ps.balance)}${x.curAdj ? `, aaj ka broker farak ${money(x.curAdj)}` : ''}</span><button type="button" class="btn ghost" id="vf-undo">Undo</button></div>`;
+  if (!x.balOff && !x.adjOff && v.undo) return `<div class="slfix" style="margin-top:8px"><span style="color:var(--good)">✓ Broker ke hisaab se app update ho gaya: balance ${money(x.ps.balance)}${x.curAdj ? `, aaj ka broker farak ${money(x.curAdj)}` : ''}</span><button type="button" class="btn ghost" id="vf-undo">Undo</button></div>`;
   if (!x.balOff && !x.adjOff) return x.bal != null || x.wantAdj != null ? `<p class="save-note" style="margin-top:8px;color:var(--good)">✓ App broker se match: balance ${money(x.ps.balance)}${x.curAdj ? `, aaj ka broker farak ${money(x.curAdj)}` : ''}</p>` : '';
   const what = [x.balOff && `balance ${money(x.ps.balance)} → ${money(x.bal)}`, x.adjOff && `aaj ka P&L ${money(x.wantAdj - x.curAdj)} farak`].filter(Boolean).join(' · ');
   return `<div class="slfix" style="margin-top:10px"><span>${what}</span><button type="button" class="btn ghost" id="vf-sync">Broker jaisa update karo</button></div>`;
@@ -2075,8 +2098,11 @@ function vfApply(v, withBalance){
 }
 function vfUndo(v){
   if (!v || !v.undo) return;
-  saveProp({ brokerAdj: v.undo.brokerAdj || {}, sync: v.undo.sync || null, adj: +v.undo.adj || 0 });
+  const undo = v.undo;
+  // mark undone first, so the automatic step doesn't re-apply while things are being put back
   try { patchToday({ verify: Object.assign({}, v, { applied: false, undone: true, undo: null }) }); } catch {}
+  saveProp({ brokerAdj: undo.brokerAdj || {}, sync: undo.sync || null, adj: +undo.adj || 0 });
+  const rec = dayTrades(tradingDate(Date.now())).find(t => t.untracked); if (rec) store.remove(rec.id).catch(() => {});
   syncPropUI(); renderAll(); renderGrowth();
 }
 function vfSync(v){
@@ -2094,7 +2120,24 @@ const dataReady = () => !gsScoresCol || (seenTrades && seenSettings);
 function renderVerify(){
   const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify, out = $('vf-out');
   // the broker is the truth: book its numbers automatically (balance only outside test mode); Undo is offered
-  if (v && !v.applied && !v.undone && !vfBusy && !vfAuto && dataReady()) { vfAuto = true; try { if (vfApply(v, !testMode)) return; } finally { vfAuto = false; } }
+  if (!vfBusy && !vfAuto && dataReady()) {
+    const yd = prevDate(tradingDate(Date.now())), yv = (scoreDocs[gsDocId(yd)] || {}).verify;
+    if (yv && !yv.undone) {
+      vfAuto = true;
+      try {
+        if (vfUntracked(yv, yd, false)) return;
+        // yesterday's leftover P&L difference (fees) once the untracked trade is in the journal
+        if (Number.isFinite(yv.brokerPnl)) {
+          const P = (activeAcc() || {}).prop, want = yv.brokerPnl - Math.round(dayTrades(yd).reduce((x, t) => x + (t.pnl || 0), 0));
+          if (P && P.on && Math.abs(want - brokerAdj(yd)) >= 1) { const ba = Object.assign({}, P.brokerAdj || {}); ba[adjKey(yd)] = want; saveProp({ brokerAdj: ba }); return; }
+        }
+      } finally { vfAuto = false; }
+    }
+  }
+  if (v && !v.undone && !vfBusy && !vfAuto && dataReady()) {
+    vfAuto = true;
+    try { if (vfUntracked(v)) return; if (vfApply(v, !testMode && !v.applied)) return; } finally { vfAuto = false; }
+  }
   if (!v) { if (!vfBusy) out.innerHTML = ''; return; }
   const ic = { ok: '✓', no: '✗', wn: '!' };
   out.innerHTML = `<div class="msgs"><p class="msg ${v.status === 'ok' ? 'good' : 'bad'}">${v.status === 'ok' ? '🔒 Verified: broker aur journal match karte hain.' : '⚠ Mismatch: journal aur broker alag hain.'}</p></div>
@@ -2112,6 +2155,8 @@ $('vf-run').addEventListener('click', async () => {
     const b = await readBroker(date);
     const c = compareBroker(b, date);
     const verify = { status: c.missing ? 'mismatch' : 'ok', checks: c.checks.map(([k, t]) => ({ k, t })), brokerCount: c.bCount, brokerPnl: c.bPnl, journalCount: c.jCount, journalPnl: c.jPnl, balance: c.balance, at: Date.now() };
+    // a re-check keeps the Undo point from the first automatic change
+    const old = (scoreDocs[gsDocId(date)] || {}).verify; if (old && old.undo && !old.undone) verify.undo = old.undo;
     // keep the screenshots as proof (compressed, one doc each)
     if (gsProofCol) ['dash', 'hist'].forEach(k => gsProofCol.doc(`${gsBucket()}_${date}_${k}`).set({ data: vfShots[k].full, date, bucket: gsBucket(), kind: k, at: Date.now() }).catch(() => {}));
     vfBusy = false;
@@ -2194,6 +2239,7 @@ syncGSUI();
 // Yesterday's costliest rule becomes today's focus. Everything is derived from the score history,
 // so nothing extra is stored except which day's start card was already seen.
 const FOCUS_LINES = {
+  untracked: 'Har trade sirf app ke checklist se. Bina log kiye koi trade nahi, chahe test ho',
   levels: '5 PM close ke baad, session se pehle levels mark karo',
   news: 'Trade se pehle USD high-impact news check karo',
   gate: 'Sirf checklist pass hone pe trade. Gate ke bina koi trade nahi',
@@ -2229,6 +2275,12 @@ function keepFrom(prev){
 function focusFrom(prev, series){
   if (!prev) return null;
   if (prev.total >= 100 || prev.noTrade) return { perfect: true, prev, keep: keepFrom(prev) };
+  if (prev.untracked) {
+    const lost = Math.round((prev.results || []).filter(r => r.cat === 'exec').reduce((x, r) => x + (r.pts - r.earned), 0));
+    const repeat = series.filter(d => d.date <= prev.date).slice(-7).filter(d => d.untracked).length;
+    const notes = (prev.accounts && prev.accounts.length ? prev.accounts.map(a => (a.notes || {}).mistake) : [(prev.notes || {}).mistake]).filter(Boolean);
+    return { perfect: false, prev, keep: keepFrom(prev), rule: { id: 'untracked', src: 'untracked', label: 'App ke bahar trade (log nahi kiya)' }, lost, line: FOCUS_LINES.untracked, notes, repeat };
+  }
   const loss = {};
   (prev.results || []).forEach(r => { loss[r.id] = (loss[r.id] || 0) + (r.pts - r.earned); });
   // biggest loss first; on a tie prefer a rule the journal shows was broken over an unanswered yes/no
@@ -2253,6 +2305,7 @@ const focusTickNeeded = () => !!(focusCache && FC().gateTick);
 // did the day fix the focus picked from the day before it? null = nothing to fix (prev was perfect or no prev)
 function fixStatus(day, prev, series){
   const f = focusFrom(prev, series); if (!f || f.perfect) return null;
+  if (f.rule.id === 'untracked') { const isToday = day.date === tradingDate(Date.now()); return day.untracked ? 'broken' : isToday && !day.trades && !day.noTrade ? 'pending' : 'fixed'; }
   const r = (day.results || []).find(x => x.id === f.rule.id); if (!r) return null;
   const passed = r.earned >= r.pts, isToday = day.date === tradingDate(Date.now());
   // today, with no trade yet, only answered prep/notes rules can already count as fixed
