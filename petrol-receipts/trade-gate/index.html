@@ -728,7 +728,11 @@ const R = { tp:15, lots:2, perDollar:10 };
 const PER = R.lots * R.perDollar; // $ per $1 move
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? '−$' : '$') + Math.abs(Math.round(n)).toLocaleString();
-const today = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+// "today" = the CME trading day (a new day starts at the 6 PM ET reset), same as the Growth tab
+const calDate = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const today = () => { try { return tradingDate(Date.now()); } catch { return calDate(); } };
+// a trade's trading day (from its time, so trades saved before this change still land on the right day)
+const tday = t => t.createdAt ? tradingDate(t.createdAt) : t.date;
 const LS = { get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -1147,8 +1151,8 @@ function propState(){
   const P = (activeAcc() || {}).prop;
   if (!P || !P.on || !(P.size > 0)) return null;
   const start = P.startDate || '0000-00-00', td = today();
-  const closed = accTrades().filter(t => t.status === 'closed' && t.date >= start);
-  const todayPnl = closed.filter(t => t.date === td).reduce((s, t) => s + (t.pnl || 0), 0) + brokerAdj(td);
+  const closed = accTrades().filter(t => t.status === 'closed' && tday(t) >= start);
+  const todayPnl = closed.filter(t => tday(t) === td).reduce((s, t) => s + (t.pnl || 0), 0) + brokerAdj(td);
   const dd = +P.maxDD || 0;
   const S = P.sync && Number.isFinite(+P.sync.balance) ? P.sync : null;
   // From a dashboard sync: start at the real balance and MLL, then add only trades closed after it.
@@ -1157,7 +1161,7 @@ function propState(){
   const balance = base + after.reduce((s, t) => s + (t.pnl || 0), 0);
   // end-of-day balances before today (trailing drawdown follows the highest one)
   const byDay = {};
-  after.filter(t => t.date < td).forEach(t => { byDay[t.date] = (byDay[t.date] || 0) + (t.pnl || 0); });
+  after.filter(t => tday(t) < td).forEach(t => { byDay[tday(t)] = (byDay[tday(t)] || 0) + (t.pnl || 0); });
   if (S && S.date < td && !byDay[S.date]) byDay[S.date] = 0;
   let run = base, peak = S ? -Infinity : base;
   Object.keys(byDay).sort().forEach(d => { run += byDay[d]; peak = Math.max(peak, run); });
@@ -1215,12 +1219,12 @@ function renderProp(){
 function evalPassState(ps){
   const P = ps.P;
   if (P.phase === 'funded' || !(+P.target > 0) || ps.profit < P.target) return null;
-  const days = new Set(accTrades().filter(t => t.status === 'closed' && t.date >= (P.startDate || '0000')).map(t => t.date)).size + (+P.priorDays || 0);
+  const days = new Set(accTrades().filter(t => t.status === 'closed' && tday(t) >= (P.startDate || '0000')).map(tday)).size + (+P.priorDays || 0);
   if (+P.minDays && days < P.minDays) return { passed: false, kind: 'days', days, left: P.minDays - days };
   if (+P.cons) {
     // best single day may be at most cons% of total profit
     const byDay = {};
-    accTrades().filter(t => t.status === 'closed' && t.date >= (P.startDate || '0000')).forEach(t => { byDay[t.date] = (byDay[t.date] || 0) + (t.pnl || 0); });
+    accTrades().filter(t => t.status === 'closed' && tday(t) >= (P.startDate || '0000')).forEach(t => { byDay[tday(t)] = (byDay[tday(t)] || 0) + (t.pnl || 0); });
     const best = Math.max(0, ...Object.values(byDay));
     if (best > P.cons / 100 * ps.profit) return { passed: false, kind: 'cons', need: Math.ceil(best / (P.cons / 100)), best };
   }
@@ -1314,7 +1318,7 @@ const n0 = id => { const v = parseFloat(String($(id).value).replace(/[,$\s]/g, '
 
 function dayInfo(){
   const mine = accTrades();
-  const todays = mine.filter(t => t.date === today() && t.status !== 'skipped');
+  const todays = mine.filter(t => tday(t) === today() && t.status !== 'skipped');
   const closed = todays.filter(t => t.status === 'closed');
   const wins = closed.filter(t => outcome(t) === 'win').length;
   const losses = closed.filter(t => outcome(t) === 'loss').length;
