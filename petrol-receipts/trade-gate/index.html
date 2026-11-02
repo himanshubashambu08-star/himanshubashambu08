@@ -1138,12 +1138,16 @@ async function deleteTrades(list){
   } else { const ids = new Set(list.map(t => t.id)); trades = trades.filter(t => !ids.has(t.id)); LS.set('gtd.trades', trades); }
 }
 
+// broker difference (untracked trades, fees) booked per day from the end-of-day check; test mode keeps its own keys
+const adjKey = date => (testMode ? 't:' : '') + date;
+const brokerAdj = date => { const P = (activeAcc() || {}).prop; return P && P.on && P.brokerAdj ? +P.brokerAdj[adjKey(date)] || 0 : 0; };
+const brokerAdjTotal = () => { const P = (activeAcc() || {}).prop; return P && P.on && P.brokerAdj ? Object.entries(P.brokerAdj).filter(([k]) => k.startsWith('t:') === testMode).reduce((s, [, v]) => s + (+v || 0), 0) : 0; };
 function propState(){
   const P = (activeAcc() || {}).prop;
   if (!P || !P.on || !(P.size > 0)) return null;
   const start = P.startDate || '0000-00-00', td = today();
   const closed = accTrades().filter(t => t.status === 'closed' && t.date >= start);
-  const todayPnl = closed.filter(t => t.date === td).reduce((s, t) => s + (t.pnl || 0), 0);
+  const todayPnl = closed.filter(t => t.date === td).reduce((s, t) => s + (t.pnl || 0), 0) + brokerAdj(td);
   const dd = +P.maxDD || 0;
   const S = P.sync && Number.isFinite(+P.sync.balance) ? P.sync : null;
   // From a dashboard sync: start at the real balance and MLL, then add only trades closed after it.
@@ -1282,7 +1286,7 @@ function saveProp(extra){
   const prop = Object.assign({ adj: +prev.adj || 0 }, {
     on: $('p-on').checked, size: n('p-size'), daily: n('p-daily'), maxDD: n('p-dd'), target: n('p-target'), cons: Math.min(100, n('p-cons')), minDays: Math.round(n('p-mindays')), priorDays: Math.round(n('p-priordays')), sync: prev.sync || null,
     type: (document.querySelector('input[name="p-type"]:checked') || {}).value || 'eod', startDate: $('p-start').value || today(),
-    phase: prev.phase || 'eval', evalBackup: prev.evalBackup || null, passedAt: prev.passedAt || null,
+    brokerAdj: prev.brokerAdj || {}, phase: prev.phase || 'eval', evalBackup: prev.evalBackup || null, passedAt: prev.passedAt || null,
     funded: { on: $('pf-on').checked, daily: n('pf-daily'), maxDD: n('pf-dd'), cons: Math.min(100, n('pf-cons')), target: n('pf-target') }
   }, extra || {});
   if (prop.on && !prop.size) { msgs($('p-msg'), [['bad', 'Account size daalo.']]); return false; }
@@ -1313,7 +1317,7 @@ function dayInfo(){
   const closed = todays.filter(t => t.status === 'closed');
   const wins = closed.filter(t => outcome(t) === 'win').length;
   const losses = closed.filter(t => outcome(t) === 'loss').length;
-  const pnl = closed.reduce((s,t) => s + (t.pnl||0), 0);
+  const pnl = closed.reduce((s,t) => s + (t.pnl||0), 0) + brokerAdj(today());
   const open = mine.find(t => t.status === 'open');
   let lock = null;
   if (wins >= 2) lock = ['Win + win = band', 'Aaj 2 win ho gaye. Profit bachao, platform band karo.'];
@@ -1533,7 +1537,8 @@ $('close-btn').addEventListener('click', async () => {
 function renderJournal(){
   const closed = accTrades().filter(t => t.status === 'closed').sort((a,b) => b.createdAt - a.createdAt);
   const wins = closed.filter(t => outcome(t) === 'win').length;
-  const net = closed.reduce((s,t) => s + (t.pnl||0), 0);
+  const bAdj = brokerAdjTotal();
+  const net = closed.reduce((s,t) => s + (t.pnl||0), 0) + bAdj;
   const clean = closed.filter(t => !(t.ruleBreaks||[]).length).length;
   const against = closed.filter(t => t.againstMentor);
   const againstPnl = against.reduce((s,t) => s + (t.pnl||0), 0);
@@ -1542,6 +1547,7 @@ function renderJournal(){
   const saved = skips.filter(t => t.review === 'saved'), missed = skips.filter(t => t.review === 'missed');
   // estimate: a skip that would have lost saved its stop (or $5 if unknown); one that would have won cost the $15 target
   const est = saved.reduce((s,t) => s + (t.sld || 5) * PER, 0) - missed.length * R.tp * PER;
+  if (bAdj) extra.push(['Broker farak (bina log trade / fees)', money(bAdj), bAdj > 0 ? 'pos' : 'neg', 'wide']);
   if (saved.length + missed.length) extra.push(['Skip kiye trades: rules ka hisaab', `${saved.length} bachaye · ${missed.length} miss · ${money(est)} (andaza)`, est > 0 ? 'pos' : est < 0 ? 'neg' : '', 'wide']);
   renderSkips(skips);
   $('stats').innerHTML = [['Total trades', String(closed.length), ''],
@@ -2033,22 +2039,38 @@ function compareBroker(b, date){
   }
   return { checks, missing, bCount, bPnl, jCount, jPnl, balance: Number.isFinite(b.balance) ? b.balance : null };
 }
-// Lucid balance from the verified screenshot vs the app's prop balance
-function vfSyncHTML(v){
-  const ps = propState();
-  if (!ps || !Number.isFinite(v.balance)) return '';
-  if (Math.abs(v.balance - ps.balance) < 1) return `<p class="save-note" style="margin-top:8px;color:var(--good)">✓ App balance Lucid se match: ${money(ps.balance)}</p>`;
-  return `<div class="slfix" style="margin-top:10px"><span>App ${money(ps.balance)} · Lucid ${money(v.balance)}</span><button type="button" class="btn ghost" id="vf-sync">App balance ${money(v.balance)} karo</button></div>`;
+// what the broker check says the app should change: balance (Lucid) and today's P&L difference
+function vfPlan(v){
+  const ps = propState(); if (!ps || !v) return null;
+  const td = today(), jPnl = Math.round(dayTrades(tradingDate(Date.now())).reduce((x, t) => x + (t.pnl || 0), 0));
+  const wantAdj = Number.isFinite(v.brokerPnl) ? v.brokerPnl - jPnl : null, curAdj = brokerAdj(td);
+  const balOff = Number.isFinite(v.balance) && Math.abs(v.balance - ps.balance) >= 1;
+  const adjOff = wantAdj != null && Math.abs(wantAdj - curAdj) >= 1;
+  return { ps, td, balOff, adjOff, bal: Number.isFinite(v.balance) ? v.balance : null, wantAdj, curAdj };
 }
-function vfSync(bal){
-  const ps = propState(); if (!ps) return;
-  const P = ps.P, mll = P.sync && Number.isFinite(+P.sync.mll) ? +P.sync.mll : Number.isFinite(ps.threshold) ? ps.threshold : null;
-  pop('', 'Prop sync', `Balance ${money(bal)} set karna hai?`, `Abhi app me ${money(ps.balance)} hai (farak ${money(bal - ps.balance)}).`,
-    'Lucid dashboard ka balance sach hai. App usi se aage chalega; liquidation (MLL) wahi rahega. Agle trades ka P&L iske upar judega.', [
-    ['Haan, sync karo', '', () => { saveProp({ sync: { at: Date.now(), date: today(), balance: bal, mll: mll != null && mll < bal ? mll : null }, adj: 0, on: true }); syncPropUI(); renderAll(); renderGrowth(); }],
+function vfSyncHTML(v){
+  const x = vfPlan(v); if (!x) return '';
+  if (!x.balOff && !x.adjOff) return x.bal != null || x.wantAdj != null ? `<p class="save-note" style="margin-top:8px;color:var(--good)">✓ App broker se match: balance ${money(x.ps.balance)}${x.curAdj ? `, aaj ka broker farak ${money(x.curAdj)}` : ''}</p>` : '';
+  const what = [x.balOff && `balance ${money(x.ps.balance)} → ${money(x.bal)}`, x.adjOff && `aaj ka P&L ${money(x.wantAdj - x.curAdj)} farak`].filter(Boolean).join(' · ');
+  return `<div class="slfix" style="margin-top:10px"><span>${what}</span><button type="button" class="btn ghost" id="vf-sync">Broker jaisa update karo</button></div>`;
+}
+function vfSync(v){
+  const x = vfPlan(v); if (!x || (!x.balOff && !x.adjOff)) return;
+  const P = x.ps.P, mll = P.sync && Number.isFinite(+P.sync.mll) ? +P.sync.mll : Number.isFinite(x.ps.threshold) ? x.ps.threshold : null;
+  const lines = [x.balOff && `Balance ${money(x.ps.balance)} → ${money(x.bal)} (Lucid)`, x.adjOff && `Aaj ka P&L me ${money(x.wantAdj - x.curAdj)} "Broker farak" judega (bina log trade / fees)`].filter(Boolean);
+  pop('', 'Prop sync', 'Broker jaisa update karna hai?', lines.join(' · '),
+    'Aaj ka P&L, daily loss limit, prop card aur journal sab broker ke hisaab se ho jayenge. Liquidation (MLL) wahi rahega.', [
+    ['Haan, update karo', '', () => {
+      const extra = { on: true };
+      if (x.adjOff) { const ba = Object.assign({}, P.brokerAdj || {}); ba[adjKey(x.td)] = x.wantAdj; extra.brokerAdj = ba; }
+      if (x.balOff) Object.assign(extra, { sync: { at: Date.now(), date: x.td, balance: x.bal, mll: mll != null && mll < x.bal ? mll : null }, adj: 0 });
+      saveProp(extra);
+      if (x.balOff) try { patchToday({ verify: Object.assign({}, v, { checks: (v.checks || []).map(c => { const [k, t] = Array.isArray(c) ? c : [c.k, c.t]; return /^Balance:/.test(t) ? { k: 'ok', t: `Balance: Lucid ${money(x.bal)}, app ${money(x.bal)} (synced)` } : { k, t }; }) }) }); } catch {}
+      syncPropUI(); renderAll(); renderGrowth();
+    }],
     ['Rehne do', 'ghost']]);
 }
-document.addEventListener('click', e => { if (e.target && e.target.id === 'vf-sync') { const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify; if (v && Number.isFinite(v.balance)) vfSync(v.balance); } });
+document.addEventListener('click', e => { if (e.target && e.target.id === 'vf-sync') { const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify; if (v) vfSync(v); } });
 function renderVerify(){
   const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify, out = $('vf-out');
   if (!v) { if (!vfBusy) out.innerHTML = ''; return; }
