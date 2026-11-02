@@ -114,12 +114,15 @@ async function test(name, fn) { try { await fn(); console.log('ok   -', name); }
     // one untracked −$28 trade at the broker; Lucid shows the balance after it
     await run({ dashboard_found: true, balance: 25272, history_found: true, dates_seen: ['2026-11-11'], trades: [{ pnl: 300 }, { pnl: -28 }] });
     await page.click('#pop-actions .btn'); // close the "Untracked trade" pop-up
-    const out = await text(page, '#vf-out');
-    assert.match(out, /balance \$25,300 → \$25,272/); assert.match(out, /aaj ka P&L −?-?\$28 farak/);
+    // applied automatically right after the check (test mode: P&L difference only, balance stays manual)
+    let out = await text(page, '#vf-out');
+    assert.match(out, /balance \$25,300 → \$25,272/); assert.doesNotMatch(out, /aaj ka P&L/);
+    assert.strictEqual(await text(page, '#d-pnl'), '$272');
     await page.click('#vf-sync');
     assert.match(await text(page, '#pop'), /Broker jaisa update karna hai/);
     await page.click('#pop-actions .btn:not(.ghost)');
-    assert.match(await text(page, '#vf-out'), /App broker se match: balance \$25,272, aaj ka broker farak -?−?\$28/);
+    out = await text(page, '#vf-out');
+    assert.match(out, /Broker ke hisaab se app update ho gaya: balance \$25,272, aaj ka broker farak -?−?\$28/);
     assert.ok(!(await page.$('#vf-sync')));
     assert.match(await text(page, '#prop-title'), /\$25,272/);
     assert.strictEqual(await text(page, '#d-pnl'), '$272');
@@ -128,6 +131,12 @@ async function test(name, fn) { try { await fn(); console.log('ok   -', name); }
     const st = await text(page, '#stats');
     assert.match(st, /Net P&L ?\$272/); assert.match(st, /Broker farak \(bina log trade \/ fees\) ?−\$28/);
     await page.click('#tab-growth');
+  });
+  await test('Undo puts the app back', async () => {
+    await page.click('#vf-undo');
+    assert.strictEqual(await text(page, '#d-pnl'), '$300');
+    assert.match(await text(page, '#prop-title'), /\$25,300/);
+    assert.ok(await page.$('#vf-sync'));
   });
   await test('no page errors', async () => assert.deepStrictEqual(errors, []));
 

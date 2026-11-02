@@ -993,6 +993,7 @@ async function startUser(user){
   growthStart(firebase.firestore().collection('users').doc(user.uid));
   if (unsubSettings) unsubSettings();
   unsubSettings = settingsDoc.onSnapshot(snap => {
+    seenSettings = true;
     const v = snap.exists ? snap.data() : null;
     if (v && (v.session || v.cooldown != null || v.prop || v.accounts)) { settings = Object.assign({}, settings, v.session ? { session: v.session } : {}, v.cooldown != null ? { cooldown: v.cooldown } : {}, v.prop ? { prop: v.prop } : {}, Array.isArray(v.accounts) && v.accounts.length ? { accounts: v.accounts } : {}); LS.set('gtd.settings', settings); syncSessionUI(); syncPropUI(); renderAll(); }
   }, () => {});
@@ -1003,7 +1004,7 @@ async function startUser(user){
   if (unsub) unsub();
   unsub = col.onSnapshot({ includeMetadataChanges: true }, snap => {
     setNote(snap.metadata.fromCache ? 'Offline. Trades phone pe save hain, internet aate hi sync ho jayenge.' : 'Synced to your Google account. Har device pe same journal.');
-    trades = snap.docs.map(d => d.data()); renderAll();
+    seenTrades = true; trades = snap.docs.map(d => d.data()); renderAll();
   }, () => setNote('Sync ruk gaya. Sign out karke dobara sign in karo.'));
 }
 const AUTH_ERR = {
@@ -2050,29 +2051,50 @@ function vfPlan(v){
 }
 function vfSyncHTML(v){
   const x = vfPlan(v); if (!x) return '';
+  if (!x.balOff && !x.adjOff && v.applied && v.undo) return `<div class="slfix" style="margin-top:8px"><span style="color:var(--good)">✓ Broker ke hisaab se app update ho gaya: balance ${money(x.ps.balance)}${x.curAdj ? `, aaj ka broker farak ${money(x.curAdj)}` : ''}</span><button type="button" class="btn ghost" id="vf-undo">Undo</button></div>`;
   if (!x.balOff && !x.adjOff) return x.bal != null || x.wantAdj != null ? `<p class="save-note" style="margin-top:8px;color:var(--good)">✓ App broker se match: balance ${money(x.ps.balance)}${x.curAdj ? `, aaj ka broker farak ${money(x.curAdj)}` : ''}</p>` : '';
   const what = [x.balOff && `balance ${money(x.ps.balance)} → ${money(x.bal)}`, x.adjOff && `aaj ka P&L ${money(x.wantAdj - x.curAdj)} farak`].filter(Boolean).join(' · ');
   return `<div class="slfix" style="margin-top:10px"><span>${what}</span><button type="button" class="btn ghost" id="vf-sync">Broker jaisa update karo</button></div>`;
 }
+// apply the broker numbers to the app; withBalance=false only books today's P&L difference
+function vfApply(v, withBalance){
+  const x = vfPlan(v); if (!x) return false;
+  const doBal = withBalance && x.balOff;
+  if (!doBal && !x.adjOff) return false;
+  const P = x.ps.P, mll = P.sync && Number.isFinite(+P.sync.mll) ? +P.sync.mll : Number.isFinite(x.ps.threshold) ? x.ps.threshold : null;
+  // Undo goes back to before the first broker update of this check
+  const undo = v.undo || { brokerAdj: Object.assign({}, P.brokerAdj || {}), sync: P.sync || null, adj: +P.adj || 0 };
+  const extra = { on: true };
+  if (x.adjOff) { const ba = Object.assign({}, P.brokerAdj || {}); ba[adjKey(x.td)] = x.wantAdj; extra.brokerAdj = ba; }
+  if (doBal) Object.assign(extra, { sync: { at: Date.now(), date: x.td, balance: x.bal, mll: mll != null && mll < x.bal ? mll : null }, adj: 0 });
+  saveProp(extra);
+  const checks = (v.checks || []).map(c => { const [k, t] = Array.isArray(c) ? c : [c.k, c.t]; return doBal && /^Balance:/.test(t) ? { k: 'ok', t: `Balance: Lucid ${money(x.bal)}, app ${money(x.bal)} (synced)` } : { k, t }; });
+  try { patchToday({ verify: Object.assign({}, v, { checks, applied: true, undone: false, undo }) }); } catch {}
+  syncPropUI(); renderAll(); renderGrowth();
+  return true;
+}
+function vfUndo(v){
+  if (!v || !v.undo) return;
+  saveProp({ brokerAdj: v.undo.brokerAdj || {}, sync: v.undo.sync || null, adj: +v.undo.adj || 0 });
+  try { patchToday({ verify: Object.assign({}, v, { applied: false, undone: true, undo: null }) }); } catch {}
+  syncPropUI(); renderAll(); renderGrowth();
+}
 function vfSync(v){
   const x = vfPlan(v); if (!x || (!x.balOff && !x.adjOff)) return;
-  const P = x.ps.P, mll = P.sync && Number.isFinite(+P.sync.mll) ? +P.sync.mll : Number.isFinite(x.ps.threshold) ? x.ps.threshold : null;
   const lines = [x.balOff && `Balance ${money(x.ps.balance)} → ${money(x.bal)} (Lucid)`, x.adjOff && `Aaj ka P&L me ${money(x.wantAdj - x.curAdj)} "Broker farak" judega (bina log trade / fees)`].filter(Boolean);
   pop('', 'Prop sync', 'Broker jaisa update karna hai?', lines.join(' · '),
     'Aaj ka P&L, daily loss limit, prop card aur journal sab broker ke hisaab se ho jayenge. Liquidation (MLL) wahi rahega.', [
-    ['Haan, update karo', '', () => {
-      const extra = { on: true };
-      if (x.adjOff) { const ba = Object.assign({}, P.brokerAdj || {}); ba[adjKey(x.td)] = x.wantAdj; extra.brokerAdj = ba; }
-      if (x.balOff) Object.assign(extra, { sync: { at: Date.now(), date: x.td, balance: x.bal, mll: mll != null && mll < x.bal ? mll : null }, adj: 0 });
-      saveProp(extra);
-      if (x.balOff) try { patchToday({ verify: Object.assign({}, v, { checks: (v.checks || []).map(c => { const [k, t] = Array.isArray(c) ? c : [c.k, c.t]; return /^Balance:/.test(t) ? { k: 'ok', t: `Balance: Lucid ${money(x.bal)}, app ${money(x.bal)} (synced)` } : { k, t }; }) }) }); } catch {}
-      syncPropUI(); renderAll(); renderGrowth();
-    }],
+    ['Haan, update karo', '', () => vfApply(v, true)],
     ['Rehne do', 'ghost']]);
 }
-document.addEventListener('click', e => { if (e.target && e.target.id === 'vf-sync') { const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify; if (v) vfSync(v); } });
+document.addEventListener('click', e => { if (e.target && e.target.id === 'vf-sync') { const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify; if (v) vfSync(v); } if (e.target && e.target.id === 'vf-undo') { vfUndo((scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify); } });
+let vfAuto = false, seenTrades = false, seenSettings = false;
+// signed in: wait until trades and account settings have arrived, so a half-loaded journal is never compared
+const dataReady = () => !gsScoresCol || (seenTrades && seenSettings);
 function renderVerify(){
   const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify, out = $('vf-out');
+  // the broker is the truth: book its numbers automatically (balance only outside test mode); Undo is offered
+  if (v && !v.applied && !v.undone && !vfBusy && !vfAuto && dataReady()) { vfAuto = true; try { if (vfApply(v, !testMode)) return; } finally { vfAuto = false; } }
   if (!v) { if (!vfBusy) out.innerHTML = ''; return; }
   const ic = { ok: '✓', no: '✗', wn: '!' };
   out.innerHTML = `<div class="msgs"><p class="msg ${v.status === 'ok' ? 'good' : 'bad'}">${v.status === 'ok' ? '🔒 Verified: broker aur journal match karte hain.' : '⚠ Mismatch: journal aur broker alag hain.'}</p></div>
