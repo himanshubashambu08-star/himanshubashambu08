@@ -77,6 +77,11 @@ async function test(name, fn) { try { await fn(); console.log('ok   -', name); }
     assert.ok(!(await page.isVisible('#pop')) || !/Untracked/.test(await text(page, '#pop')));
   });
 
+  await test('saved verify has no nested arrays (Firestore rejects them)', async () => {
+    const doc = await page.evaluate(() => window.__tradeGate.todayScore());
+    const nested = (v, inArr) => Array.isArray(v) ? (inArr || v.some(x => nested(x, true))) : v && typeof v === 'object' ? Object.values(v).some(x => nested(x, false)) : false;
+    assert.ok(doc && doc.verify, 'verify saved'); assert.ok(!nested(doc, false), JSON.stringify(doc.verify.checks));
+  });
   await test('extra broker trade → mismatch, untracked pop-up', async () => {
     await run({ dashboard_found: true, balance: 25150, history_found: true, dates_seen: ['2026-11-11'], trades: [{ pnl: 300 }, { pnl: -150 }] });
     const out = await text(page, '#vf-out');

@@ -1942,7 +1942,7 @@ function renderWeekly(busy){
 }
 $('gs-week-now').addEventListener('click', () => buildWeekly(growthSeries(), mondayOf(tradingDate(Date.now())), true));
 // read-only hooks for the automated tests in /tests
-window.__tradeGate = Object.freeze({ tradingDate, mondayOf });
+window.__tradeGate = Object.freeze({ tradingDate, mondayOf, todayScore: () => JSON.parse(JSON.stringify(scoreDocs[gsDocId(tradingDate(Date.now()))] || null)) });
 /* ---- end-of-day verification against broker screenshots ---- */
 let vfShots = { dash: null, hist: null };
 // AI copy of a screenshot: width up to 1100px, tall screenshots cut into pages of 1600px so text stays readable
@@ -2038,7 +2038,7 @@ function renderVerify(){
   if (!v) { if (!vfBusy) out.innerHTML = ''; return; }
   const ic = { ok: '✓', no: '✗', wn: '!' };
   out.innerHTML = `<div class="msgs"><p class="msg ${v.status === 'ok' ? 'good' : 'bad'}">${v.status === 'ok' ? '🔒 Verified: broker aur journal match karte hain.' : '⚠ Mismatch: journal aur broker alag hain.'}</p></div>
-    <ul class="vf-list" style="margin-top:8px">${(v.checks || []).map(([k, t]) => `<li><span class="${k}">${ic[k]}</span><span>${esc(t)}</span></li>`).join('')}</ul>
+    <ul class="vf-list" style="margin-top:8px">${(v.checks || []).map(c => Array.isArray(c) ? c : [c.k, c.t]).map(([k, t]) => `<li><span class="${k}">${ic[k]}</span><span>${esc(t)}</span></li>`).join('')}</ul>
     <p class="save-note" style="margin-top:6px">Checked ${new Date(v.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Naye screenshot daal ke dobara verify kar sakte ho.</p>`;
 }
 let vfBusy = false;
@@ -2050,11 +2050,12 @@ $('vf-run').addEventListener('click', async () => {
   try {
     const b = await readBroker(date);
     const c = compareBroker(b, date);
-    const verify = { status: c.missing ? 'mismatch' : 'ok', checks: c.checks, brokerCount: c.bCount, brokerPnl: c.bPnl, journalCount: c.jCount, journalPnl: c.jPnl, balance: c.balance, at: Date.now() };
+    const verify = { status: c.missing ? 'mismatch' : 'ok', checks: c.checks.map(([k, t]) => ({ k, t })), brokerCount: c.bCount, brokerPnl: c.bPnl, journalCount: c.jCount, journalPnl: c.jPnl, balance: c.balance, at: Date.now() };
     // keep the screenshots as proof (compressed, one doc each)
     if (gsProofCol) ['dash', 'hist'].forEach(k => gsProofCol.doc(`${gsBucket()}_${date}_${k}`).set({ data: vfShots[k].full, date, bucket: gsBucket(), kind: k, at: Date.now() }).catch(() => {}));
     vfBusy = false;
-    patchToday(c.missing ? { verify, untracked: true } : { verify });
+    try { patchToday(c.missing ? { verify, untracked: true } : { verify }); }
+    catch (e) { renderGrowth(); msgs($('vf-out'), [['warn', 'Check ho gaya par save nahi hua (' + String(e?.message || e).slice(0, 80) + '). Dobara verify karo.']]); }
     if (c.missing) pop('no', 'Broker check', 'Untracked trade', c.checks.filter(x => x[0] === 'no').map(x => x[1]).join(' · '), 'Jo trade log nahi hua, uska execution score 0. Kal se har trade app ke through.', [['Theek hai', '']]);
   } catch (err) {
     vfBusy = false;
