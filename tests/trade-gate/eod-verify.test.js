@@ -109,34 +109,69 @@ async function test(name, fn) { try { await fn(); console.log('ok   -', name); }
     assert.match(out, /AI abhi screenshots nahi padh paya/); assert.match(out, /Detail: \[400\] schema not supported/);
     await page.evaluate(() => { window.__vfFail = null; });
   });
-  await test('broker balance and P&L difference flow into the app everywhere', async () => {
+  await test('untracked broker trade is auto-logged as a mistake and counted everywhere', async () => {
     await page.evaluate(() => { const $ = id => document.getElementById(id); $('p-on').checked = true; $('p-size').value = '25000'; $('p-dd').value = '1000'; $('p-daily').value = '600'; $('p-start').value = '2026-11-01'; $('p-save').click(); });
     // one untracked −$28 trade at the broker; Lucid shows the balance after it
     await run({ dashboard_found: true, balance: 25272, history_found: true, dates_seen: ['2026-11-11'], trades: [{ pnl: 300 }, { pnl: -28 }] });
     await page.click('#pop-actions .btn'); // close the "Untracked trade" pop-up
-    // applied automatically right after the check (test mode: P&L difference only, balance stays manual)
-    let out = await text(page, '#vf-out');
-    assert.match(out, /balance \$25,300 → \$25,272/); assert.doesNotMatch(out, /aaj ka P&L/);
-    assert.strictEqual(await text(page, '#d-pnl'), '$272');
-    await page.click('#vf-sync');
-    assert.match(await text(page, '#pop'), /Broker jaisa update karna hai/);
-    await page.click('#pop-actions .btn:not(.ghost)');
-    out = await text(page, '#vf-out');
-    assert.match(out, /Broker ke hisaab se app update ho gaya: balance \$25,272, aaj ka broker farak -?−?\$28/);
-    assert.ok(!(await page.$('#vf-sync')));
+    await page.waitForFunction(() => document.getElementById('d-pnl').textContent === '$272');
     assert.match(await text(page, '#prop-title'), /\$25,272/);
-    assert.strictEqual(await text(page, '#d-pnl'), '$272');
     assert.match(await text(page, '#prop-card'), /\$872 bacha/); // daily room 600 + 272
+    assert.strictEqual(await text(page, '#d-count'), '2');
+    const out = await text(page, '#vf-out');
+    assert.match(out, /Mismatch/); assert.match(out, /Broker me 2 trade, journal me sirf 1/);
+    assert.ok(!(await page.$('#vf-sync')));
     await page.click('#tab-journal');
     const st = await text(page, '#stats');
-    assert.match(st, /Net P&L ?\$272/); assert.match(st, /Broker farak \(bina log trade \/ fees\) ?−\$28/);
+    assert.match(st, /Net P&L ?\$272/); assert.match(st, /Rules followed ?50%/); assert.doesNotMatch(st, /Broker farak/);
+    const j = await text(page, '#journal');
+    assert.match(j, /untracked/i); assert.match(j, /Bina app ke trade/); assert.match(j, /−\$28/);
     await page.click('#tab-growth');
   });
-  await test('Undo puts the app back', async () => {
+  await test('re-checking does not log it twice', async () => {
+    await run({ dashboard_found: true, balance: 25272, history_found: true, dates_seen: ['2026-11-11'], trades: [{ pnl: 300 }, { pnl: -28 }] });
+    await page.click('#pop-actions .btn');
+    await page.waitForTimeout(300);
+    assert.strictEqual(await text(page, '#d-count'), '2'); assert.strictEqual(await text(page, '#d-pnl'), '$272');
+  });
+  await test('Undo removes the auto-logged trade', async () => {
     await page.click('#vf-undo');
-    assert.strictEqual(await text(page, '#d-pnl'), '$300');
-    assert.match(await text(page, '#prop-title'), /\$25,300/);
-    assert.ok(await page.$('#vf-sync'));
+    await page.waitForFunction(() => document.getElementById('d-pnl').textContent === '$300');
+    assert.strictEqual(await text(page, '#d-count'), '1');
+  });
+  await test('next day the focus warns about the untracked trade', async () => {
+    // the broker mismatch already marked today as untracked
+    assert.strictEqual(await page.evaluate(() => window.__tradeGate.todayScore().untracked), true);
+    await page.clock.fastForward('24:00:00'); await page.clock.runFor(61000);
+    await page.reload(); await page.evaluate(() => { document.getElementById('auth').hidden = true; document.getElementById('app').hidden = false; });
+    await page.clock.runFor(61000); // the focus card checks every minute
+    assert.ok(await page.isVisible('#focus-start'));
+    const fs = await text(page, '#focus-start');
+    assert.match(fs, /App ke bahar trade/); assert.match(fs, /Bina log kiye koi trade nahi/);
+  });
+  await test('a check from yesterday (opened after the 6 PM reset) still logs the untracked trade', async () => {
+    const p2 = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    p2.on('pageerror', e => errors.push(e.message));
+    await p2.clock.install({ time: new Date('2026-11-11T23:30:00Z') }); // 6:30 PM ET → trading day 12 Nov
+    await p2.route(/gstatic\.com|faireconomy\.media/, r => r.abort());
+    const at = Date.parse('2026-11-11T19:52:00Z');
+    await p2.addInitScript(([at]) => {
+      localStorage.setItem('gtd.test', 'true');
+      localStorage.setItem('gtd.scores', JSON.stringify({ '__test_main_2026-11-11': { id: '__test_main_2026-11-11', bucket: '__test_main', date: '2026-11-11', untracked: true, manual: {}, notes: {},
+        verify: { status: 'mismatch', checks: [], brokerCount: 2, brokerPnl: -128, journalCount: 1, journalPnl: -120, balance: null, at, applied: true } } }));
+    }, [at]);
+    await p2.goto(base + '/trade-gate/index.html');
+    await p2.evaluate(() => { document.getElementById('auth').hidden = true; document.getElementById('app').hidden = false; });
+    const yf = path.join(tmp, 'y.json');
+    fs.writeFileSync(yf, JSON.stringify({ trades: [{ id: 'y1', accountId: '__test_main', date: '2026-11-11', createdAt: at - 3600e3, closedAt: at - 3000e3, dir: 'short', liq: '15', t15: 'up', t5: 'up', sld: 6, lots: 2, status: 'closed', result: 'sl', pnl: -120, ruleBreaks: [], tags: [], photos: [] }] }));
+    await p2.click('#tab-settings'); await p2.click('#acct summary'); await p2.setInputFiles('#bk-file', yf);
+    await p2.waitForTimeout(300); if (await p2.isVisible('#focus-start')) await p2.click('#fs-ok');
+    await p2.click('#tab-growth'); await p2.waitForTimeout(300);
+    await p2.click('#tab-journal');
+    const j = await text(p2, '#journal');
+    assert.match(j, /Bina app ke trade/); assert.match(j, /−\$8/);
+    assert.match(await text(p2, '#stats'), /Net P&L ?−?-?\$128/);
+    await p2.close();
   });
   await test('no page errors', async () => assert.deepStrictEqual(errors, []));
 
