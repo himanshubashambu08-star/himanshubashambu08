@@ -129,6 +129,10 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .fs-focus b{color:var(--gold);font-size:20px}
 .fs-repeat{color:var(--bad);font-weight:700;font-size:14px}
 .fs-note{font-style:italic;color:var(--ink);opacity:.85}
+.fs-keep{border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+.fs-keep .lbl{color:var(--good)}
+.fs-keep ul,.focus-box ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:15px}
+.focus-box .keep{color:var(--good);font-size:13px;font-weight:600}
 .focus-box{border:1px solid var(--gold);background:var(--gold-soft);gap:6px;padding:12px 14px}
 .focus-box .lbl{color:var(--gold)}
 .focus-box b{font-size:16px}
@@ -1981,21 +1985,39 @@ const FOCUS_LINES = {
   eod: 'Din ke end me ek galti + ek achhi baat likho'
 };
 const ruleBroken = (day, id) => (day.results || []).some(r => r.id === id && r.earned < r.pts);
+const KEEP_LINES = {
+  levels: 'Levels session se pehle mark kiye', news: 'Trade se pehle news check ki', gate: 'Har trade checklist pass karke liya',
+  lot: 'Sirf 2 MGC lot', sl: 'SL set kiya aur move nahi kiya', target: 'Fixed $15 target pe exit, chase nahi',
+  reentry: 'Fail hue level pe re-entry nahi', stops: 'Din ke stop rules follow kiye', window: 'Sirf trading window me trade',
+  dll: 'Daily loss limit ke andar rahe', shots: 'Har trade ka screenshot liya', eod: 'Din ka note likha'
+};
+// up to 3 things to repeat: the trader's own 'achhi baat' first, then the biggest rules fully kept
+function keepFrom(prev){
+  const goods = (prev.accounts && prev.accounts.length ? prev.accounts.map(a => (a.notes || {}).good) : [(prev.notes || {}).good]).filter(Boolean);
+  const out = goods.map(g => `“${g}”`);
+  if (prev.noTrade) out.push('Valid setup nahi tha to trade nahi liya (patience)');
+  const byId = {};
+  (prev.results || []).forEach(r => { const x = byId[r.id] = byId[r.id] || { id: r.id, pts: r.pts, label: r.label, ok: true }; if (r.earned < r.pts) x.ok = false; });
+  const traded = (prev.trades || 0) > 0;
+  Object.values(byId).filter(x => x.ok && x.pts > 0 && (traded || ['prep', 'review'].includes((gsSettings.rules.find(r => r.id === x.id) || {}).cat)) && !(x.id === 'eod' && goods.length))
+    .sort((a, b) => b.pts - a.pts).forEach(x => out.push(KEEP_LINES[x.id] || x.label));
+  return [...new Set(out)].slice(0, 3);
+}
 function focusFrom(prev, series){
   if (!prev) return null;
-  if (prev.total >= 100 || prev.noTrade) return { perfect: true, prev };
+  if (prev.total >= 100 || prev.noTrade) return { perfect: true, prev, keep: keepFrom(prev) };
   const loss = {};
   (prev.results || []).forEach(r => { loss[r.id] = (loss[r.id] || 0) + (r.pts - r.earned); });
   // biggest loss first; on a tie prefer a rule the journal shows was broken over an unanswered yes/no
   const srcOf = k => (gsSettings.rules.find(r => r.id === k) || {}).src;
   const id = Object.keys(loss).filter(k => loss[k] > 0).sort((a, b) => (loss[b] - loss[a]) || ((srcOf(a) === 'manual') - (srcOf(b) === 'manual')))[0];
-  if (!id) return { perfect: true, prev };
+  if (!id) return { perfect: true, prev, keep: keepFrom(prev) };
   const rule = gsSettings.rules.find(r => r.id === id) || { id, src: id, label: ((prev.results || []).find(r => r.id === id) || {}).label || id };
   const notes = (prev.accounts && prev.accounts.length ? prev.accounts.map(a => (a.notes || {}).mistake) : [(prev.notes || {}).mistake]).filter(Boolean);
   // repeat: days in the last 7 scored days (up to and including prev) where this rule lost points
   const recent = series.filter(d => d.date <= prev.date).slice(-7);
   const repeat = recent.filter(d => ruleBroken(d, id)).length;
-  return { perfect: false, prev, rule, lost: Math.round(loss[id]), line: FOCUS_LINES[rule.id] || FOCUS_LINES[rule.src] || `Ye rule follow karo: ${rule.label}`, notes, repeat };
+  return { perfect: false, prev, keep: keepFrom(prev), rule, lost: Math.round(loss[id]), line: FOCUS_LINES[rule.id] || FOCUS_LINES[rule.src] || `Ye rule follow karo: ${rule.label}`, notes, repeat };
 }
 let focusCache = null;
 function todayFocus(){
@@ -2027,10 +2049,12 @@ function renderFocusBox(){
   const box = $('focus-box'), f = focusCache;
   box.hidden = !f;
   if (!f) return;
+  const keep = (f.keep || []).length ? `<span class="keep">✅ Repeat karo</span><ul>${f.keep.map(k => `<li>${esc(k)}</li>`).join('')}</ul>` : '';
   box.innerHTML = f.perfect
-    ? `<span class="lbl">🎯 Aaj ka focus</span><b>Kal perfect tha — wahi repeat karo</b>`
-    : `<span class="lbl">🎯 Aaj ka focus</span><b>${esc(f.line)}</b><small>Kal ki galti: ${esc(f.rule.label)} (−${f.lost})</small>${f.repeat >= 2 ? `<span class="fs-repeat">⚠ Repeat galti (${f.repeat}x is hafte)</span>` : ''}`;
+    ? `<span class="lbl">🎯 Aaj ka focus</span><b>Kal perfect tha — wahi repeat karo</b>${keep}`
+    : `<span class="lbl">🎯 Aaj ka focus</span><b>${esc(f.line)}</b><small>Kal ki galti: ${esc(f.rule.label)} (−${f.lost})</small>${f.repeat >= 2 ? `<span class="fs-repeat">⚠ Repeat galti (${f.repeat}x is hafte)</span>` : ''}${keep}`;
 }
+const keepBlock = f => (f.keep || []).length ? `<div class="fs-block fs-keep"><span class="lbl">✅ Kal ka achha · repeat karo</span><ul>${f.keep.map(k => `<li>${esc(k)}</li>`).join('')}</ul></div>` : '';
 function showFocusStart(force){
   const f = todayFocus();
   const key = (testMode ? 't' : 'r') + tradingDate(Date.now());
@@ -2038,13 +2062,13 @@ function showFocusStart(force){
   $('fs-date').textContent = `Aaj ka focus · ${shortDate(tradingDate(Date.now()))}${testMode ? ' · 🧪 test' : ''}`;
   if (f.perfect) {
     $('fs-title').textContent = 'Kal perfect tha — wahi repeat karo';
-    $('fs-body').innerHTML = `<div class="fs-block"><span class="lbl">Kal ka score</span><b>${f.prev.total}/100${f.prev.noTrade ? ' · 🧘 Patience day' : ''}</b></div>`;
+    $('fs-body').innerHTML = `<div class="fs-block"><span class="lbl">Kal ka score</span><b>${f.prev.total}/100${f.prev.noTrade ? ' · 🧘 Patience day' : ''}</b></div>${keepBlock(f)}`;
   } else {
     $('fs-title').textContent = 'Naya trading din';
     $('fs-body').innerHTML = `<div class="fs-block"><span class="lbl">Kal ki galti (${esc(shortDate(f.prev.date))} · ${f.prev.total}/100)</span><b>${esc(f.rule.label)} <span style="color:var(--bad)">−${f.lost}</span></b>
         ${f.repeat >= 2 ? `<span class="fs-repeat">⚠ Repeat galti (${f.repeat}x is hafte)</span>` : ''}
         ${f.notes.length ? f.notes.map(n => `<span class="fs-note">“${esc(n)}”</span>`).join('') : ''}</div>
-      <div class="fs-block fs-focus"><span class="lbl">Aaj ka focus</span><b>${esc(f.line)}</b></div>`;
+      <div class="fs-block fs-focus"><span class="lbl">Aaj ka focus</span><b>${esc(f.line)}</b></div>${keepBlock(f)}`;
   }
   $('focus-start').hidden = false;
   $('fs-ok').focus();
@@ -2062,7 +2086,7 @@ setInterval(() => {
   if (etMinutes() !== hm2min(c.notifyTime || '20:00') || LS.get('gtd.focusNotified') === key) return;
   const f = todayFocus(); if (!f) return;
   LS.set('gtd.focusNotified', key);
-  const body = f.perfect ? 'Kal perfect tha — wahi repeat karo' : f.line;
+  const body = (f.perfect ? 'Kal perfect tha — wahi repeat karo' : f.line) + ((f.keep || [])[0] ? ` · Repeat: ${f.keep[0]}` : '');
   const show = reg => reg && reg.showNotification ? reg.showNotification('Gold Trade Gate · Aaj ka focus', { body, icon: 'icon.svg', tag: 'focus-' + key }) : new Notification('Gold Trade Gate · Aaj ka focus', { body });
   (navigator.serviceWorker ? navigator.serviceWorker.getRegistration('../') : Promise.resolve(null)).then(show).catch(() => { try { show(null); } catch {} });
 }, 20000);
