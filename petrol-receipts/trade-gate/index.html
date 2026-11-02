@@ -2028,17 +2028,34 @@ function compareBroker(b, date){
   if (!b.dashboard_found) checks.push(['wn', 'Dashboard screenshot me balance nahi padh paya.']);
   else if (Number.isFinite(b.balance)) {
     const ps = propState();
-    if (ps) { const d = Math.abs(b.balance - ps.balance); checks.push([d > 25 ? 'wn' : 'ok', `Balance: Lucid ${money(b.balance)}, app ${money(ps.balance)}${d > 25 ? ' · Settings → Prop account me sync kar lo' : ''}`]); }
+    if (ps) { const d = Math.abs(b.balance - ps.balance); checks.push([d > 25 ? 'wn' : 'ok', `Balance: Lucid ${money(b.balance)}, app ${money(ps.balance)}`]); }
     else checks.push(['ok', `Lucid balance ${money(b.balance)}`]);
   }
   return { checks, missing, bCount, bPnl, jCount, jPnl, balance: Number.isFinite(b.balance) ? b.balance : null };
 }
+// Lucid balance from the verified screenshot vs the app's prop balance
+function vfSyncHTML(v){
+  const ps = propState();
+  if (!ps || !Number.isFinite(v.balance)) return '';
+  if (Math.abs(v.balance - ps.balance) < 1) return `<p class="save-note" style="margin-top:8px;color:var(--good)">✓ App balance Lucid se match: ${money(ps.balance)}</p>`;
+  return `<div class="slfix" style="margin-top:10px"><span>App ${money(ps.balance)} · Lucid ${money(v.balance)}</span><button type="button" class="btn ghost" id="vf-sync">App balance ${money(v.balance)} karo</button></div>`;
+}
+function vfSync(bal){
+  const ps = propState(); if (!ps) return;
+  const P = ps.P, mll = P.sync && Number.isFinite(+P.sync.mll) ? +P.sync.mll : Number.isFinite(ps.threshold) ? ps.threshold : null;
+  pop('', 'Prop sync', `Balance ${money(bal)} set karna hai?`, `Abhi app me ${money(ps.balance)} hai (farak ${money(bal - ps.balance)}).`,
+    'Lucid dashboard ka balance sach hai. App usi se aage chalega; liquidation (MLL) wahi rahega. Agle trades ka P&L iske upar judega.', [
+    ['Haan, sync karo', '', () => { saveProp({ sync: { at: Date.now(), date: today(), balance: bal, mll: mll != null && mll < bal ? mll : null }, adj: 0, on: true }); syncPropUI(); renderAll(); renderGrowth(); }],
+    ['Rehne do', 'ghost']]);
+}
+document.addEventListener('click', e => { if (e.target && e.target.id === 'vf-sync') { const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify; if (v && Number.isFinite(v.balance)) vfSync(v.balance); } });
 function renderVerify(){
   const v = (scoreDocs[gsDocId(tradingDate(Date.now()))] || {}).verify, out = $('vf-out');
   if (!v) { if (!vfBusy) out.innerHTML = ''; return; }
   const ic = { ok: '✓', no: '✗', wn: '!' };
   out.innerHTML = `<div class="msgs"><p class="msg ${v.status === 'ok' ? 'good' : 'bad'}">${v.status === 'ok' ? '🔒 Verified: broker aur journal match karte hain.' : '⚠ Mismatch: journal aur broker alag hain.'}</p></div>
     <ul class="vf-list" style="margin-top:8px">${(v.checks || []).map(c => Array.isArray(c) ? c : [c.k, c.t]).map(([k, t]) => `<li><span class="${k}">${ic[k]}</span><span>${esc(t)}</span></li>`).join('')}</ul>
+    ${vfSyncHTML(v)}
     <p class="save-note" style="margin-top:6px">Checked ${new Date(v.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Naye screenshot daal ke dobara verify kar sakte ho.</p>`;
 }
 let vfBusy = false;

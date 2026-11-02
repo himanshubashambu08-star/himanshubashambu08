@@ -109,6 +109,17 @@ async function test(name, fn) { try { await fn(); console.log('ok   -', name); }
     assert.match(out, /AI abhi screenshots nahi padh paya/); assert.match(out, /Detail: \[400\] schema not supported/);
     await page.evaluate(() => { window.__vfFail = null; });
   });
+  await test('Lucid balance from the screenshot can be synced into the app', async () => {
+    await page.evaluate(() => { const $ = id => document.getElementById(id); $('p-on').checked = true; $('p-size').value = '25000'; $('p-dd').value = '1000'; $('p-start').value = '2026-11-01'; $('p-save').click(); });
+    await run({ dashboard_found: true, balance: 24547, history_found: true, dates_seen: ['2026-11-11'], trades: [{ pnl: 300 }] });
+    assert.match(await text(page, '#vf-out'), /App \$25,300 · Lucid \$24,547/);
+    await page.click('#vf-sync');
+    assert.match(await text(page, '#pop'), /Balance \$24,547 set karna hai/);
+    await page.click('#pop-actions .btn:not(.ghost)');
+    assert.match(await text(page, '#vf-out'), /App balance Lucid se match: \$24,547/);
+    assert.ok(!(await page.$('#vf-sync')));
+    assert.match(await text(page, '#prop-title'), /\$24,547/);
+  });
   await test('no page errors', async () => assert.deepStrictEqual(errors, []));
 
   await browser.close(); server.close();
