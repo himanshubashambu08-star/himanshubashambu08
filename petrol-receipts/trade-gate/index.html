@@ -1945,9 +1945,22 @@ $('gs-week-now').addEventListener('click', () => buildWeekly(growthSeries(), mon
 window.__tradeGate = Object.freeze({ tradingDate, mondayOf });
 /* ---- end-of-day verification against broker screenshots ---- */
 let vfShots = { dash: null, hist: null };
+// AI copy of a screenshot: width up to 1100px, tall screenshots cut into pages of 1600px so text stays readable
+async function aiShot(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url), k = Math.min(1, 1100 / img.width), W = Math.round(img.width * k), H = Math.round(img.height * k), out = [];
+    for (let y = 0; y < H && out.length < 6; y += 1600) {
+      const h = Math.min(1600, H - y), c = document.createElement('canvas'); c.width = W; c.height = h;
+      c.getContext('2d').drawImage(img, 0, y / k, img.width, h / k, 0, 0, W, h);
+      out.push(c.toDataURL('image/jpeg', .8));
+    }
+    return out;
+  } finally { URL.revokeObjectURL(url); }
+}
 async function vfPick(kind, file){
   if (!file) return;
-  try { vfShots[kind] = await compress(file); $(`vf-${kind}-img`).src = vfShots[kind].thumb; $(`vf-${kind}-img`).hidden = false; }
+  try { vfShots[kind] = await compress(file); vfShots[kind].ai = await aiShot(file); $(`vf-${kind}-img`).src = vfShots[kind].thumb; $(`vf-${kind}-img`).hidden = false; }
   catch { msgs($('vf-out'), [['bad', 'Ye photo khul nahi payi. Screenshot dobara lo.']]); }
   $('vf-run').disabled = !(vfShots.dash && vfShots.hist);
 }
@@ -1968,20 +1981,30 @@ async function readBroker(date){
   await loadAI();
   const [{ getApps }, { getAI, getGenerativeModel, GoogleAIBackend }] = await Promise.all([import(`${base}/firebase-app.js`), import(`${base}/firebase-ai.js`)]);
   const ai = getAI(getApps().find(a => a.name === 'mentor'), { backend: new GoogleAIBackend() });
-  const img = x => ({ inlineData: { data: x.full.split(',')[1], mimeType: 'image/jpeg' } });
+  const parts = x => (x.ai && x.ai.length ? x.ai : [x.full]).map(u => ({ inlineData: { data: u.split(',')[1], mimeType: 'image/jpeg' } }));
   const prompt = ['You read screenshots for a futures trader (micro gold MGC). Image 1 should be the prop firm dashboard (Lucid), image 2 the trade history from Tradovate, Tradesea or NinjaTrader.',
     `The trading day being checked is ${date} (CME session: starts 6 PM ET the evening before).`,
     'Report only what is visible. Count ROUND-TRIP trades (an entry and its exit together = 1 trade). Do not guess numbers you cannot read; leave them out.',
-    'List the dates you can see on the trades as YYYY-MM-DD.'].join('\n');
+    'List the dates you can see on the trades as YYYY-MM-DD.',
+    'A long screenshot may come as several images in order; first the dashboard part(s), then the history part(s).',
+    'Reply with JSON only: {"dashboard_found":bool,"balance":number,"history_found":bool,"dates_seen":[string],"trades":[{"time":string,"side":string,"qty":number,"pnl":number}],"day_pnl":number,"notes":string}.'].join('\n');
   let last;
-  for (const name of MODELS) {
+  const content = [prompt, 'DASHBOARD:', ...parts(vfShots.dash), 'TRADE HISTORY:', ...parts(vfShots.hist)];
+  const pref = LS.get('gtd.model'), names = [...MODELS].sort((a, b) => (b === pref) - (a === pref));
+  // try each model with the strict JSON schema first, then plain JSON (some models reject the schema)
+  for (const strict of [true, false]) for (const name of names) {
+    const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 60000);
     try {
-      const m = getGenerativeModel(ai, { model: name, generationConfig: { responseMimeType: 'application/json', responseJsonSchema: VERIFY_SCHEMA, temperature: 0 } });
-      const r = await m.generateContent([prompt, img(vfShots.dash), img(vfShots.hist)]);
-      return JSON.parse(r.response.text());
-    } catch (e) { last = e; }
+      const generationConfig = strict ? { responseMimeType: 'application/json', responseJsonSchema: VERIFY_SCHEMA, temperature: 0 } : { responseMimeType: 'application/json', temperature: 0 };
+      const r = await getGenerativeModel(ai, { model: name, generationConfig }).generateContent(content, { signal: ctrl.signal, timeout: 60000 });
+      const txt = r.response.text().replace(/^```(?:json)?\s*|\s*```$/g, '');
+      const out = JSON.parse(txt);
+      if (!out || typeof out !== 'object') throw new Error('empty answer');
+      out.trades = Array.isArray(out.trades) ? out.trades : [];
+      return out;
+    } catch (e) { last = e; } finally { clearTimeout(timer); }
   }
-  throw last;
+  throw last || new Error('no model');
 }
 // compare what the broker shows with the journal; returns checks and whether trades are missing
 function compareBroker(b, date){
@@ -2037,6 +2060,7 @@ $('vf-run').addEventListener('click', async () => {
     vfBusy = false;
     const offline = !navigator.onLine || /Load failed|Failed to fetch|network/i.test(err?.message || '');
     msgs($('vf-out'), [['bad', offline ? 'Internet nahi hai. Connect karke dobara try karo.' : 'AI abhi screenshots nahi padh paya. Thodi der baad dobara try karo.']]);
+    if (!offline) { const d = document.createElement('p'); d.className = 'save-note'; d.style.marginTop = '6px'; d.textContent = 'Detail: ' + String(err?.message || err).slice(0, 160); $('vf-out').appendChild(d); }
   }
   $('vf-run').disabled = !(vfShots.dash && vfShots.hist);
 });

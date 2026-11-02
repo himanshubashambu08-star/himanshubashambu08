@@ -22,7 +22,8 @@ const text = async (page, sel) => (await page.textContent(sel)).replace(/\s+/g, 
 
 // Firebase modular SDK stubs: the AI answer is whatever the test puts in window.__vfResp
 const APP_STUB = "export const getApps=()=>[{name:'mentor'}]; export const initializeApp=()=>({name:'mentor'});";
-const AI_STUB = "export class GoogleAIBackend{}; export const getAI=()=>({}); export const getGenerativeModel=()=>({generateContent:async()=>({response:{text:()=>JSON.stringify(window.__vfResp)}})});";
+// window.__vfFail: 'strict' = models reject the JSON schema, 'all' = every call fails
+const AI_STUB = "export class GoogleAIBackend{}; export const getAI=()=>({}); export const getGenerativeModel=(ai,o)=>({generateContent:async(parts)=>{window.__vfParts=parts.length; if(window.__vfFail==='all'||(window.__vfFail==='strict'&&o.generationConfig.responseJsonSchema)) throw new Error('[400] schema not supported'); return {response:{text:()=>JSON.stringify(window.__vfResp)}};}})";
 
 let failures = 0;
 async function test(name, fn) { try { await fn(); console.log('ok   -', name); } catch (e) { failures++; console.log('FAIL -', name, '\n      ', e.message); } }
@@ -91,6 +92,18 @@ async function test(name, fn) { try { await fn(); console.log('ok   -', name); }
     await page.click('#pop-actions .btn');
   });
 
+  await test('falls back to plain JSON when the schema is rejected', async () => {
+    await page.evaluate(() => { window.__vfFail = 'strict'; });
+    await run({ dashboard_found: true, history_found: true, dates_seen: ['2026-11-11'], trades: [{ pnl: 300 }] });
+    assert.match(await text(page, '#vf-out'), /Verified/);
+  });
+  await test('when AI fails, the reason is shown', async () => {
+    await page.evaluate(() => { window.__vfFail = 'all'; });
+    await run({});
+    const out = await text(page, '#vf-out');
+    assert.match(out, /AI abhi screenshots nahi padh paya/); assert.match(out, /Detail: \[400\] schema not supported/);
+    await page.evaluate(() => { window.__vfFail = null; });
+  });
   await test('no page errors', async () => assert.deepStrictEqual(errors, []));
 
   await browser.close(); server.close();
