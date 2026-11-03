@@ -72,6 +72,7 @@ class Signal:
     atr: float
     reason: str
     time: float = field(default_factory=lambda: datetime.now(timezone.utc).timestamp())
+    features: dict = field(default_factory=dict)   # conditions at entry, used by the learner
 
 
 GRANULARITY_SECONDS = {

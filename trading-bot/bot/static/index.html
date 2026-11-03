@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chart Board</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2230;--mute:#6b7280;--line:#e3e6eb;--up:#0f9d6b;--down:#d64545;
+ --sig:#0f9d6b;--form:#d99a00;--watch:#4c7bd9;--none:#9aa1ad;--zone:rgba(217,154,0,.16);--ema:#7c5cd6}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#171b23;--ink:#e6e8ec;--mute:#8b93a1;--line:#272d38;
+ --zone:rgba(217,154,0,.22);--ema:#a58cf0}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+header h1{font-size:16px;margin:0 8px 0 0}.kpi b{font-variant-numeric:tabular-nums}.pill{padding:2px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
+.bad{color:var(--down)}.good{color:var(--up)}
+.filters{display:flex;gap:6px;margin-left:auto}.filters button{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer}
+.filters button.on{border-color:var(--ink)}
+main{display:grid;grid-template-columns:1fr 320px;gap:16px;padding:16px}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;align-content:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;border-top:4px solid var(--none)}
+.card.signal{border-top-color:var(--sig)}.card.forming{border-top-color:var(--form)}.card.watch{border-top-color:var(--watch)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.name{font-weight:650}.badge{font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:6px;color:#fff;background:var(--none)}
+.signal .badge{background:var(--sig)}.forming .badge{background:var(--form)}.watch .badge{background:var(--watch)}
+canvas{width:100%;height:120px;display:block;margin:6px 0}
+.note{font-size:12.5px;color:var(--ink)}.meta{font-size:11.5px;color:var(--mute);margin-top:4px}
+aside section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+aside h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute)}
+aside ul{margin:0;padding-left:18px}aside li{margin:4px 0;font-size:13px}
+.empty{color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Chart Board</h1>
+  <span class="kpi">Equity <b id="nav">-</b></span>
+  <span class="kpi">Today <b id="pl">-</b></span>
+  <span class="kpi">Open trades <b id="ot">-</b></span>
+  <span class="pill" id="sess">-</span>
+  <span class="pill" id="halt" hidden></span>
+  <div class="filters" id="filters">
+    <button data-f="all" class="on">All</button><button data-f="signal">Signals</button>
+    <button data-f="forming">Forming</button><button data-f="watch">Watch</button>
+  </div>
+</header>
+<main>
+  <div class="grid" id="grid"><p class="empty">Waiting for the first scan...</p></div>
+  <aside>
+    <section><h2>Open trades</h2><div id="trades" class="empty">none</div></section>
+    <section><h2>What the bot learned</h2><ul id="lessons"></ul></section>
+    <section><h2>Rules it taught itself</h2><ul id="rules"></ul></section>
+    <section><h2>Top mistakes (30 days)</h2><ul id="mistakes"></ul></section>
+    <section><h2>Last 30 days</h2><div id="stats" class="empty"></div></section>
+    <section><h2>Latest decisions</h2><ul id="journal"></ul></section>
+  </aside>
+</main>
+<script>
+let filter = 'all', last = null;
+document.getElementById('filters').addEventListener('click', e => {
+  if (!e.target.dataset.f) return;
+  filter = e.target.dataset.f;
+  document.querySelectorAll('#filters button').forEach(b => b.classList.toggle('on', b === e.target));
+  if (last) render(last);
+});
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const px = v => v == null ? '-' : Number(v).toFixed(Math.abs(v) < 20 ? 5 : Math.abs(v) < 1000 ? 3 : 2);
+const fmt = (x, d=2) => x == null ? '-' : Number(x).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+
+function draw(cv, ch) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const c = ch.candles || []; if (!c.length) return;
+  let lo = Math.min(...c.map(x => x[3])), hi = Math.max(...c.map(x => x[2]));
+  (ch.ema || []).forEach(v => { if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
+  if (ch.zone) { lo = Math.min(lo, ch.zone[0]); hi = Math.max(hi, ch.zone[1]); }
+  const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  const y = v => h - (v - lo) / (hi - lo) * h, bw = w / c.length;
+  if (ch.zone) { g.fillStyle = css('--zone'); g.fillRect(0, y(ch.zone[1]), w, y(ch.zone[0]) - y(ch.zone[1])); }
+  g.strokeStyle = css('--line'); g.setLineDash([3,3]);
+  [ch.swing_high, ch.swing_low].forEach(v => { if (v != null) { g.beginPath(); g.moveTo(0, y(v)); g.lineTo(w, y(v)); g.stroke(); } });
+  g.setLineDash([]);
+  c.forEach((k, i) => {
+    const [t, o, hh, l, cl] = k, x = i * bw + bw / 2, col = cl >= o ? css('--up') : css('--down');
+    g.strokeStyle = col; g.fillStyle = col; g.beginPath(); g.moveTo(x, y(hh)); g.lineTo(x, y(l)); g.stroke();
+    const top = y(Math.max(o, cl)), bh = Math.max(1, Math.abs(y(o) - y(cl)));
+    g.fillRect(x - Math.max(1, bw * 0.35), top, Math.max(2, bw * 0.7), bh);
+  });
+  if (ch.ema) { g.strokeStyle = css('--ema'); g.lineWidth = 1.5; g.beginPath();
+    let started = false;
+    ch.ema.forEach((v, i) => { if (v == null) return; const x = i * bw + bw / 2;
+      started ? g.lineTo(x, y(v)) : (g.moveTo(x, y(v)), started = true); });
+    g.stroke(); }
+}
+
+function render(s) {
+  last = s;
+  const st = s.status || {}, L = s.learning || {};
+  document.getElementById('nav').textContent = st.nav != null ? fmt(st.nav) + ' ' + (st.currency || '') : '-';
+  const pl = st.nav != null && st.day_start_nav ? st.nav - st.day_start_nav : null;
+  const plEl = document.getElementById('pl'); plEl.textContent = pl == null ? '-' : (pl >= 0 ? '+' : '') + fmt(pl);
+  plEl.className = pl == null ? '' : pl >= 0 ? 'good' : 'bad';
+  document.getElementById('ot').textContent = (st.open_trades || []).length;
+  document.getElementById('sess').textContent = st.in_session ? 'US session: open for entries' : 'Outside US session: watching only';
+  const halt = document.getElementById('halt');
+  halt.hidden = !st.no_new_trades || st.no_new_trades === 'outside US session';
+  halt.textContent = 'No new trades: ' + (st.no_new_trades || ''); halt.className = 'pill bad';
+
+  const grid = document.getElementById('grid');
+  const charts = (s.charts || []).filter(c => filter === 'all' || c.state === filter);
+  grid.innerHTML = charts.length ? '' : '<p class="empty">No charts in this group right now.</p>';
+  charts.forEach(ch => {
+    const d = document.createElement('div'); d.className = 'card ' + ch.state;
+    const arrow = ch.bias > 0 ? '▲' : ch.bias < 0 ? '▼' : '•';
+    const label = {signal:'SIGNAL', forming:'FORMING', watch:'WATCH', none:'NO SETUP'}[ch.state] || ch.state;
+    const dec = ch.decision ? `<div class="meta">Bot: ${esc(ch.decision === 'open' ? 'took it' : 'skipped - ' + (ch.decision_reason || ''))}</div>` : '';
+    d.innerHTML = `<div class="row"><span class="name">${esc(ch.instrument.replace('_','/'))} <span class="${ch.bias>0?'good':ch.bias<0?'bad':''}">${arrow}</span></span>
+      <span class="badge">${label}</span></div><canvas></canvas>
+      <div class="note">${esc(ch.note)}</div>
+      <div class="meta">Price ${px(ch.price)} · RSI ${esc(ch.rsi ?? '-')} · score ${esc(ch.score)}</div>${dec}`;
+    grid.appendChild(d); draw(d.querySelector('canvas'), ch);
+  });
+
+  const list = (id, items, f) => { const el = document.getElementById(id);
+    el.innerHTML = items && items.length ? items.map(f).join('') : '<li class="empty">nothing yet</li>'; };
+  list('lessons', L.lessons, l => `<li><b>${esc(l.day)}</b> ${esc(l.text)}</li>`);
+  list('rules', L.filters, f => `<li>Avoid ${esc(f.text)}</li>`);
+  list('mistakes', L.mistakes_30d, m => `<li>${esc(m.count)} × ${esc(m.text)}</li>`);
+  list('journal', s.journal, j => `<li>${esc(j.time_utc.slice(11,16))} ${esc(j.event)} ${esc(j.instrument)} ${esc(j.side)} ${esc((j.reason || j.note || '').replace(/^(BUY|SELL): /, ''))}</li>`);
+  const S = L.stats_30d || {};
+  document.getElementById('stats').textContent =
+    `${S.bot_trades ?? 0} bot trades (${fmt(S.bot_total_r)}R) · ${S.setups_followed ?? 0} setups followed (${fmt(S.all_setups_total_r)}R)`;
+  const tr = st.open_trades || [];
+  document.getElementById('trades').innerHTML = tr.length ? tr.map(t =>
+    `<div>${esc(t.instrument)} ${t.units > 0 ? 'BUY' : 'SELL'} ${esc(Math.abs(t.units))} @ ${px(t.entry)} · SL ${px(t.stop)} · TP ${px(t.take_profit)}</div>`).join('') : 'none';
+}
+
+async function poll() {
+  try { const r = await fetch('/api/state'); if (r.ok) render(await r.json()); } catch (e) {}
+  setTimeout(poll, 15000);
+}
+window.addEventListener('resize', () => last && render(last));
+poll();
+</script>
+</body>
+</html>

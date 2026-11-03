@@ -125,7 +125,8 @@ class EngineTests(unittest.TestCase):
         b.data[("XAU_USD", "H4")] = htf
         b.data[("XAU_USD", "H1")] = ltf
         b.mid["XAU_USD"] = ltf[-1].c
-        cfg = {"engine": {"instruments": ["XAU_USD"], "kill_file": os.path.join(tmp or ".", "STOP_TEST")},
+        cfg = {"engine": {"instruments": ["XAU_USD"], "kill_file": os.path.join(tmp or ".", "STOP_TEST"),
+                          "entry_sessions_ny": []},
                "strategy": {"rsi_buy_min": 0, "rsi_buy_max": 100, "rsi_sell_min": 0, "rsi_sell_max": 100},
                "risk": {"risk_per_trade_pct": 1.0}}
         clock = [ltf[-1].time + 3600 + 30]

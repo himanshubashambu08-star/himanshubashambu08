@@ -5,3 +5,5 @@ bot.log
 STOP
 .env
 __pycache__/
+memory-*.db
+reports/

@@ -69,3 +69,23 @@ def summary(trades):
         "profit_factor": round(sum(wins) / -sum(losses), 2) if losses else None,
         "max_drawdown_R": round(dd, 2),
     }
+
+
+def simulate(side, entry, stop_distance, bars, reward_risk=2.0, breakeven_at_r=1.0):
+    """Follow one trade through the bars after entry, with the same rules as run().
+    Returns (r, bars_held, max_favourable_r) or None if it has not finished yet."""
+    stop = entry - side * stop_distance
+    tp = entry + side * reward_risk * stop_distance
+    best_r = 0.0
+    for n, bar in enumerate(bars, 1):
+        stop_hit = (bar.l <= stop) if side > 0 else (bar.h >= stop)
+        tp_hit = (bar.h >= tp) if side > 0 else (bar.l <= tp)
+        if stop_hit:
+            return (stop - entry) * side / stop_distance, n, best_r
+        if tp_hit:
+            return reward_risk, n, max(best_r, reward_risk)
+        fav = ((bar.h - entry) if side > 0 else (entry - bar.l)) / stop_distance
+        best_r = max(best_r, fav)
+        if fav >= breakeven_at_r and (entry - stop) * side > 0:
+            stop = entry
+    return None

@@ -56,6 +56,12 @@ class SimBroker(Broker):
         self.balance += (exit_ - t.entry) * t.units
         self.closed.append((t, exit_))
 
+    def closed_price(self, trade_id):
+        for t, exit_ in self.closed:
+            if t.id == trade_id:
+                return exit_
+        return None
+
     def move(self, instrument, mid):
         """Move price; fill stops / targets that were crossed (stop checked first)."""
         self.mid[instrument] = mid

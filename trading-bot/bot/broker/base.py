@@ -21,3 +21,7 @@ class Broker(ABC):
     def modify_stop(self, trade_id, price, instrument=None): ...
     @abstractmethod
     def close_trade(self, trade_id): ...
+
+    def closed_price(self, trade_id):
+        """Average close price of a finished trade, or None if unknown / still open."""
+        return None

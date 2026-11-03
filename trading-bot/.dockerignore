@@ -4,3 +4,5 @@ state-*.json
 journal-*.csv
 bot.log
 __pycache__/
+memory-*.db
+reports/

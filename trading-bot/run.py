@@ -5,6 +5,9 @@
   python run.py practice                                     # 24/5 on an OANDA DEMO account
   python run.py live --i-understand-real-money               # real money (only after demo results)
   python run.py flatten                                      # close every open trade now
+  python run.py review                                       # run the daily self-review now
+
+The dashboard runs with the bot at http://127.0.0.1:8050 (change with --port / --host).
 
 Env vars: OANDA_TOKEN, OANDA_ACCOUNT_ID (demo and live have different ones).
 """
@@ -14,6 +17,7 @@ import logging
 import os
 import sys
 
+from bot import dashboard
 from bot.backtest import run as backtest_run, summary
 from bot.broker.oanda import OandaBroker
 from bot.engine import DEFAULTS as ENGINE_DEFAULTS, Engine
@@ -36,13 +40,15 @@ def make_broker(env):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["backtest", "practice", "live", "flatten"])
+    ap.add_argument("mode", choices=["backtest", "practice", "live", "flatten", "review"])
     ap.add_argument("--config", default="config.json")
     ap.add_argument("--instruments", help="comma list, overrides config (backtest)")
     ap.add_argument("--bars", type=int, default=5000, help="history bars for backtest (max 5000)")
     ap.add_argument("--env", default="practice", choices=["practice", "live"],
                     help="which account flatten/backtest uses")
     ap.add_argument("--i-understand-real-money", action="store_true")
+    ap.add_argument("--host", default="127.0.0.1", help="dashboard host (keep 127.0.0.1 on a server)")
+    ap.add_argument("--port", type=int, default=8050, help="dashboard port, 0 = no dashboard")
     a = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
@@ -80,7 +86,18 @@ def main(argv=None):
             print("closed", t.instrument, t.id)
         return
 
-    Engine(broker, cfg, state_path=f"state-{env}.json", journal_path=f"journal-{env}.csv").run_forever()
+    engine = Engine(broker, cfg, state_path=f"state-{env}.json", journal_path=f"journal-{env}.csv",
+                    memory_path=f"memory-{env}.db")
+    if a.mode == "review":
+        from bot.risk import trading_day
+        import time
+        engine.review(trading_day(time.time() - 86400))
+        print("report written to", engine.learner.p["reports_dir"])
+        return
+    if a.port:
+        dashboard.start(engine, a.host, a.port)
+        logging.info("dashboard: http://%s:%d", a.host, a.port)
+    engine.run_forever()
 
 
 if __name__ == "__main__":

@@ -1,13 +1,36 @@
 {
   "engine": {
-    "instruments": ["XAU_USD", "XAG_USD", "EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD"],
-    "instrument_types": ["CURRENCY", "METAL"],
+    "instruments": [
+      "EUR_USD",
+      "GBP_USD",
+      "USD_JPY",
+      "USD_CAD",
+      "AUD_USD",
+      "NZD_USD",
+      "USD_CHF",
+      "EUR_JPY",
+      "GBP_JPY",
+      "EUR_GBP",
+      "AUD_JPY",
+      "EUR_AUD"
+    ],
+    "instrument_types": [
+      "CURRENCY"
+    ],
     "entry_timeframe": "H1",
     "trend_timeframe": "H4",
+    "entry_sessions_ny": [
+      [
+        "08:00",
+        "16:00"
+      ]
+    ],
+    "board_refresh_seconds": 60,
     "breakeven_at_r": 1.0,
     "trail_start_r": 1.5,
     "trail_atr_mult": 1.0,
-    "blackout_utc": []
+    "blackout_utc": [],
+    "learn": true
   },
   "strategy": {
     "htf_ema_fast": 50,
@@ -23,5 +46,14 @@
     "max_trades_per_instrument": 1,
     "max_trades_per_currency": 2,
     "reward_risk": 2.0
+  },
+  "learning": {
+    "min_samples": 20,
+    "window_days": 90,
+    "margin_r": 0.25,
+    "tune": true,
+    "tune_bars": 3000,
+    "tune_instruments": 8,
+    "test_fraction": 0.3
   }
 }
