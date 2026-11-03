@@ -1,7 +1,7 @@
 # systemd unit for a Linux VPS. Copy to /etc/systemd/system/, then:
 #   sudo systemctl daemon-reload && sudo systemctl enable --now trading-bot
 [Unit]
-Description=24/5 trading bot (OANDA)
+Description=24/5 forex trading bot (OANDA)
 After=network-online.target
 Wants=network-online.target
 
