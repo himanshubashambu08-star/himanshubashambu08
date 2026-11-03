@@ -744,7 +744,7 @@ const STEPS = [
          { k:'focusOk', t:'tick', text:'Aaj ka focus follow kar raha hun' },
          { k:'lvl5', t:'tick', text:'5pm close ke baad levels mark kiye' } ],
     check: d => [ d.market === 'closed' && ['bad', d.marketMsg, 'hard'],
-                  d.session === 'out' && ['bad', d.sessionMsg, 'hard'],
+                  d.session === 'out' && ['bad', d.sessionMsg.replace('Abhi trade nahi.', 'Prep (news, focus, levels) abhi tick kar lo, trade session me.'), 'wait'],
                   d.news === 'blocked' && ['bad', d.newsMsg, 'hard'],
                   d.news === 'manual' && !d.newsManual && ['bad','News calendar check karo.'],
                   !d.lvl5 && ['bad','Levels mark karo.'],
@@ -1403,11 +1403,13 @@ function evaluate(fromUser){
     fs.classList.toggle('done', isDone);
     fs.classList.toggle('collapsed', isDone && !last && !expanded.has(i));
     $('sum' + i).textContent = isDone ? STEP_SUM[i](d) : '';
-    fs.classList.toggle('fail', open && !ok && t);
-    chip.className = 'chip ' + (!open ? 'wait' : ok ? 'pass' : t ? 'stop' : 'wait');
-    chip.textContent = !open ? 'Locked' : ok ? 'Pass' : t ? 'Rule fail' : 'Pending';
+    const onlyWait = !ok && m.some(x => x[2] === 'wait') && !m.some(x => x[2] === 'hard');
+    fs.classList.toggle('fail', open && !ok && t && !onlyWait);
+    chip.className = 'chip ' + (!open ? 'wait' : ok ? 'pass' : t && !onlyWait ? 'stop' : 'wait');
+    chip.textContent = !open ? 'Locked' : ok ? 'Pass' : onlyWait ? 'Session ka wait' : t ? 'Rule fail' : 'Pending';
     // only show blocking messages once the step has been touched; show the first one only to keep it short
-    const show = !open ? [] : ok ? m : (t ? m.filter(x => x[2] === 'hard').slice(0,1) : []);
+    const wait = m.filter(x => x[2] === 'wait').map(x => ['warn', x[1]]);
+    const show = !open ? [] : ok ? m : wait.length ? wait.concat(t ? m.filter(x => x[2] === 'hard').slice(0,1) : []) : (t ? m.filter(x => x[2] === 'hard').slice(0,1) : []);
     msgs($('m' + i), show);
     if (open && !hard) hard = m.find(x => x[2] === 'hard') || null;
     if (!ok) { open = false; all = false; }
@@ -1421,7 +1423,13 @@ function evaluate(fromUser){
   // only a tap moves the verdict on, so a block that appears on its own (news time, session end) still pops up at the next tap
   if (fromUser) lastVerdict = key;
 }
-form.addEventListener('change', () => evaluate(true));
+form.addEventListener('change', e => {
+  evaluate(true);
+  if (e.target && e.target.id === 'q-lvl5' && e.target.checked && typeof patchToday === 'function') {
+    const r = gsSettings.rules.find(x => x.id === 'levels' && x.src === 'manual'), day = computeDay(tradingDate(Date.now()));
+    if (r && day.manual.levels !== true) try { patchToday({ manual: Object.assign({}, day.manual, { levels: true }) }); } catch {}
+  }
+});
 
 /* ---------- verdict pop-ups ---------- */
 const MSG = {
