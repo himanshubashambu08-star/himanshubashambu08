@@ -1,0 +1,27 @@
+{
+  "engine": {
+    "instruments": ["XAU_USD", "XAG_USD", "EUR_USD", "GBP_USD", "USD_JPY", "AUD_USD", "USD_CAD"],
+    "instrument_types": ["CURRENCY", "METAL"],
+    "entry_timeframe": "H1",
+    "trend_timeframe": "H4",
+    "breakeven_at_r": 1.0,
+    "trail_start_r": 1.5,
+    "trail_atr_mult": 1.0,
+    "blackout_utc": []
+  },
+  "strategy": {
+    "htf_ema_fast": 50,
+    "htf_ema_slow": 200,
+    "ltf_ema_pullback": 20,
+    "atr_stop_mult": 1.5
+  },
+  "risk": {
+    "risk_per_trade_pct": 0.5,
+    "daily_loss_limit_pct": 2.0,
+    "max_drawdown_pct": 10.0,
+    "max_open_trades": 5,
+    "max_trades_per_instrument": 1,
+    "max_trades_per_currency": 2,
+    "reward_risk": 2.0
+  }
+}

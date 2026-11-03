@@ -1,0 +1,6 @@
+.env
+config.json
+state-*.json
+journal-*.csv
+bot.log
+__pycache__/
