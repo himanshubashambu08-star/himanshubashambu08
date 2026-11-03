@@ -1,4 +1,4 @@
-// The Trade tab starts a new day at the 6 PM ET reset (test mode, offline).
+// The Trade tab starts a new day at the 5 PM ET close (test mode, offline).
 // Run from the repo root:  node tests/trade-gate/day-reset.test.js   (needs Playwright + Chromium)
 const http = require('http');
 const fs = require('fs');
@@ -47,24 +47,41 @@ async function test(name, fn) { try { await fn(); console.log('ok   -', name); }
   };
   const errors = [];
 
-  const before = await open('2026-11-11T22:50:00Z'); // 5:50 PM ET, same trading day
-  await test('before 6 PM ET: two losses lock the day', async () => {
+  const before = await open('2026-11-11T21:50:00Z'); // 4:50 PM ET, same trading day
+  await test('before 5 PM ET: two losses lock the day, with a countdown to the new day', async () => {
     assert.strictEqual(await text(before, '#d-count'), '2'); assert.strictEqual(await text(before, '#d-pnl'), '−$200');
     assert.ok(await before.isVisible('#locked-title')); assert.match(await text(before, '#locked-title'), /Do loss = band/);
+    assert.match(await text(before, '#locked-note'), /Naya din 5:00 PM ET pe · 00:(09:\d\d|10:00) baaki/);
   });
-  await test('crossing 6 PM ET starts the new day without a reload', async () => {
-    await before.clock.runFor(25 * 60e3); // → 6:15 PM ET
+  await test('crossing 5 PM ET starts the new day without a reload', async () => {
+    await before.clock.runFor(25 * 60e3); // → 5:15 PM ET
     assert.strictEqual(await text(before, '#d-count'), '0'); assert.strictEqual(await text(before, '#d-pnl'), '$0');
     assert.ok(!(await before.isVisible('#locked-title'))); assert.match(await text(before, '#app'), /Trading allowed/);
   });
   await before.close();
 
   const after = await open('2026-11-11T23:12:00Z'); // 6:12 PM ET → trading day Thu 12 Nov
-  await test('opened after 6 PM ET: fresh day, journal keeps yesterday', async () => {
+  await test('opened after 5 PM ET: fresh day, journal keeps yesterday', async () => {
     assert.strictEqual(await text(after, '#d-count'), '0');
     assert.ok(!(await after.isVisible('#locked-title')));
     await after.click('#tab-journal');
     assert.match(await text(after, '#journal'), /−\$200/);
+  });
+  await test('5:01 PM ET (real mode): market band with the open countdown, old 6 PM setting moved to 5 PM', async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    page.on('pageerror', e => errors.push(e.message));
+    await page.clock.install({ time: new Date('2026-11-11T22:01:00Z') }); // Wed 5:01 PM ET
+    await page.route(/gstatic\.com|faireconomy\.media/, r => r.abort());
+    await page.addInitScript(() => { localStorage.setItem('gtd.test', 'false'); localStorage.setItem('gtd.gs', JSON.stringify({ on: true, reset: '18:00' })); });
+    await page.goto(base + '/trade-gate/index.html');
+    await page.evaluate(() => { document.getElementById('auth').hidden = true; document.getElementById('app').hidden = false; });
+    await page.click('#tab-settings'); await page.click('#acct summary'); await page.setInputFiles('#bk-file', file);
+    await page.waitForTimeout(300); await page.clock.runFor(2000);
+    if (await page.isVisible('#focus-start')) await page.click('#fs-ok');
+    await page.click('#tab-trade');
+    assert.strictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('gtd.gs')).reset || ''), '17:00');
+    assert.match(await text(page, '#status'), /Khulne me 00:5\d:\d\d/);
+    await page.close();
   });
   await test('no page errors', async () => assert.deepStrictEqual(errors, []));
 

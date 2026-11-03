@@ -728,7 +728,7 @@ const R = { tp:15, lots:2, perDollar:10 };
 const PER = R.lots * R.perDollar; // $ per $1 move
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? '−$' : '$') + Math.abs(Math.round(n)).toLocaleString();
-// "today" = the CME trading day (a new day starts at the 6 PM ET reset), same as the Growth tab
+// "today" = the CME trading day (a new day starts at the 5 PM ET close), same as the Growth tab
 const calDate = () => { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const today = () => { try { return tradingDate(Date.now()); } catch { return calDate(); } };
 // a trade's trading day (from its time, so trades saved before this change still land on the right day)
@@ -1644,10 +1644,11 @@ const fmtLeft = ms => { const t = Math.max(0, Math.ceil(ms / 1000)), m = Math.fl
 function tickCooldown(until){
   const left = until - Date.now();
   $('locked-timer').textContent = fmtLeft(left);
-  $('status-text').textContent = `Cooldown: ${fmtLeft(left)} baaki. Abhi trade nahi.`;
+  if (!marketState().closed) $('status-text').textContent = `Cooldown: ${fmtLeft(left)} baaki. Abhi trade nahi.`;
 }
 setInterval(() => {
   if (!$('status-sub').hidden && marketState().closed) $('status-sub').textContent = openCountdown();
+  if (!$('locked-card').hidden && !cooldownActive) $('locked-note').textContent = `Naya din ${resetLabel()} ET pe · ${resetCountdown()} baaki. Tab checklist apne aap khul jayegi.`;
   if (!cooldownActive) return;
   const info = dayInfo();
   if (info.cooldownUntil) tickCooldown(info.cooldownUntil); else renderAll();
@@ -1686,10 +1687,13 @@ const GS_DEFAULT_RULES = [
   { id: 'eod', cat: 'review', label: 'Din ka note: ek galti + ek achhi baat', pts: 5, src: 'eod' }
 ];
 const GS_AUTO = { gate: 1, lot: 1, sl: 1, target: 1, reentry: 1, stops: 1, window: 1, dll: 1, shots: 1, eod: 1 };
-const defaultGS = () => ({ on: true, noTradeFull: true, reset: '18:00', winStart: '20:00', winEnd: '12:00', target: 90, rules: GS_DEFAULT_RULES.map(r => Object.assign({}, r)),
+const defaultGS = () => ({ on: true, noTradeFull: true, reset: '17:00', resetV: 2, winStart: '20:00', winEnd: '12:00', target: 90, rules: GS_DEFAULT_RULES.map(r => Object.assign({}, r)),
   focus: { on: true, gateTick: true, notify: false, notifyTime: '20:00' } });
 const FC = () => Object.assign({ on: true, gateTick: true, notify: false, notifyTime: '20:00' }, gsSettings.focus || {});
-let gsSettings = Object.assign(defaultGS(), LS.get('gtd.gs') || {});
+// old default reset was 6 PM ET; gold closes at 5 PM, so move the untouched default once
+const migrateGS = g => { if (!g.resetV) { if (!g.reset || g.reset === '18:00') g.reset = '17:00'; g.resetV = 2; g._migrated = true; } return g; };
+let gsSettings = migrateGS(Object.assign(defaultGS(), LS.get('gtd.gs') || {}, { resetV: (LS.get('gtd.gs') || {}).resetV }));
+if (gsSettings._migrated) { delete gsSettings._migrated; LS.set('gtd.gs', gsSettings); }
 let scoreDocs = LS.get('gtd.scores') || {};
 let weeklyDocs = LS.get('gtd.weekly') || {};
 let gsScoresCol = null, gsRef = null, gsWeeklyCol = null, gsProofCol = null, gsUnsubs = [];
@@ -1700,7 +1704,7 @@ function growthStart(userDoc){
   gsWeeklyCol = userDoc.collection('weeklyReports');
   gsProofCol = userDoc.collection('eodProof');
   gsRef = userDoc.collection('meta').doc('growthScoreSettings');
-  gsUnsubs.push(gsRef.onSnapshot(sn => { if (sn.exists) { gsSettings = Object.assign(defaultGS(), sn.data()); LS.set('gtd.gs', gsSettings); syncGSUI(); renderGrowth(); } }, () => {}));
+  gsUnsubs.push(gsRef.onSnapshot(sn => { if (sn.exists) { const d = sn.data(); gsSettings = migrateGS(Object.assign(defaultGS(), d, { resetV: d.resetV })); const mig = gsSettings._migrated; delete gsSettings._migrated; LS.set('gtd.gs', gsSettings); if (mig) saveGS(); syncGSUI(); renderGrowth(); } }, () => {}));
   gsUnsubs.push(gsScoresCol.onSnapshot(sn => { scoreDocs = {}; sn.docs.forEach(d => { scoreDocs[d.id] = d.data(); }); LS.set('gtd.scores', scoreDocs); renderGrowth(); }, () => {}));
   gsUnsubs.push(gsWeeklyCol.onSnapshot(sn => { weeklyDocs = {}; sn.docs.forEach(d => { weeklyDocs[d.id] = d.data(); }); LS.set('gtd.weekly', weeklyDocs); renderGrowth(); }, () => {}));
 }
@@ -1709,8 +1713,16 @@ function saveGS(){ LS.set('gtd.gs', gsSettings); if (gsRef) gsRef.set(gsSettings
 function saveScoreDoc(doc){ scoreDocs[doc.id] = doc; LS.set('gtd.scores', scoreDocs); if (gsScoresCol) gsScoresCol.doc(doc.id).set(doc).catch(() => {}); }
 function saveWeekly(doc){ weeklyDocs[doc.id] = doc; LS.set('gtd.weekly', weeklyDocs); if (gsWeeklyCol) gsWeeklyCol.doc(doc.id).set(doc).catch(() => {}); }
 
-// trading day: after the reset time (default 6 PM ET) it is already the next day's session
-function tradingDate(ms){ const d = new Date(ms); const day = etDate(d); return etMinutes(d) >= hm2min(gsSettings.reset || '18:00') ? nextDate(day) : day; }
+// trading day: after the reset time (default 5 PM ET, when gold closes) it is already the next day's session
+function tradingDate(ms){ const d = new Date(ms); const day = etDate(d); return etMinutes(d) >= hm2min(gsSettings.reset || '17:00') ? nextDate(day) : day; }
+// time left until the next day reset
+const resetLabel = () => minLabel(hm2min(gsSettings.reset || '17:00'));
+function resetCountdown(){
+  const now = Date.now(), r = hm2min(gsSettings.reset || '17:00'), m = etMinutes(new Date(now));
+  let left = ((r - m + 1440) % 1440 || 1440) * 60 - Math.floor(now / 1000) % 60;
+  const p2 = n => String(n).padStart(2, '0');
+  return `${p2(Math.floor(left / 3600))}:${p2(Math.floor(left % 3600 / 60))}:${p2(left % 60)}`;
+}
 const prevDate = d => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - 1); return x.toISOString().slice(0, 10); };
 const shortDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 function inGsWindow(ms){ const m = etMinutes(new Date(ms)), a = hm2min(gsSettings.winStart || '20:00'), b = hm2min(gsSettings.winEnd || '12:00'); return a <= b ? m >= a && m < b : m >= a || m < b; }
@@ -2200,7 +2212,7 @@ async function weeklyTips(st){
 function syncGSUI(){
   if (typeof syncFocusUI === 'function' && $('fc-on')) try { syncFocusUI(); } catch {}
   $('gs-on').checked = !!gsSettings.on; $('gs-ntf').checked = !!gsSettings.noTradeFull;
-  $('gs-reset').value = gsSettings.reset || '18:00'; $('gs-target').value = gsSettings.target ?? 90;
+  $('gs-reset').value = gsSettings.reset || '17:00'; $('gs-target').value = gsSettings.target ?? 90;
   $('gs-wstart').value = gsSettings.winStart || '20:00'; $('gs-wend').value = gsSettings.winEnd || '12:00';
   const box = $('gs-rules'); box.innerHTML = '';
   gsSettings.rules.forEach((r, i) => {
@@ -2423,16 +2435,16 @@ function renderAll(){
   const st = $('status');
   $('status-sub').hidden = true;
   if (info.open) { st.className = 'status open'; $('status-text').textContent = 'Trade open hai. Close karke result bharo, tabhi agla trade khulega.'; }
+  else if (marketState().closed) { st.className = 'status lock'; $('status-text').textContent = marketState().msg; $('status-sub').textContent = openCountdown(); $('status-sub').hidden = false; }
   else if (info.cooldownUntil) { st.className = 'status lock'; $('status-text').textContent = `Cooldown: ${fmtLeft(info.cooldownUntil - Date.now())} baaki. Abhi trade nahi.`; }
   else if (info.lock) { st.className = 'status lock'; $('status-text').textContent = info.lock[0] + '. Aaj aur trade nahi.'; }
-  else if (marketState().closed) { st.className = 'status lock'; $('status-text').textContent = marketState().msg; $('status-sub').textContent = openCountdown(); $('status-sub').hidden = false; }
   else { st.className = 'status ok'; $('status-text').textContent = 'Trading allowed. Upar se neeche tap karte jao.'; }
   $('open-card').hidden = !info.open;
   $('locked-card').hidden = !(info.lock && !info.open);
   form.hidden = !!(info.open || info.lock || marketState().closed);
   if (info.lock) { $('locked-title').textContent = info.lock[0]; $('locked-text').textContent = info.lock[1]; }
   $('locked-timer').hidden = !info.cooldownUntil;
-  $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : 'Kal naya din. Checklist kal apne aap khul jayegi.';
+  $('locked-note').textContent = info.cooldownUntil ? 'Timer khatam hote hi checklist apne aap khul jayegi.' : `Naya din ${resetLabel()} ET pe · ${resetCountdown()} baaki. Tab checklist apne aap khul jayegi.`;
   cooldownActive = !!info.cooldownUntil;
   renderProp();
   if (!testMode) checkEvalPass();
