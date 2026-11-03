@@ -1,5 +1,5 @@
 // Trading-day boundary tests for Gold Trade Gate's Daily Growth Score.
-// A trade placed Sunday after the 6 PM ET reset belongs to Monday's trading day
+// Trading day: the day resets at the 5 PM ET close, so a trade Sunday evening (market opens 6 PM) belongs to Monday
 // and to Monday's weekly-report week.
 //
 // Run from the repo root:  node tests/trade-gate/trading-day.test.js
@@ -57,7 +57,8 @@ async function test(name, fn) {
 
   await test('Sunday 6:30 PM ET counts as Monday', async () => assert.strictEqual(await td('2026-11-08T23:30:00Z'), '2026-11-09'));
   await test('Sunday 6:00 PM ET exactly counts as Monday', async () => assert.strictEqual(await td('2026-11-08T23:00:00Z'), '2026-11-09'));
-  await test('Sunday 5:59 PM ET stays Sunday', async () => assert.strictEqual(await td('2026-11-08T22:59:00Z'), '2026-11-08'));
+  await test('Sunday 5:00 PM ET (reset) already counts as Monday', async () => assert.strictEqual(await td('2026-11-08T22:00:00Z'), '2026-11-09'));
+  await test('Sunday 4:59 PM ET stays Sunday', async () => assert.strictEqual(await td('2026-11-08T21:59:00Z'), '2026-11-08'));
   await test('Monday 10 AM ET is Monday', async () => assert.strictEqual(await td('2026-11-09T15:00:00Z'), '2026-11-09'));
   await test('Monday 7 PM ET counts as Tuesday', async () => assert.strictEqual(await td('2026-11-10T00:00:00Z'), '2026-11-10'));
   await test('Sunday 6:30 PM on DST-start day (EDT) counts as Monday', async () => assert.strictEqual(await td('2026-03-08T22:30:00Z'), '2026-03-09'));
