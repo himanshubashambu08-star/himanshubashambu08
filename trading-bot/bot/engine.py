@@ -376,7 +376,8 @@ class Engine:
             self.status = {
                 "time": now, "nav": account.nav, "balance": account.balance, "currency": account.currency,
                 "day_start_nav": self.risk.state.get("day_start_nav"),
-                "open_trades": [t.__dict__ for t in self.broker.open_trades()],
+                "open_trades": [{**t.__dict__, "init_stop": (self.risk.state["trades"].get(str(t.id)) or {}).get("stop"),
+                                 "ref": A.trade_refs.get(str(t.id))} for t in self.broker.open_trades()],
                 "no_new_trades": self.why_no_new_trades(now),
                 "in_session": self.in_session(now), "session_text": self.session_text(now),
                 "params": params, "reward_risk": self.reward_risk(),

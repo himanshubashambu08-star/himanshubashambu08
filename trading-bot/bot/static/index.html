@@ -161,6 +161,8 @@ details summary{cursor:pointer;font-weight:600}
 .cur{font:600 12px var(--f-num);padding:1px 6px;border-radius:5px;background:var(--bg);border:1px solid var(--line)}
 .imp{font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;text-transform:uppercase}
 .imp.High{background:var(--bad-soft);color:var(--bad)}.imp.Medium{background:var(--warn-soft);color:var(--warn)}
+.otr{padding:10px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:3px}.otr:first-of-type{border-top:none}
+.otr a{color:var(--gold);font-weight:600;text-decoration:none}
 .rc{display:flex;flex-direction:column;gap:1px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
 .rc:first-child{border-top:none}.rc b{font:500 14px var(--f-num)}
 .chat{display:flex;flex-direction:column;gap:8px}
@@ -421,13 +423,31 @@ function viewChart(inst){
   ${tr.length ? `<div class="card"><h2>🎯 Is pair ka open trade</h2>${openTrades({open_trades: tr})}</div>` : ''}
   ${js.length ? `<div class="card"><h2>🧭 Is pair ke signals</h2></div>${js.map(journeyCard).join('')}` : ''}`;
 }
+function liveR(t, price){
+  const risk = t.init_stop != null ? Math.abs(t.entry - t.init_stop) : null;
+  return risk ? (price - t.entry) * Math.sign(t.units) / risk : null;
+}
+function openList(){
+  const tr = (S.status || {}).open_trades || [];
+  if (!tr.length) return `<div class="card" id="c-open-list"><h2>🎯 Chal rahe trades (0)</h2><p class="empty">Abhi koi trade open nahi hai.</p></div>`;
+  const byInst = Object.fromEntries((S.charts || []).map(c => [c.instrument, c]));
+  return `<div class="card" id="c-open-list"><h2>🎯 Chal rahe trades (${tr.length})</h2>${tr.map(t => {
+    const id = esc(t.instrument), price = byInst[t.instrument]?.price ?? t.entry, r = liveR(t, price);
+    return `<div class="otr"><div class="row"><b>${esc(pair(t.instrument))} ${t.units > 0 ? '<span class="good">▲ BUY</span>' : '<span class="bad">▼ SELL</span>'} <span class="small muted">${Math.abs(t.units)}</span></b>
+        <b class="num ${r == null ? '' : r >= 0 ? 'good' : 'bad'}" data-trr="${esc(t.id)}">${r == null ? '' : (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'}</b></div>
+      <div class="small muted">Entry ${px(t.entry)} · Abhi <b class="num" data-px="${id}">${px(price)}</b> · SL ${px(t.stop)}${t.init_stop != null && Math.abs(t.stop - t.init_stop) > 1e-12 ? ' (move hua)' : ''} · TP ${px(t.take_profit)}</div>
+      <div class="small">P&amp;L <b class="${t.unrealized_pl >= 0 ? 'good' : 'bad'}">${t.unrealized_pl >= 0 ? '+' : ''}${money(t.unrealized_pl, S.status.currency)}</b> ·
+        <a href="#chart/${id}" data-go="chart/${id}">🔍 Chart</a>${t.ref ? ` · <a href="#journeys" data-ref="${esc(t.ref)}">🧭 Safar</a>` : ''}</div></div>`; }).join('')}</div>`;
+}
 function viewCharts(){
-  const charts = (S.charts || []).filter(c => cfilter === 'all' || c.state === cfilter);
+  const openSet = new Set(((S.status || {}).open_trades || []).map(t => t.instrument));
+  const charts = (S.charts || []).filter(c => cfilter === 'all' || (cfilter === 'open' ? openSet.has(c.instrument) : c.state === cfilter));
   const n = s => (S.charts || []).filter(c => c.state === s).length;
   const btn = (k, t) => `<button class="${cfilter === k ? 'on' : ''}" onclick="cfilter='${k}';render()">${t}</button>`;
   return `<div class="card" id="c-charts"><div class="row"><h2>📈 Saare charts (${(S.charts || []).length})</h2><span id="livenote">${liveNote()}</span></div>
     <div class="legend" style="margin-bottom:8px"><span><b class="good">SIGNAL</b>: abhi rules poore</span><span><b style="color:var(--gold-hi)">BAN RAHA</b>: price zone ki taraf aa raha</span><span><b style="color:#4c7bd9">WATCH</b>: trend hai, price door</span><span><b>KUCH NAHI</b>: trend nahi</span><span>Peeli patti = entry zone · Purple line = EMA20 · Aakhri candle live chalti hai</span></div>
-    <div class="seg">${btn('all','Sab')}${btn('signal','Signal '+n('signal'))}${btn('forming','Ban raha '+n('forming'))}${btn('watch','Watch '+n('watch'))}${btn('none','Kuch nahi '+n('none'))}</div></div>
+    <div class="seg">${btn('all','Sab')}${btn('open','🎯 Open trades '+openSet.size)}${btn('signal','Signal '+n('signal'))}${btn('forming','Ban raha '+n('forming'))}${btn('watch','Watch '+n('watch'))}${btn('none','Kuch nahi '+n('none'))}</div></div>
+  ${openSet.size || cfilter === 'open' ? openList() : ''}
   <div class="cgrid">${charts.map(c => chartCard(c)).join('') || '<p class="empty">Is group mein abhi koi chart nahi.</p>'}</div>`;
 }
 function agentCharts(id){
@@ -761,10 +781,12 @@ function applyLive(redraw){
   document.querySelectorAll('[data-px]').forEach(el => { const c = (S.charts || []).find(x => x.instrument === el.dataset.px); if (c) el.textContent = px(c.price); });
   document.querySelectorAll('[data-live]').forEach(el => { const p = (L.prices || {})[el.dataset.live]; el.classList.toggle('on', !!(p && p.open)); el.title = p && p.open ? 'Live' : 'Market band'; });
   const ln = document.getElementById('livenote'); if (ln) ln.innerHTML = liveNote();
+  ((S.status || {}).open_trades || []).forEach(t => { const el = document.querySelector(`[data-trr="${CSS.escape(String(t.id))}"]`); const p = (L.prices || {})[t.instrument];
+    if (!el || !p) return; const r = liveR(t, p.mid); if (r == null) return; el.textContent = (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'; el.className = 'num ' + (r >= 0 ? 'good' : 'bad'); });
   if (redraw) drawCharts();
 }
 async function tickLive(){
-  if (!document.hidden && S && document.querySelector('canvas[data-inst]') && !LIVE.busy) {
+  if (!document.hidden && S && document.querySelector('canvas[data-inst], [data-trr]') && !LIVE.busy) {
     LIVE.busy = true;
     try { const r = await fetch('/api/prices', {cache:'no-store'}); if (r.ok) { LIVE.data = await r.json(); applyLive(true); } } catch (e) {}
     LIVE.busy = false;
