@@ -145,8 +145,10 @@ class RiskManager:
         return units if units >= instrument.min_units else 0
 
     # ---- remember initial risk per trade (for breakeven / trailing) --
-    def remember(self, trade_id, entry, stop, atr):
-        self.state["trades"][str(trade_id)] = {"entry": entry, "stop": stop, "atr": atr}
+    def remember(self, trade_id, entry, stop, atr, instrument=None, units=None, opened=None, tp=None):
+        """Saved to disk, so a restart still knows which trades the bot opened (and can record their result)."""
+        self.state["trades"][str(trade_id)] = {"entry": entry, "stop": stop, "atr": atr, "instrument": instrument,
+                                               "units": units, "opened": opened, "tp": tp}
         self.save()
 
     def forget_closed(self, open_ids):

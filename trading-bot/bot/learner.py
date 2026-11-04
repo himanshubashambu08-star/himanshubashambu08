@@ -159,6 +159,9 @@ class Learner:
               real_r REAL, mistakes TEXT);
             CREATE TABLE IF NOT EXISTS lessons(day TEXT, kind TEXT, text TEXT, data TEXT);
             CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE IF NOT EXISTS closed(
+              trade_id TEXT PRIMARY KEY, instrument TEXT, side INTEGER, units REAL, entry REAL, exit REAL,
+              stop REAL, tp REAL, r REAL, pl REAL, opened REAL, closed REAL, how TEXT, ref TEXT);
         """)
 
     # ---- key/value ---------------------------------------------------
@@ -181,6 +184,10 @@ class Learner:
     # ---- recording ---------------------------------------------------
     def record_signal(self, sig, taken, skip_reason=None, trade_id=None, entry=None):
         with self.lock:
+            dup = self.db.execute("SELECT id FROM signals WHERE instrument=? AND time=? AND side=?",
+                                  (sig.instrument, sig.time, sig.side)).fetchone()
+            if dup:                                  # same signal seen again (e.g. after a restart): keep one row
+                return dup[0]
             cur = self.db.execute(
                 "INSERT INTO signals(instrument, side, time, entry, stop_dist, features, taken, skip_reason, trade_id)"
                 " VALUES(?,?,?,?,?,?,?,?,?)",
@@ -229,6 +236,28 @@ class Learner:
             self.last_resolved.append({**row, "r": r, "bars_held": bars, "max_r": max_r, "mistakes": tags})
             done += 1
         return done
+
+    # ---- closed trades (the bot's real trade history) ------------------------
+    def record_close(self, **row):
+        cols = ["trade_id", "instrument", "side", "units", "entry", "exit", "stop", "tp", "r", "pl", "opened",
+                "closed", "how", "ref"]
+        with self.lock:
+            self.db.execute(f"INSERT OR REPLACE INTO closed({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
+                            [row.get(c) for c in cols])
+            self.db.commit()
+
+    def closed_trades(self, limit=200):
+        with self.lock:
+            rows = self.db.execute("SELECT * FROM closed ORDER BY closed DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def closed_summary(self, since=0):
+        with self.lock:
+            rows = self.db.execute("SELECT r, pl FROM closed WHERE closed>=?", (since,)).fetchall()
+        rs = [r["r"] or 0 for r in rows]
+        pls = [r["pl"] for r in rows if r["pl"] is not None]
+        return {**_card_r(rs), "wins": sum(1 for x in rs if x > 0.05), "losses": sum(1 for x in rs if x < -0.05),
+                "be": sum(1 for x in rs if abs(x) <= 0.05), "pl": round(sum(pls), 2)}
 
     def set_real_result(self, trade_id, real_r):
         with self.lock:

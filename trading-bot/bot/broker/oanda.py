@@ -129,6 +129,14 @@ class OandaBroker(Broker):
             unrealized_pl=float(t.get("unrealizedPL", 0)),
         ) for t in out]
 
+    def closed_trade(self, trade_id):
+        t = self._req("GET", self._acct(f"/trades/{trade_id}"))["trade"]
+        if t.get("state") != "CLOSED" or "averageClosePrice" not in t:
+            return None
+        return {"price": float(t["averageClosePrice"]), "pl": float(t.get("realizedPL", 0)),
+                "time": _ts(t["closeTime"]) if t.get("closeTime") else None,
+                "instrument": t.get("instrument"), "units": float(t.get("initialUnits", 0))}
+
     def closed_price(self, trade_id):
         t = self._req("GET", self._acct(f"/trades/{trade_id}"))["trade"]
         if t.get("state") != "CLOSED" or "averageClosePrice" not in t:

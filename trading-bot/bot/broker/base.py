@@ -29,3 +29,8 @@ class Broker(ABC):
     def closed_price(self, trade_id):
         """Average close price of a finished trade, or None if unknown / still open."""
         return None
+
+    def closed_trade(self, trade_id):
+        """{"price", "pl" (account currency or None), "time", "instrument", "units"} of a finished trade, or None."""
+        px = self.closed_price(trade_id)
+        return None if px is None else {"price": px, "pl": None, "time": None, "instrument": None, "units": None}

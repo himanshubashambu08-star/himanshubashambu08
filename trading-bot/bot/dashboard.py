@@ -3,6 +3,7 @@
 Binds to 127.0.0.1 by default. To see it from a VPS, use an SSH tunnel:
     ssh -L 8050:127.0.0.1:8050 you@your-server   then open http://localhost:8050
 """
+import gzip
 import json
 import os
 import threading
@@ -14,8 +15,16 @@ STATIC = os.path.join(os.path.dirname(__file__), "static", "index.html")
 def make_handler(engine):
     class Handler(BaseHTTPRequestHandler):
         def _send(self, code, body, ctype):
+            if len(body) > 2048 and "gzip" in (self.headers.get("Accept-Encoding") or ""):
+                body = gzip.compress(body, 5)
+                gz = True
+            else:
+                gz = False
             self.send_response(code)
             self.send_header("Content-Type", ctype)
+            if gz:
+                self.send_header("Content-Encoding", "gzip")
+            self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)

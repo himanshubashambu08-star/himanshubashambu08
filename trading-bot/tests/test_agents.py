@@ -101,3 +101,33 @@ class SlTpAmounts(unittest.TestCase):
             self.assertAlmostEqual(t["sl_amt"], -risk, places=1)
             self.assertAlmostEqual(t["tp_amt"], 2 * risk, places=1)
             self.assertLessEqual(-t["sl_amt"], 100.0 + 1e-6)     # <= 1% of 10k as configured
+
+
+class RestartSafety(unittest.TestCase):
+    def test_close_recorded_after_restart_and_no_rescan(self):
+        from bot.engine import Engine
+        with tempfile.TemporaryDirectory() as d:
+            b, e, clock = make_engine(d)
+            st, mem, ag = (os.path.join(d, x) for x in ("s.json", "m.db", "a.json"))
+            cfg = {"engine": {"instruments": ["XAU_USD"], "kill_file": os.path.join(d, "STOP"), "entry_sessions_ny": []},
+                   "strategy": {"rsi_buy_min": 0, "rsi_buy_max": 100}, "news": {"enabled": False},
+                   "learning": {"reports_dir": d}}
+            e = Engine(b, cfg, state_path=st, memory_path=mem, agents_path=ag, clock=lambda: clock[0])
+            e.tick()
+            self.assertEqual(len(b.orders), 1)
+            t = b.orders[0]
+            # restart: brand-new engine object, same files
+            e2 = Engine(b, cfg, state_path=st, memory_path=mem, agents_path=ag, clock=lambda: clock[0])
+            clock[0] += 30
+            e2.tick()
+            self.assertEqual(len(e2.learner._rows("1=1")), 1)          # same candle not scanned twice
+            b.move("XAU_USD", t.take_profit + 0.1)                      # target hit while "restarted"
+            clock[0] += 30
+            e2.tick()
+            closed = e2.learner.closed_trades()
+            self.assertEqual(len(closed), 1)
+            self.assertEqual(closed[0]["how"], "TP 🎯")
+            self.assertAlmostEqual(closed[0]["r"], 2.0, places=2)
+            self.assertGreater(closed[0]["pl"], 0)
+            self.assertEqual(e2.learner.closed_summary()["wins"], 1)
+            self.assertNotIn(str(t.id), e2.risk.state["trades"])

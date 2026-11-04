@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from . import strategy
 from .agents import AgentLog
 from .journal import Journal
-from .learner import Learner, MISTAKE_WORDS, describe
+from .learner import Learner, MISTAKE_WORDS
 from .models import GRANULARITY_SECONDS
 from .news import NewsCalendar
 from .brain import Brain
@@ -225,20 +225,35 @@ class Engine:
         self.report_news(now)
         trades = self.broker.open_trades()
         self._spot_closed(trades)
-        self.risk.forget_closed([t.id for t in trades])
         self.manage(trades)
 
         tf = GRANULARITY_SECONDS[self.cfg["entry_timeframe"]]
         bucket = int((now - self.cfg["scan_delay_seconds"]) // tf)
+        if self.last_bucket is None:
+            self.last_bucket = self.risk.state.get("last_bucket")   # after a restart, never rescan the same candle
         new_candle = bucket != self.last_bucket
         if new_candle or now - self.last_board >= self.cfg["board_refresh_seconds"]:
             self.refresh(account, trades, now, look_for_trades=new_candle)
             self.last_board = now
+            if new_candle:
+                self.risk.state["last_bucket"] = bucket
+                self.risk.save()
             self.last_bucket = bucket
 
         if self.cfg["learn"] and prev_day and prev_day != self.risk.state["day"] \
-                and self.learner.get("last_review_day") != prev_day:
-            self.review(prev_day)
+                and self.learner.get("last_review_day") != prev_day and not getattr(self, "_reviewing", False):
+            # minutes of history downloads: run beside the loop so open trades keep being managed
+            self._reviewing = True
+
+            def run(day=prev_day):
+                try:
+                    self.review(day)
+                finally:
+                    self._reviewing = False
+            if getattr(self, "background_review", True):
+                threading.Thread(target=run, daemon=True).start()
+            else:
+                run()
         self.brain.maybe_brief(now, self._brief_done)
         if self.cfg["learn"] and not getattr(self, "_validated_once", False) and not self.learner.get("report_card"):
             self._validated_once = True
@@ -339,10 +354,12 @@ class Engine:
                                                   if self.learner.filters() else ""))
         for inst, sig in signals:
             ref = ref_for(inst.name, sig.time)
+            if ref in A.journeys and A.journeys[ref]["steps"]:
+                continue                       # already handled this exact signal
             A.journey_start(ref, inst.name, sig.side, sig.time, sig.reason)
             f = sig.features
             A.step(ref, "scanner", "pass", f"{pair(inst.name)} ka {tf_name} candle {ny_time(sig.time + tf_s)} pe close hua")
-            A.step(ref, "reader", "pass", f"Chart pe signal dikha")
+            A.step(ref, "reader", "pass", "Chart pe signal dikha")
             A.step(ref, "rules", "pass", f"✓ H4 trend {'up' if sig.side > 0 else 'down'} · ✓ EMA pullback + rejection · "
                    f"✓ RSI {f.get('rsi')} · SL distance {pf(sig.stop_distance)}")
             A.count("rules", "passed")
@@ -425,7 +442,8 @@ class Engine:
             stop = entry - sig.side * sig.stop_distance
             tp = entry + sig.side * rr * sig.stop_distance
             trade = self.broker.market_order(inst.name, sig.side * units, stop, tp)
-            self.risk.remember(trade.id, trade.entry, stop, sig.atr)
+            self.risk.remember(trade.id, trade.entry, stop, sig.atr, instrument=inst.name, units=trade.units,
+                               opened=self.clock(), tp=tp)
             self.known_trades[str(trade.id)] = inst.name
             A.trade_refs[str(trade.id)] = ref
             if self.cfg["learn"]:
@@ -519,32 +537,65 @@ class Engine:
 
     # ---- Exit Planner ------------------------------------------------------
     def _spot_closed(self, open_trades):
+        """A trade the bot opened is no longer open: record how it ended. Works across restarts, because the
+        list of bot trades lives in the saved risk state, not only in memory."""
         A = self.agents
         open_ids = {str(t.id) for t in open_trades}
-        for tid in [t for t in self.known_trades if t not in open_ids]:
-            inst = self.known_trades.pop(tid)
-            info = self.risk.state["trades"].get(tid)
+        for tid in [t for t in list(self.risk.state["trades"]) if t not in open_ids]:
+            info = self.risk.state["trades"].get(tid) or {}
             ref = A.trade_refs.get(tid)
             try:
-                px = self.broker.closed_price(tid)
+                c = self.broker.closed_trade(tid)
             except Exception as e:
-                log.error("closed price %s: %s", tid, e)
-                px = None
-            if info and px is not None:
-                risk = abs(info["entry"] - info["stop"])
-                side = 1 if info["stop"] < info["entry"] else -1
-                r = (px - info["entry"]) * side / risk if risk else 0.0
-                self.learner.set_real_result(tid, r)
-                word = "TARGET 🎯" if r > 0.5 else ("breakeven" if abs(r) < 0.05 else ("STOP LOSS" if r < 0 else "profit"))
-                A.did("manager", f"{pair(inst)} close @ {pf(px)}: {r:+.2f}R ({word})", ref,
-                      "good" if r > 0 else ("bad" if r < 0 else "info"))
-                A.count("manager", "closed")
-                A.count("manager", "r_x100", int(round(r * 100)))
-                A.step(ref, "manager", "pass", f"Trade close @ {pf(px)}: {r:+.2f}R ({word})")
-                A.mark(ref, state="khatam", result=f"{r:+.2f}R", r=round(r, 2))
-                A.handoff("manager", "learner", f"{pair(inst)} ka result {r:+.2f}R seekhne ko", ref)
-                self.journal.write("close", inst, side, entry=info["entry"], note=f"{r:+.2f}R exit {px}")
-                log.info("CLOSED %s %s %+.2fR", inst, tid, r)
+                log.error("closed trade %s: %s", tid, e)
+                c = None
+            if not c:                         # not readable yet: try again next tick, give up after ~10 minutes
+                info["tries"] = info.get("tries", 0) + 1
+                if info["tries"] > 30:
+                    log.warning("trade %s closed but its result could not be read; dropping it", tid)
+                    self.risk.state["trades"].pop(tid, None)
+                self.risk.save()
+                continue
+            inst = info.get("instrument") or c.get("instrument") or self.known_trades.get(tid) or "?"
+            px, entry, stop = c["price"], info.get("entry"), info.get("stop")
+            if entry is None or stop is None:
+                continue
+            risk = abs(entry - stop)
+            side = 1 if stop < entry else -1
+            r = (px - entry) * side / risk if risk else 0.0
+            tp = info.get("tp")
+            if tp is not None and risk and abs(px - tp) <= 0.15 * risk:
+                how = "TP 🎯"
+            elif abs(r) <= 0.05:
+                how = "Breakeven"
+            elif r < 0:
+                how = "SL 🛑"
+            else:
+                how = "Trailing SL (profit)"
+            units = info.get("units") or c.get("units")
+            pl = c.get("pl")
+            if pl is None and units:
+                try:
+                    pl = (px - entry) * units * self.broker.quote_to_home(inst)
+                except Exception:
+                    pl = None
+            self.learner.set_real_result(tid, r)
+            self.learner.record_close(trade_id=tid, instrument=inst, side=side, units=units, entry=entry, exit=px,
+                                      stop=stop, tp=tp, r=round(r, 3), pl=None if pl is None else round(pl, 2),
+                                      opened=info.get("opened"), closed=c.get("time") or self.clock(), how=how, ref=ref)
+            money = f" ({pl:+,.0f} {self.status.get('currency', '')})" if pl is not None else ""
+            A.did("manager", f"{pair(inst)} close @ {pf(px)}: {r:+.2f}R{money} · {how}", ref,
+                  "good" if r > 0.05 else ("bad" if r < -0.05 else "info"))
+            A.count("manager", "closed")
+            A.count("manager", "r_x100", int(round(r * 100)))
+            A.step(ref, "manager", "pass", f"Trade close @ {pf(px)}: {r:+.2f}R{money} · {how}")
+            A.mark(ref, state="khatam", result=f"{r:+.2f}R", r=round(r, 2))
+            A.handoff("manager", "learner", f"{pair(inst)} ka result {r:+.2f}R seekhne ko", ref)
+            self.journal.write("close", inst, side, entry=entry, note=f"{r:+.2f}R exit {px} {how}")
+            log.info("CLOSED %s %s %+.2fR %s", inst, tid, r, how)
+            self.known_trades.pop(tid, None)
+            self.risk.state["trades"].pop(tid, None)
+            self.risk.save()
 
     def manage(self, trades):
         A = self.agents
@@ -645,8 +696,12 @@ class Engine:
                     self.broker.candles(name, self.cfg["entry_timeframe"], n))
         try:
             before = len(self.learner.lessons(500))
+            names = [i.name for i in self.universe()]
+            liquid = ["EUR_USD", "GBP_USD", "USD_JPY", "XAU_USD", "AUD_USD", "USD_CAD", "NAS100_USD", "EUR_JPY",
+                      "GBP_JPY", "USD_CHF", "SPX500_USD", "XAG_USD"]
+            tune_on = [n for n in liquid if n in names] + [n for n in names if n not in liquid]
             out = self.learner.daily_review(day, history, self.params(), self.reward_risk(),
-                                            [i.name for i in self.universe()], self.cfg["breakeven_at_r"])
+                                            tune_on, self.cfg["breakeven_at_r"])
             mist = sorted(out["mistakes"].items(), key=lambda x: -x[1])
             A.did("learner", f"Daily review {day}: " + (", ".join(f"{n}× {MISTAKE_WORDS.get(k, k)}"
                                                                     for k, n in mist[:3]) or "koi galti nahi mili"))
@@ -681,6 +736,8 @@ class Engine:
             "news": [{"cur": e["currency"], "title": e["title"], "impact": e["impact"], "time_ny": ny_time(e["time"]),
                       "forecast": e["forecast"], "previous": e["previous"], "actual": e["actual"]} for e in snap["news"][:15]],
             "learning": {k: snap["learning"][k] for k in ("filters", "lessons", "mistakes_30d", "stats_30d", "params")},
+            "closed_trades": [{k: c[k] for k in ("instrument", "side", "entry", "exit", "r", "pl", "how")}
+                              for c in self.learner.closed_trades(20)],
             "settings": {"risk": st.get("risk"), "strategy": st.get("params"), "reward_risk": st.get("reward_risk")},
         }
 
@@ -759,7 +816,11 @@ class Engine:
         return {"status": status, "charts": charts, "learning": self.learner.snapshot(),
                 "news": self.news_list(self.clock()), "news_error": self.news.error,
                 "journal": self.journal.rows[-30:][::-1], **self.agents.snapshot(),
-                **({} if light else {"brain": self.brain.snapshot(), "seen": list(self.seen)})}
+                **({} if light else {"brain": self.brain.snapshot(), "seen": list(self.seen),
+                                     "closed": self.learner.closed_trades(200),
+                                     "closed_stats": {"day": self.learner.closed_summary(self.clock() - 86400),
+                                                      "week": self.learner.closed_summary(self.clock() - 7 * 86400),
+                                                      "all": self.learner.closed_summary(0)}})}
 
     def run_forever(self):
         log.info("bot started")

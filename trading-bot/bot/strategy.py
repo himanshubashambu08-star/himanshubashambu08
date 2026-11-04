@@ -120,7 +120,9 @@ def read_chart(instrument, htf_candles, ltf_candles, params=None, bars=80):
     out = {"instrument": instrument, "state": "none", "bias": bias, "score": 0,
            "note": "Abhi kaafi data nahi hai", "price": ltf_candles[-1].c if ltf_candles else None}
     show = ltf_candles[-bars:]
-    out["candles"] = [[c.time, c.o, c.h, c.l, c.c] for c in show]
+    ref = ltf_candles[-1].c if ltf_candles else 1
+    nd = 6 if abs(ref) < 20 else (4 if abs(ref) < 1000 else 2)
+    out["candles"] = [[int(c.time), round(c.o, nd), round(c.h, nd), round(c.l, nd), round(c.c, nd)] for c in show]
     if not x:
         return out
     e, r, a = x["ema"], x["rsi"], x["atr"]

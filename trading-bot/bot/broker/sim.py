@@ -1,7 +1,7 @@
 """In-memory broker for tests and dry runs. No network, no money."""
 import itertools
 
-from ..models import Account, Instrument, Price, Trade
+from ..models import Account, Price, Trade
 from .base import Broker
 
 
@@ -55,6 +55,13 @@ class SimBroker(Broker):
         exit_ = at if at is not None else self.mid[t.instrument]
         self.balance += (exit_ - t.entry) * t.units
         self.closed.append((t, exit_))
+
+    def closed_trade(self, trade_id):
+        for t, exit_ in self.closed:
+            if t.id == trade_id:
+                return {"price": exit_, "pl": (exit_ - t.entry) * t.units, "time": None,
+                        "instrument": t.instrument, "units": t.units}
+        return None
 
     def closed_price(self, trade_id):
         for t, exit_ in self.closed:

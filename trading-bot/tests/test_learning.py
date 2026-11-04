@@ -16,7 +16,13 @@ XAU = Instrument("XAU_USD", "METAL", display_precision=3, units_precision=0, min
 NOW = 1_790_000_000
 
 
-def sig(inst="EUR_USD", side=1, t=NOW - 3600 * 10, **features):
+import itertools
+_T = itertools.count()
+
+
+def sig(inst="EUR_USD", side=1, t=None, **features):
+    if t is None:
+        t = NOW - 3600 * 10 - next(_T) * 60      # every test signal is a different signal
     f = {"hour_ny": 10, "dow": 2, "rsi": 55, "trend_strength": 0.5, "dist_ema_atr": 0.2,
          "body_atr": 0.5, "spread_ratio": 0.02, "entry_ref": 1.1}
     f.update(features)
@@ -213,6 +219,7 @@ class EngineLearning(unittest.TestCase):
     def test_review_runs_when_day_rolls(self):
         with tempfile.TemporaryDirectory() as d:
             b, e, clock = make_engine(d)
+            e.background_review = False
             e.tick()
             day1 = e.risk.state["day"]
             clock[0] += 86400

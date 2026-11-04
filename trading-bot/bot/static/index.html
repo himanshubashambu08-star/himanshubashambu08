@@ -186,6 +186,7 @@ details summary{cursor:pointer;font-weight:600}
     <button role="tab" data-view="agents" aria-selected="false">🤖 Agents</button>
     <button role="tab" data-view="journeys" aria-selected="false">🧭 Trades ka safar</button>
     <button role="tab" data-view="charts" aria-selected="false">📈 Charts</button>
+    <button role="tab" data-view="closed" aria-selected="false">📒 Band trades</button>
     <button role="tab" data-view="ask" aria-selected="false">💬 Pucho</button>
     <button role="tab" data-view="news" aria-selected="false">📰 News</button>
     <button role="tab" data-view="learn" aria-selected="false">🧠 Seekhna</button>
@@ -253,6 +254,7 @@ function render(){
   else if (base === 'chart') v.innerHTML = viewChart(decodeURIComponent(route.split('/')[1] || ''));
   else if (base === 'learn') v.innerHTML = viewLearn();
   else if (base === 'news') v.innerHTML = viewNews();
+  else if (base === 'closed') v.innerHTML = viewClosed();
   else if (base === 'ask') { const q = document.getElementById('q')?.value || ''; v.innerHTML = viewAsk(); const t = document.getElementById('q'); if (t) t.value = q; }
   else v.innerHTML = viewHome();
   if (v.querySelector('canvas[data-inst]')) { applyLive(false); drawCharts(); }
@@ -557,6 +559,32 @@ function reportCard(card, st){
     <details style="margin-top:10px"><summary>Har pair ka result</summary><div style="margin-top:6px">${card.pairs.map(p => p.error ? `<div class="rc"><span>${esc(pair(p.pair))}</span><b class="muted">data nahi mila</b></div>` : rcRow(esc(pair(p.pair)), {n:p.n, win_pct:p.win_pct, total_r:p.total_r, pf:p.pf})).join('')}</div></details>
     <p class="small muted" style="margin:8px 0 0">1R = ek trade pe jitna risk. PF (profit factor) 1 se upar = jitna haara usse zyada kamaya. Purana result aage ki guarantee nahi.</p></div>`;
 }
+
+let kfilter = 'all', kperiod = 'week';
+function viewClosed(){
+  const all = S.closed || [], st = (S.closed_stats || {})[kperiod] || {}, ccy = (S.status || {}).currency || '';
+  const since = {day: Date.now()/1000 - 86400, week: Date.now()/1000 - 7*86400, all: 0}[kperiod];
+  const list = all.filter(c => (c.closed || 0) >= since).filter(c => kfilter === 'all' || (kfilter === 'win' ? c.r > 0.05 : kfilter === 'loss' ? c.r < -0.05 : Math.abs(c.r) <= 0.05));
+  const b = (k, t, v, cur) => `<button class="${cur === k ? 'on' : ''}" onclick="${v}='${k}';render()">${t}</button>`;
+  const n = f => all.filter(c => (c.closed || 0) >= since).filter(f).length;
+  return `<div class="card"><h2>📒 Band hue trades</h2>
+    <p class="small muted" style="margin:0 0 8px">Bot ke asli (demo) trades jo SL, TP, breakeven ya trailing SL pe band hue. Paisa aapke account currency mein, OANDA ke hisaab se.</p>
+    <div class="seg" style="margin-bottom:8px">${b('day','24 ghante','kperiod',kperiod)}${b('week','7 din','kperiod',kperiod)}${b('all','Shuru se','kperiod',kperiod)}</div>
+    <div class="daybar">
+      <div><span class="lbl">Trades</span><b>${st.n || 0}</b></div>
+      <div><span class="lbl">Jeete / Haare</span><b><span class="good">${st.wins || 0}</span> / <span class="bad">${st.losses || 0}</span></b></div>
+      <div><span class="lbl">Kul R</span><b class="${(st.total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.total_r || 0) >= 0 ? '+' : ''}${(st.total_r || 0).toFixed(2)}R</b></div>
+      <div><span class="lbl">Kul P&amp;L</span><b class="${(st.pl || 0) >= 0 ? 'good' : 'bad'}">${(st.pl || 0) >= 0 ? '+' : ''}${money(st.pl || 0)} ${ccy}</b></div>
+    </div>
+    <div class="seg" style="margin-top:8px">${b('all','Sab '+n(() => true),'kfilter',kfilter)}${b('win','✅ Jeete '+n(c => c.r > 0.05),'kfilter',kfilter)}${b('loss','❌ Haare '+n(c => c.r < -0.05),'kfilter',kfilter)}${b('be','➖ Breakeven '+n(c => Math.abs(c.r) <= 0.05),'kfilter',kfilter)}</div></div>
+  ${list.length ? `<div class="card">${list.map(c => { const id = esc(c.instrument);
+    return `<div class="otr"><div class="row"><b>${esc(pair(c.instrument))} ${c.side > 0 ? '<span class="good">▲ BUY</span>' : '<span class="bad">▼ SELL</span>'}</b>
+        <b class="num ${c.r > 0.05 ? 'good' : c.r < -0.05 ? 'bad' : ''}">${c.r >= 0 ? '+' : ''}${Number(c.r).toFixed(2)}R${c.pl != null ? ` · ${c.pl >= 0 ? '+' : ''}${money(c.pl)} ${ccy}` : ''}</b></div>
+      <div class="small">${esc(c.how || '')} · Entry ${px(c.entry)} → Exit ${px(c.exit)}</div>
+      <div class="small muted">${c.opened ? 'Khula ' + nyDT(c.opened) + ' · ' : ''}Band ${nyDT(c.closed)} NY</div>
+      <div class="small"><a href="#chart/${id}" data-go="chart/${id}">🔍 Chart</a>${c.ref ? ` · <a href="#journeys" data-ref="${esc(c.ref)}">🧭 Safar</a>` : ''}</div></div>`; }).join('')}</div>`
+    : `<p class="empty">${all.length ? 'Is filter mein koi trade nahi.' : 'Abhi tak koi trade band nahi hua. Jaise hi koi trade SL ya TP pe band hoga, yahan aa jayega.'}</p>`}`;
+}
 function viewLearn(){
   const L = S.learning || {}, st = L.stats_30d || {};
   const params = Object.entries(L.params || {});
@@ -601,7 +629,7 @@ function robotTo(x, y){
 function robotHome(){ robotTo(innerWidth - 82, innerHeight); }
 function mood(m){ robot.dataset.mood = m || 'info'; }
 function jump(){ robot.classList.remove('jump'); void robot.offsetWidth; robot.classList.add('jump'); setTimeout(() => robot.classList.remove('jump'), 1400); }
-setInterval(() => { if (bubble.hidden && !BOT.guiding) robotTo(20 + Math.random() * (innerWidth - 110), innerHeight); }, 9000);
+setInterval(() => { if (bubble.hidden && !BOT.guiding) robotTo(innerWidth - 82 - Math.random() * 40, innerHeight); }, 9000);   // stays in its corner, never over prices
 robot.addEventListener('click', () => startBriefing(true));
 window.addEventListener('resize', () => { if (bubble.hidden) robotHome(); });
 
