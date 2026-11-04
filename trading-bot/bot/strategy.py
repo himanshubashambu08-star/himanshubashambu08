@@ -30,6 +30,7 @@ DEFAULTS = {
     "atr_period": 14,
     "atr_stop_mult": 1.5,
     "forming_atr": 1.0,      # chart reader: within this many ATR of the EMA = "forming"
+    "confirm_candles": 0,    # 1 = after the rejection candle, the NEXT candle must also close in the trend direction
 }
 
 
@@ -71,6 +72,23 @@ def _ltf(c, p):
 
 def evaluate(instrument, htf_candles, ltf_candles, params=None):
     p = {**DEFAULTS, **(params or {})}
+    if p["confirm_candles"]:
+        c = _closed(ltf_candles)
+        if len(c) < 3:
+            return None
+        base = _evaluate_base(instrument, htf_candles, c[:-1], p)
+        if not base:
+            return None
+        sig_bar, conf = c[-2], c[-1]
+        if (conf.c - sig_bar.c) * base.side <= 0:      # confirmation candle did not continue
+            return None
+        base.time = conf.time
+        base.reason += " + confirmation candle"
+        return base
+    return _evaluate_base(instrument, htf_candles, ltf_candles, p)
+
+
+def _evaluate_base(instrument, htf_candles, ltf_candles, p):
     bias, strength = _htf(htf_candles, p)
     if bias == 0:
         return None

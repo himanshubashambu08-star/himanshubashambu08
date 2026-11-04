@@ -58,6 +58,13 @@ def ny_time(ts):
     return datetime.fromtimestamp(ts, timezone.utc).astimezone(NY).strftime("%H:%M")
 
 
+# the 28 main forex pairs/crosses + gold, silver and the US indices: tight spreads, deep markets
+LIQUID = {"EUR_USD", "GBP_USD", "USD_JPY", "USD_CHF", "USD_CAD", "AUD_USD", "NZD_USD", "EUR_GBP", "EUR_JPY",
+          "GBP_JPY", "EUR_CHF", "EUR_AUD", "EUR_CAD", "AUD_JPY", "CAD_JPY", "CHF_JPY", "GBP_CHF", "GBP_AUD",
+          "AUD_CAD", "AUD_NZD", "NZD_JPY", "GBP_CAD", "EUR_NZD", "GBP_NZD", "AUD_CHF", "CAD_CHF", "NZD_CAD",
+          "NZD_CHF", "XAU_USD", "XAG_USD", "NAS100_USD", "SPX500_USD", "US30_USD"}
+
+
 def pf(v):
     """Readable price: 1.08423 / 151.234 / 2,415.20 / 621,310.50 (never 6.2e+05)."""
     a = abs(v)
@@ -91,6 +98,8 @@ def hinglish_reason(reason):
         return f"{r[21:].replace('_', '/')} pehle se open hai, aur yeh pair uske saath hi chalta hai (double risk se bachne ke liye)"
     if r.startswith("too much ") and r.endswith(" exposure"):
         return f"{r[9:-9]} mein pehle se kaafi trades hain (ek currency pe zyada risk nahi)"
+    if r == "liquid only":
+        return "Sirf bade pairs mode: yeh chhota/exotic pair hai, trade nahi lega (sirf data ke liye follow hoga)"
     if r.startswith("news: "):
         return "Bada news aa raha hai: " + r[6:] + " · 15 min pehle se 15 min baad tak naya trade nahi"
     if r.startswith("learned filter: avoid "):
@@ -255,7 +264,7 @@ class Engine:
             else:
                 run()
         self.brain.maybe_brief(now, self._brief_done)
-        if self.cfg["learn"] and not getattr(self, "_validated_once", False) and not self.learner.get("report_card"):
+        if self.cfg["learn"] and not getattr(self, "_validated_once", False) and not self.learner.get("experiments"):
             self._validated_once = True
             threading.Thread(target=self.validate_setup, args=(self.risk.state["day"],), daemon=True).start()
         self.agents.save()
@@ -411,6 +420,8 @@ class Engine:
             sig.features["spread_ratio"] = round(price.spread / sig.stop_distance, 4)
 
             # Entry Timer
+            if not blocked_now and self.learner.get("universe", "all") == "liquid" and inst.name not in LIQUID:
+                blocked_now = "liquid only"
             ev = None if blocked_now else self.news.blocking(inst.name, self.clock())
             reason = blocked_now or (f"news: {ev['currency']} {ev['title']} {ny_time(ev['time'])} NY (High)" if ev else None) \
                 or (self.learner.blocked(sig) if self.cfg["learn"] else None)
@@ -666,7 +677,7 @@ class Engine:
         A.plan("learner", "Agla daily review 17:00 New York (galtiyan → naye rules, ek setting ka walk-forward test)")
 
     def validate_setup(self, day):
-        """Report card: backtest today's setup on real broker history for every pair."""
+        """Report card + experiments: today's rules and 5 alternatives on real broker history, spread included."""
         A = self.agents
         n = self.learner.p["validate_bars"]
 
@@ -674,17 +685,30 @@ class Engine:
             return (self.broker.candles(name, self.cfg["trend_timeframe"], n),
                     self.broker.candles(name, self.cfg["entry_timeframe"], n))
         try:
-            A.did("learner", "Report card bana raha hoon: setup ko har pair ke asli purane data pe test kar raha hoon…")
-            card = self.learner.validate(day, history, [i.name for i in self.universe()], self.params(),
-                                         self.reward_risk(), self.cfg["breakeven_at_r"], self.in_session)
-            if card:
+            names = [i.name for i in self.universe()]
+            A.did("learner", f"Experiment shuru: {len(names)} charts ke ~7 mahine ke asli data pe 6 versions test "
+                             "kar raha hoon (spread ke kharche ke saath)…")
+            try:
+                spreads = {k: p.spread for k, p in self.broker.prices(names).items()}
+            except Exception as e:
+                log.error("spreads for experiment: %s", e)
+                spreads = {}
+            out = self.learner.experiment(day, history, names, LIQUID, self.params(), self.reward_risk(),
+                                          self.cfg["breakeven_at_r"], spreads, self.in_session)
+            if out:
+                card = self.learner.get("report_card")
                 a = card["all"]
-                A.did("learner", f"Report card: {a['n']} trades, win {a['win_pct']}%, {a['total_r']:+.1f}R, "
-                      f"PF {a['pf']} (session ke andar {card['in_session']['total_r']:+.1f}R, bahar "
-                      f"{card['off_session']['total_r']:+.1f}R)", tone="good" if card["verdict"] == "pass" else "bad")
+                A.did("learner", f"Report card (spread ke saath): {a['n']} trades, win {a['win_pct']}%, "
+                      f"{a['total_r']:+.1f}R, PF {a['pf']}", tone="good" if card["verdict"] == "pass" else "bad")
+                if out["adopted"]:
+                    v = next(x for x in out["table"] if x["id"] == out["adopted"])
+                    A.did("learner", f"Naya version apnaya: {v['name']}", tone="good")
+                    A.handoff("learner", "rules", f"Naye rules laagu: {v['name']}")
+                else:
+                    A.did("learner", "Experiment: koi version pakka behtar nahi nikla, rules wahi rahe")
         except Exception as e:
-            log.exception("validate failed: %s", e)
-            A.did("learner", f"Report card fail: {e}", tone="bad")
+            log.exception("experiment failed: %s", e)
+            A.did("learner", f"Experiment fail: {e}", tone="bad")
 
     def review(self, day):
         log.info("daily review for %s", day)

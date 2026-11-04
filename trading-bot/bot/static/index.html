@@ -167,6 +167,8 @@ details summary{cursor:pointer;font-weight:600}
 .dayrow{border-top:1px solid var(--line);padding:8px 0}.dayrow:first-of-type{border-top:none}
 .dayrow summary{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;cursor:pointer;font-size:14px}
 .dayrow summary .dname{font-weight:700;min-width:84px}.dayrow summary b{margin-left:auto}
+.xt{display:flex;flex-direction:column;gap:6px;margin-top:8px}.xr{display:grid;grid-template-columns:1fr 92px 92px;gap:6px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}
+.xr.win{border-color:var(--good);background:var(--good-soft)}.xn{font-size:14px;font-weight:600}.xc{font-size:13px;text-align:right}.xc .lbl{display:block;font-size:10px}
 .rc{display:flex;flex-direction:column;gap:1px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
 .rc:first-child{border-top:none}.rc b{font:500 14px var(--f-num)}
 .chat{display:flex;flex-direction:column;gap:8px}
@@ -556,7 +558,7 @@ function reportCard(card, st){
   const V = {pass:['ok','✅ Setup asli data pe plus mein hai'], weak:['lock','⚠️ Setup asli data pe kamzor hai. Live paisa mat lagao, rules badalne padenge.'], few:['open','⏳ Abhi trades kam hain, pakka nahi keh sakte']}[card.verdict] || ['open', ''];
   const months = Math.round((card.to - card.from) / (30 * 86400));
   return `<div class="card" id="c-report"><div class="row"><h2>📋 Setup ka report card</h2><span class="small muted">${nyDT(card.made)} NY</span></div>
-    <div class="status ${V[0]}"><span class="dot"></span><span>${V[1]}<small>Aaj ke rules ko pichhle ~${months} mahine ke asli OANDA candles pe chala ke dekha (har din 5 PM NY pe dobara).</small></span></div>
+    <div class="status ${V[0]}"><span class="dot"></span><span>${V[1]}<small>Laagu rules ko pichhle ~${months} mahine ke asli OANDA candles pe chala ke dekha${card.spread_cost ? ', spread ka kharcha kaat ke' : ''} (har din 5 PM NY pe dobara).${(S.learning || {}).universe === 'liquid' ? ' Mode: sirf bade pairs.' : ''}</small></span></div>
     <div style="margin-top:8px">${rcRow('📊 Sab (asli purana data)', card.all)}${rcRow('🌞 Entry window ke andar', card.in_session)}${rcRow('🌙 Window ke bahar', card.off_session)}
       <div class="rc"><span>📉 Sabse bada girawat</span><b>${card.all.max_dd_r}R</b></div></div>
     ${live}
@@ -591,6 +593,16 @@ function viewClosed(){
 }
 function dayName(d){ const [y, m, dd] = d.split('-').map(Number); return new Date(Date.UTC(y, m - 1, dd, 12)).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'}); }
 const CSTATE = {active:['good','✅ LAAGU HAI'], next_review:['bad','🔜 AGLE REVIEW MEIN BANEGA'], watching:['info','👀 NAZAR MEIN'], collecting:['info','📥 DATA JAMA HO RAHA'], fine:['good','👍 THEEK HAI']};
+function experimentsCard(X){
+  if (!X) return `<div class="card" id="c-exp"><h2>🔬 Setup behtar karne ka experiment</h2><p class="empty">Chal raha hai: 6 versions asli data pe test ho rahe hain (5–15 minute). Phir yahan table aayegi.</p></div>`;
+  const cell = c => c && c.n ? `<b class="num ${c.total_r >= 0 ? 'good' : 'bad'}">${c.total_r >= 0 ? '+' : ''}${c.total_r}R</b><br><span class="small muted">${c.n} tr · PF ${c.pf ?? '-'}</span>` : '<span class="muted">-</span>';
+  return `<div class="card" id="c-exp"><div class="row"><h2>🔬 Setup behtar karne ka experiment</h2><span class="small muted">${nyDT(X.made)} NY</span></div>
+    <p class="small muted" style="margin:0 0 8px">Wahi asli data, 6 tareeke. Spread ka kharcha har trade pe kata hai. "Naya data" = aakhri 30% samay jo test ke liye alag rakha gaya. Koi version tabhi apnaya jaata hai jab woh naye data pe PF 1.2+ de aur abhi wale se saaf behtar ho.</p>
+    ${X.adopted ? `<div class="status ok"><span class="dot"></span><span>✅ Naya version apnaya: ${esc((X.table.find(v => v.id === X.adopted) || {}).name || X.adopted)}<small>Agle scan se laagu.</small></span></div>`
+                : `<div class="status open"><span class="dot"></span><span>Koi version pakka behtar nahi nikla, rules wahi rahe<small>Har din 5 PM NY pe naye data ke saath dobara test hoga.</small></span></div>`}
+    <div class="xt">${X.table.map(v => `<div class="xr ${v.id === X.adopted ? 'win' : ''}"><div class="xn">${esc(v.name)}${v.id === X.active_id ? ' <span class="pill info">LAAGU THA</span>' : ''}${v.id === X.adopted ? ' <span class="pill good">APNAYA</span>' : ''}</div>
+      <div class="xc"><span class="lbl">Sab data</span>${cell(v.all)}</div><div class="xc"><span class="lbl">Naya data</span>${cell(v.new)}</div></div>`).join('')}</div></div>`;
+}
 function viewLearn(){
   const L = S.learning || {}, st = L.stats_30d || {}, ccy = (S.status || {}).currency || '';
   const params = Object.entries(L.params || {}), nr = S.next_review;
@@ -625,6 +637,7 @@ function viewLearn(){
   <div class="card" id="c-rules"><h2>🚫 Laagu rules (bot ne khud banaye)</h2>${(L.filters || []).length ? `<ul class="plain">${L.filters.map(f => `<li>Bachna hai: ${esc(f.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi. Upar "Kaunse rule ban sakte hain" mein dekho kaun sa kitna kareeb hai.</p>'}</div>
 
   ${reportCard(L.report_card, st)}
+  ${experimentsCard(L.experiments)}
   <div class="daybar">
     <div><span class="lbl">Setups follow (30 din)</span><b>${st.setups_followed ?? 0}</b></div>
     <div><span class="lbl">Bot trades</span><b>${st.bot_trades ?? 0}</b></div>

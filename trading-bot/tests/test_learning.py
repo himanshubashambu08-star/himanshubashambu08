@@ -338,3 +338,83 @@ class Candidates(unittest.TestCase):
             L.learn_filters("d")
             self.assertEqual({x["name"]: x for x in L.candidates()}["weak_trend"]["state"], "active")
             self.assertTrue(any(l["text"].startswith("Naya rule") and "Agle signal se" in l["text"] for l in L.lessons()))
+
+
+def _noisy(n=3000, slope=0.5, seed=7):
+    import math
+    import random
+    rnd = random.Random(seed)
+    htf = trend_candles(1500, step=2.0 * (1 if slope > 0 else -1), period_s=14400, wiggle=6)
+    ltf, prev = [], 2000.0
+    for i in range(n):
+        c = 2000 + slope * i + 10 * math.sin(i / 5) + rnd.gauss(0, 3)
+        ltf.append(Candle(1_700_000_000 + 210 * 14400 + i * 3600, prev,
+                          max(prev, c) + abs(rnd.gauss(0, 1)), min(prev, c) - abs(rnd.gauss(0, 1)), c))
+        prev = c
+    return htf, ltf
+
+
+class Experiments(unittest.TestCase):
+    def test_confirmation_rule_live(self):
+        htf, ltf = pullback_setup(1)
+        p = {"rsi_buy_min": 0, "rsi_buy_max": 100}
+        base = strategy.evaluate("XAU_USD", htf, ltf, p)
+        self.assertIsNotNone(base)
+        self.assertIsNone(strategy.evaluate("XAU_USD", htf, ltf, {**p, "confirm_candles": 1}))   # no next candle yet
+        last = ltf[-1]
+        up = Candle(last.time + 3600, last.c, last.c + 2, last.c - 0.1, last.c + 1.5)
+        s = strategy.evaluate("XAU_USD", htf, ltf + [up], {**p, "confirm_candles": 1})
+        self.assertIsNotNone(s)
+        self.assertEqual(s.time, up.time)
+        down = Candle(last.time + 3600, last.c, last.c + 0.1, last.c - 2, last.c - 1.5)
+        self.assertIsNone(strategy.evaluate("XAU_USD", htf, ltf + [down], {**p, "confirm_candles": 1}))
+
+    def test_spread_is_charged(self):
+        from bot.backtest import signals, variant
+        htf, ltf = _noisy()
+        sigs = signals("X", htf, ltf, params={"rsi_buy_min": 0, "rsi_buy_max": 100})
+        free = variant(ltf, sigs, 0, 1.5, 2.0, 1.0, 0.0)
+        paid = variant(ltf, sigs, 0, 1.5, 2.0, 1.0, 2.0)
+        self.assertEqual(len(free), len(paid))
+        self.assertLess(sum(t["r"] for t in paid), sum(t["r"] for t in free))
+
+    def test_experiment_table_report_card_and_safe_adoption(self):
+        htf, ltf = _noisy()
+        with tempfile.TemporaryDirectory() as d:
+            L = Learner({"reports_dir": d}, clock=lambda: NOW)
+            out = L.experiment("d", lambda n: (htf, ltf), ["XAU_USD", "USD_TRY"], {"XAU_USD"},
+                               {"rsi_buy_min": 0, "rsi_buy_max": 100}, 2.0, spreads={"XAU_USD": 0.3, "USD_TRY": 5.0})
+            ids = [v["id"] for v in out["table"]]
+            self.assertEqual(ids[:2], ["now", "liquid"])
+            now = out["table"][0]
+            liq = out["table"][1]
+            self.assertLess(liq["all"]["n"], now["all"]["n"])                  # exotic left out
+            self.assertTrue(L.get("report_card")["spread_cost"])
+            if out["adopted"]:
+                v = next(x for x in out["table"] if x["id"] == out["adopted"])
+                self.assertGreaterEqual(v["new"]["pf"], 1.2)
+                self.assertEqual(L.get("universe"), v["universe"])
+                self.assertEqual(L.params()["confirm_candles"], v["confirm"])
+            else:
+                self.assertEqual(L.params(), {})
+            self.assertEqual(L.snapshot()["experiments"]["table"][0]["id"], "now")
+
+    def test_engine_liquid_mode_blocks_exotics(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make_engine(d)
+            e.learner.put("universe", "liquid")
+            nas = Instrument("XAU_USD", "METAL", 3, 0, 1)
+            e._universe = [nas]
+            e.tick()                                        # XAU_USD is liquid: trade allowed
+            self.assertEqual(len(b.orders), 1)
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make_engine(d)
+            e.learner.put("universe", "liquid")
+            b._instruments = {"XAU_JPY": Instrument("XAU_JPY", "METAL", 3, 0, 1)}
+            b.data[("XAU_JPY", "H4")], b.data[("XAU_JPY", "H1")] = b.data[("XAU_USD", "H4")], b.data[("XAU_USD", "H1")]
+            b.mid["XAU_JPY"] = b.mid["XAU_USD"]
+            e.cfg["instruments"] = ["XAU_JPY"]
+            e.tick()
+            self.assertEqual(b.orders, [])
+            j = e.snapshot()["journeys"][0]
+            self.assertIn("Sirf bade pairs", [s for s in j["steps"] if s["verdict"] == "block"][0]["text"])

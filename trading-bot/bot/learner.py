@@ -23,6 +23,7 @@ import threading
 import time
 
 from . import backtest
+from .backtest import signals, variant
 
 DEFAULTS = {
     "min_samples": 20,          # never learn from fewer trades than this
@@ -498,7 +499,111 @@ class Learner:
                 "off_session": _card(outside),
             },
             "report_card": self.get("report_card"),
+            "experiments": self.get("experiments"),
+            "universe": self.get("universe", "all"),
         }
+
+    # ---- experiments: several rule versions on the same real history -----------
+    VARIANTS = [
+        {"id": "now", "name": "Abhi wala setup (saare charts)", "universe": "all", "confirm": 0},
+        {"id": "liquid", "name": "Sirf bade pairs", "universe": "liquid", "confirm": 0},
+        {"id": "confirm", "name": "Confirmation candle (saare charts)", "universe": "all", "confirm": 1},
+        {"id": "liquid_confirm", "name": "Bade pairs + confirmation", "universe": "liquid", "confirm": 1},
+        {"id": "liquid_confirm_wide", "name": "Bade pairs + confirmation + SL 2 ATR", "universe": "liquid",
+         "confirm": 1, "stop_mult": 2.0},
+        {"id": "liquid_confirm_rr15", "name": "Bade pairs + confirmation + TP 1.5R", "universe": "liquid",
+         "confirm": 1, "rr": 1.5},
+    ]
+
+    def current_variant(self, base_params, base_rr):
+        lp = self.params()
+        return {"universe": self.get("universe", "all"),
+                "confirm": int(lp.get("confirm_candles", base_params.get("confirm_candles", 0))),
+                "stop_mult": float(lp.get("atr_stop_mult", base_params.get("atr_stop_mult", 1.5))),
+                "rr": float(lp.get("reward_risk", base_rr))}
+
+    def experiment(self, day, history, instruments, liquid, base_params, base_rr, breakeven_at_r=1.0,
+                   spreads=None, in_session=None, adopt=True):
+        """Run every variant on the same real history (spread cost included), split older 70% / recent 30%,
+        write the report card for the active rules, and adopt a clearly better variant."""
+        cur = self.current_variant(base_params, base_rr)
+        variants = [dict(v, stop_mult=v.get("stop_mult", cur["stop_mult"]), rr=v.get("rr", cur["rr"]))
+                    for v in self.VARIANTS]
+        active = {**cur, "id": "active", "name": "Abhi laagu rules"}
+        if not any(all(v[k] == active[k] for k in ("universe", "confirm", "stop_mult", "rr")) for v in variants):
+            variants.insert(0, active)
+        res = {v["id"]: [] for v in variants}
+        span, per, had = [None, None], {}, False
+        for n in instruments:
+            try:
+                htf, ltf = history(n)
+            except Exception as e:
+                per[n] = {"error": str(e)}
+                continue
+            if len(ltf) < 400:
+                continue
+            had = True
+            sigs = signals(n, htf, ltf, params={**base_params, **self.params()})
+            sp = (spreads or {}).get(n, 0.0)
+            for v in variants:
+                if v["universe"] == "liquid" and n not in liquid:
+                    continue
+                ts = variant(ltf, sigs, v["confirm"], v["stop_mult"], v["rr"], breakeven_at_r, sp)
+                for t in ts:
+                    t["pair"] = n
+                    t["in"] = bool(in_session(t["time"], n)) if in_session else True
+                res[v["id"]] += ts
+            span[0] = min(span[0] or ltf[0].time, ltf[0].time)
+            span[1] = max(span[1] or ltf[-1].time, ltf[-1].time)
+        if not had:
+            self.put("report_card", {"day": day, "made": self.clock(), "verdict": "nodata", "pairs": []})
+            return None
+        split = span[0] + 0.7 * (span[1] - span[0])
+        table = []
+        for v in variants:
+            ts = res[v["id"]]
+            table.append({"id": v["id"], "name": v["name"], "universe": v["universe"], "confirm": v["confirm"],
+                          "stop_mult": v["stop_mult"], "rr": v["rr"],
+                          "all": _card_r([t["r"] for t in ts]),
+                          "old": _card_r([t["r"] for t in ts if t["time"] < split]),
+                          "new": _card_r([t["r"] for t in ts if t["time"] >= split])})
+        def is_active(v):
+            return all(v[k] == cur[k] for k in ("universe", "confirm", "stop_mult", "rr"))
+        now_row = next(v for v in table if is_active(v))
+        # report card = the rules that are live right now (with spread cost)
+        ts = res[now_row["id"]]
+        pairs = {}
+        for t in ts:
+            pairs.setdefault(t["pair"], []).append(t["r"])
+        a = now_row["all"]
+        card = {"day": day, "from": span[0], "to": span[1], "made": self.clock(), "spread_cost": True,
+                "all": a, "in_session": _card_r([t["r"] for t in ts if t["in"]]),
+                "off_session": _card_r([t["r"] for t in ts if not t["in"]]),
+                "pairs": sorted([{"pair": k, **_card_r(v)} for k, v in pairs.items()], key=lambda x: -x["total_r"]),
+                "verdict": ("pass" if a["n"] >= 30 and a["total_r"] > 0 and (a["pf"] or 0) >= 1.1 else
+                            "weak" if a["n"] >= 30 else "few")}
+        self.put("report_card", card)
+        # adopt only with proof on BOTH the older and the most recent (unseen) part
+        ok = [v for v in table if v["new"]["n"] >= 30 and (v["new"]["pf"] or 0) >= 1.2 and (v["old"]["pf"] or 0) >= 1.1
+              and v["new"]["total_r"] > now_row["new"]["total_r"] + 2 and not is_active(v)]
+        best = max(ok, key=lambda v: v["new"]["total_r"]) if ok and adopt else None
+        result = {"day": day, "made": self.clock(), "from": span[0], "to": span[1], "split": split,
+                  "table": table, "active_id": now_row["id"], "adopted": best["id"] if best else None}
+        if best:
+            lp = self.params()
+            lp.update(confirm_candles=best["confirm"], atr_stop_mult=best["stop_mult"], reward_risk=best["rr"])
+            self.put("params", lp)
+            self.put("universe", best["universe"])
+            self.lesson(day, "experiment", f"Naya version apnaya: \"{best['name']}\". Naye data pe "
+                        f"{best['new']['total_r']:+.1f}R (PF {best['new']['pf']}) vs abhi wala "
+                        f"{now_row['new']['total_r']:+.1f}R. Agle scan se laagu.", {"id": best["id"]})
+        else:
+            self.lesson(day, "experiment", f"{len(table)} versions test kiye (spread ke kharche ke saath). Koi bhi naye "
+                        f"data pe pakka behtar (PF 1.2+) nahi nikla, isliye rules nahi badle.", {})
+        self.lesson(day, "validate", f"Report card (spread ke saath): {a['n']} trades, win {a['win_pct']}%, "
+                    f"total {a['total_r']:+.1f}R, PF {a['pf']}.", {"all": a})
+        self.put("experiments", result)
+        return result
 
     # ---- setup report card on real broker history ----------------------------
     def validate(self, day, history, instruments, params, rr, breakeven_at_r=1.0, in_session=None, bars=None):

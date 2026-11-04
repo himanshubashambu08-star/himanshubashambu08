@@ -89,3 +89,45 @@ def simulate(side, entry, stop_distance, bars, reward_risk=2.0, breakeven_at_r=1
         if fav >= breakeven_at_r and (entry - stop) * side > 0:
             stop = entry
     return None
+
+
+def signals(instrument, htf, ltf, ltf_gran="H1", htf_gran="H4", params=None, window=300):
+    """Every base signal on the history (no confirmation, positions ignored): [(bar_index, Signal)].
+    The expensive part, done once per instrument; variants are then simulated cheaply from it."""
+    ls, hs = GRANULARITY_SECONDS[ltf_gran], GRANULARITY_SECONDS[htf_gran]
+    p = {**(params or {}), "confirm_candles": 0}
+    out, hi = [], 0
+    for i in range(len(ltf) - 2):
+        close_t = ltf[i].time + ls
+        while hi < len(htf) and htf[hi].time + hs <= close_t:
+            hi += 1
+        sig = strategy.evaluate(instrument, htf[max(0, hi - window):hi], ltf[max(0, i + 1 - window):i + 1], p)
+        if sig:
+            out.append((i, sig))
+    return out
+
+
+def variant(ltf, sigs, confirm=0, stop_mult=1.5, reward_risk=2.0, breakeven_at_r=1.0, spread=0.0):
+    """Trades for one rule variant. Spread is paid on every trade (in R), one position at a time."""
+    trades, busy = [], -1
+    for i, sig in sigs:
+        if i <= busy:
+            continue
+        j = i
+        if confirm:
+            if i + 1 >= len(ltf) or (ltf[i + 1].c - ltf[i].c) * sig.side <= 0:
+                continue
+            j = i + 1
+        if j + 1 >= len(ltf):
+            break
+        dist = stop_mult * sig.atr
+        if dist <= 0:
+            continue
+        entry = ltf[j + 1].o
+        res = simulate(sig.side, entry, dist, ltf[j + 1:], reward_risk, breakeven_at_r)
+        if res is None:
+            break
+        r, bars, _ = res
+        trades.append({"time": ltf[j + 1].time, "r": r - spread / dist, "side": sig.side})
+        busy = j + bars
+    return trades
