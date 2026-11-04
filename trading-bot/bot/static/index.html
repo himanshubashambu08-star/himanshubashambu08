@@ -230,6 +230,9 @@ document.addEventListener('click', e => {
 });
 
 function render(){
+  const brainOn = !!(S && S.brain && S.brain.available);
+  const askTab = document.querySelector('.tabs [data-view=ask]'); if (askTab) askTab.hidden = !brainOn;
+  if (route === 'ask' && S && !brainOn) { route = 'home'; history.replaceState(null, '', '#home'); }
   const base = route.split('/')[0];
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === (base === 'agent' ? 'agents' : base))));
   if (!S) return;
@@ -547,7 +550,7 @@ function showIntro(manual){
   const hr = +tfmt.format(new Date()).slice(0, 2);
   const hello = hr < 12 ? 'Good morning' : hr < 17 ? 'Namaste' : 'Good evening';
   mood(b ? 'bad' : g ? 'good' : 'info');
-  const ask = '<button class="btn" data-b="ask">💬 Kuch pucho</button>';
+  const ask = (S.brain || {}).available ? '<button class="btn" data-b="ask">💬 Kuch pucho</button>' : '';
   if (!BOT.items.length) {
     bubble.innerHTML = `<div class="bhead"><b>🤖 Manager</b><button class="bx" data-b="close" aria-label="Band karo">×</button></div>
       <div>${hello}! Koi nayi khabar nahi. Bot ${(S.charts || []).length} charts dekh raha hai.<br><span class="small muted">${esc(S.status?.session_text || '')}</span></div>
@@ -570,7 +573,7 @@ function showItem(i, auto){
     <div style="margin-top:6px"><b>${esc(it.title)}</b><br>${esc(it.text)}</div>
     <div class="btns">${BOT.auto ? '<button class="btn" data-b="stop">⏸ Ruko</button>' : ''}
       ${i + 1 < BOT.items.length ? '<button class="btn pri" data-b="next">Agla →</button>' : '<button class="btn pri" data-b="close">Ho gaya ✓</button>'}
-      ${BOT.mode === 'brief' ? '<button class="btn" data-b="list">Saari list</button>' : ''}<button class="btn" data-b="ask">💬 Pucho</button></div>`;
+      ${BOT.mode === 'brief' ? '<button class="btn" data-b="list">Saari list</button>' : ''}${(S.brain || {}).available ? '<button class="btn" data-b="ask">💬 Pucho</button>' : ''}</div>`;
   bubble.hidden = false;
   guide(it);
 }

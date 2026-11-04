@@ -62,7 +62,10 @@ Tip: Safari mein **Share** dabao, phir **Add to Home Screen**. Phir yeh app jais
 | Wapas chalu karna | `rm ~/himanshubashambu08/trading-bot/STOP` |
 | Saare trades abhi band karna | `cd ~/himanshubashambu08/trading-bot && set -a && . ./.env && set +a && python3 run.py flatten --port 0` |
 | Bot band / chalu | `sudo systemctl stop trading-bot` / `sudo systemctl start trading-bot` |
-| Naya code lena | `bash ~/himanshubashambu08/trading-bot/deploy/update.sh` |
+| Naya code lena (haath se) | `bash ~/himanshubashambu08/trading-bot/deploy/update.sh` |
+| Auto-update chalu (ek baar) | `sudo bash ~/himanshubashambu08/trading-bot/deploy/enable-auto-update.sh` |
+| Auto-update ki history | `journalctl -u trading-bot-update -n 20 --no-pager` |
+| Auto-update band | `sudo systemctl disable --now trading-bot-update.timer` |
 
 ## Kuch zaroori baatein
 
