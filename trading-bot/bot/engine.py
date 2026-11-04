@@ -56,6 +56,8 @@ DEFAULTS = {
     "cell_min_unseen_pf": 1.2,
     "cell_min_tuning_pf": 1.1,               # ...and it must also be good on the older data (no luck picks)
     "auto_add_cells": True,
+    "trade_mode": "all",                     # "all" = real demo order on every setup, every chart, every hour
+                                             # "list" = only the tested trading list, everything else shadow
 }
 
 
@@ -194,7 +196,9 @@ class Engine:
                 "window_ny": self.cfg["base_window_ny"] or ema_break.DEFAULTS["window_ny"]}
 
     def trade_allowed(self, inst_name, now):
-        """Real demo order only for the trading list; everything else is shadow (recorded, followed, not traded)."""
+        """trade_mode "all": every setup is traded. "list": only the trading list, everything else is shadow."""
+        if self.cfg["trade_mode"] == "all":
+            return True
         if inst_name == self.cfg["base_instrument"] and self.gate() and ema_break.in_window(now, self.cfg["base_window_ny"]):
             return True
         if not self.cfg["auto_add_cells"]:
@@ -413,7 +417,8 @@ class Engine:
             A.plan("rules", f"Rules ({tf_name}): EMA{ep['ema_fast']} > EMA{ep['ema_slow']} = sirf BUY, neeche = sirf SELL · "
                    f"alert candle EMA ko touch na kare · agli candle high/low tode to entry · SL alert candle ka "
                    f"low/high · TP {ep['reward_risk']}R · SL {ep['min_stop_atr']}–{ep['max_stop_atr']}×ATR · "
-                   f"max {ep['max_trades_per_day']} trade/din")
+                   + (f"max {ep['max_trades_per_day']} trade/din" if ep['max_trades_per_day'] else "din ki koi limit nahi")
+                   + (" · HAR chart, HAR time pe asli trade" if self.cfg["trade_mode"] == "all" else " · asli trade sirf trading list pe"))
         else:
           A.plan("rules", f"Rules: H4 pe EMA{p['htf_ema_fast']}/{p['htf_ema_slow']} trend · H1 pe EMA"
                f"{p['ltf_ema_pullback']} tak pullback aur wapas close · RSI buy {p['rsi_buy_min']}–{p['rsi_buy_max']}, "
@@ -511,7 +516,8 @@ class Engine:
             if not blocked_now and self.ema:
                 if not self.trade_allowed(inst.name, self.clock()):
                     blocked_now = "shadow"
-                elif self.trades_today() >= self.ema_params()["max_trades_per_day"]:
+                elif self.ema_params()["max_trades_per_day"] and \
+                        self.trades_today() >= self.ema_params()["max_trades_per_day"]:
                     blocked_now = "max trades today"
             ev = None if blocked_now else self.news.blocking(inst.name, self.clock())
             reason = blocked_now or (f"news: {ev['currency']} {ev['title']} {ny_time(ev['time'])} NY (High)" if ev else None) \
@@ -1230,6 +1236,7 @@ class Engine:
                 "news": self.news_list(self.clock()), "news_error": self.news.error,
                 "journal": self.journal.rows[-30:][::-1], **self.agents.snapshot(),
                 "mode": {"strategy": self.cfg["strategy"], "timeframe": self.cfg["entry_timeframe"],
+                         "trade_mode": self.cfg["trade_mode"],
                          "ema": self.ema_params() if self.ema else None, "gate": self.learner.get("gate"),
                          "backtest": self.learner.get("ema_backtest"),
                          "pending": list((self.risk.state.get("pending") or {}).values()),

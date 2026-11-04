@@ -636,10 +636,11 @@ function emaCard(compact){
   const B = M.backtest, G = M.gate || {}, e = M.ema || {};
   const row = (label, c) => c && c.n ? `<div class="rc"><span>${label}</span><b class="${c.total_r >= 0 ? 'good' : 'bad'}">${c.n} trades · win ${c.win_pct}% · PF ${c.pf ?? '-'} · ${c.total_r >= 0 ? '+' : ''}${c.total_r}R · max DD ${c.max_dd_r}R</b></div>` : `<div class="rc"><span>${label}</span><b class="muted">koi trade nahi</b></div>`;
   const nList = ((S.learning || {}).trade_list || []).length;
-  const gate = !B ? `<div class="status open"><span class="dot"></span><span>⏳ Backtest chal raha hai (2 saal ka M5 data download ho raha hai, 5–15 min)<small>Tab tak saare charts shadow mein: record ho rahe hain, trade nahi.</small></span></div>`
+  const gate = M.trade_mode === 'all' ? `<div class="status ok"><span class="dot"></span><span>⚡ Har jagah trade mode: har chart pe, har time setup milte hi demo trade<small>Backtest sirf jaankari ke liye hai, trade nahi rokta. Risk limits (0.5%/trade, daily loss, max open trades, spread) chalu hain.</small></span></div>`
+    : !B ? `<div class="status open"><span class="dot"></span><span>⏳ Backtest chal raha hai (2 saal ka M5 data download ho raha hai, 5–15 min)<small>Tab tak saare charts shadow mein: record ho rahe hain, trade nahi.</small></span></div>`
     : G.passed ? `<div class="status ok"><span class="dot"></span><span>✅ Gate PASS: demo pe trading chalu<small>Unseen data pe PF ${B.unseen.pf} aur ${B.unseen.n} trades.</small></span></div>`
     : `<div class="status lock"><span class="dot"></span><span>🔒 XAU/USD gate band${nList ? ` · lekin ${nList} pair+ghanta trading list mein` : ': abhi sab shadow mein'}<small>Wajah: ${esc(G.reason || '')}. Shart: unseen pe ${B.need_trades}+ trades aur PF ${B.need_pf}+.</small></span></div>`;
-  if (compact) return `<div class="card" id="c-ema"><div class="row"><h2>🥇 EMA 9/15 · ${esc(pair((B && B.pairs || ['XAU_USD'])[0]))} · ${esc(M.timeframe)}</h2><span class="small muted">Aaj ${M.trades_today ?? 0}/${e.max_trades_per_day} trades</span></div>${gate}
+  if (compact) return `<div class="card" id="c-ema"><div class="row"><h2>🥇 EMA 9/15 · ${esc(pair((B && B.pairs || ['XAU_USD'])[0]))} · ${esc(M.timeframe)}</h2><span class="small muted">Aaj ${M.trades_today ?? 0}${e.max_trades_per_day ? '/' + e.max_trades_per_day : ''} trades</span></div>${gate}
     ${(M.pending || []).map(o => `<div class="small" style="margin-top:6px">⏳ Stop order: ${o.side > 0 ? 'BUY' : 'SELL'} ${esc(pair(o.instrument))} jab price ${px(o.entry)} tode · SL ${px(o.stop)} · TP ${px(o.tp)} · ${nyT(o.expire)} NY tak</div>`).join('')}</div>`;
   return `<div class="card" id="c-ema"><h2>🥇 Strategy: EMA 9/15 breakout</h2>
     <ul class="plain small" style="margin-bottom:8px">
@@ -648,7 +649,7 @@ function emaCard(compact){
       <li>Alert candle: BUY ke liye green candle jiska low dono EMA ke upar (touch nahi). SELL ulta.</li>
       <li>Entry: agli candle alert ka high tode (SELL: low). Na tode to setup cancel.</li>
       <li>SL: alert candle ka low (SELL: high) · TP: ${e.reward_risk}R · SL ${e.min_stop_atr}–${e.max_stop_atr}×ATR ke beech na ho to skip</li>
-      <li>Sirf ${(e.window_ny || []).map(w => w.join('–')).join(', ')} NY · din mein max ${e.max_trades_per_day} trades · 0.5% risk · open trades ka risk bhi daily limit mein gina jaata hai</li>
+      <li>${M.trade_mode === 'all' ? '24 ghante, saare charts pe' : 'Sirf ' + (e.window_ny || []).map(w => w.join('–')).join(', ') + ' NY'} · ${e.max_trades_per_day ? 'din mein max ' + e.max_trades_per_day + ' trades' : 'din ki koi limit nahi'} · 0.5% risk · open trades ka risk bhi daily limit mein gina jaata hai</li>
     </ul>
     ${gate}
     ${B ? `<div style="margin-top:8px">${row('🔧 Tuning (purana 70%)', B.tuning)}${row('🧪 Unseen (naya 30%)', B.unseen)}${row('📊 Sab', B.all)}</div>
@@ -667,7 +668,7 @@ function researchCard(){
   const base = `<div class="rc"><span>🥇 ${esc(pair('XAU_USD'))} 08:00–12:00 NY (shuru wali)</span><b class="${(M.gate || {}).passed ? 'good' : 'bad'}">${(M.gate || {}).passed ? '✅ chalu' : '🔒 gate band'}</b></div>`;
   const listHtml = base + list.map(c => `<div class="rc"><span>${esc(pair(c.instrument))} · ${c.hour}:00–${c.hour + 1}:00 NY</span><b class="good">✅ unseen PF ${c.unseen_pf ?? '∞'} · ${c.unseen_n} trades</b></div>`).join('');
   if (!R_) return `<div class="card" id="c-research"><h2>📋 Trading list</h2>${listHtml}<p class="empty">Research chal raha hai: har instrument × har ghanta ka backtest (10–30 min). Phir yahan table aayegi.</p></div>`;
-  return `<div class="card" id="c-research"><h2>📋 Trading list (asli orders sirf yahan)</h2>${listHtml}
+  return `<div class="card" id="c-research"><h2>📋 ${(S.mode || {}).trade_mode === 'all' ? 'Research: kaunse pair+ghante kaam karte hain' : 'Trading list (asli orders sirf yahan)'}</h2>${(S.mode || {}).trade_mode === 'all' ? '<p class="small muted" style="margin:0 0 6px">Abhi har jagah trade ho raha hai. Yeh list batati hai kahan strategy sach mein kaam karti hai, taaki baad mein sirf wahan trade karna ho to ek setting badlo.</p>' : ''}${listHtml}
     <p class="small muted" style="margin:8px 0 0">Research ${nyDT(R_.made)} NY: ${R_.instruments.length} instruments, ${R_.cells_tested} pair+ghanta test hue, ${R_.passed.length} pass. Shart: unseen pe ${R_.rules.min_unseen_trades}+ trades aur PF ${R_.rules.min_unseen_pf}+, aur purane data pe bhi PF ${R_.rules.min_tuning_pf}+ (taaki luck se achhe dikhne wale na aayein). Har din 5 PM NY pe dobara.</p>
     <details style="margin-top:8px"><summary>Har instrument ka result (unseen ke hisaab se)</summary><div class="xt">${R_.instruments.map(r => `<div class="xr"><div class="xn">${esc(pair(r.pair))}</div>
       <div class="xc"><span class="lbl">Purana 70%</span><b class="num ${r.tuning.total_r >= 0 ? 'good' : 'bad'}">${r.tuning.total_r >= 0 ? '+' : ''}${r.tuning.total_r}R</b><br><span class="small muted">${r.tuning.n} · PF ${r.tuning.pf ?? '-'}</span></div>

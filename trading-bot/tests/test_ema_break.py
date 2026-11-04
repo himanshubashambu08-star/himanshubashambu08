@@ -107,6 +107,8 @@ def make(tmp, gate=True, candles=None):
            "learning": {"reports_dir": tmp}}
     clock = [c[-1].time + 300 + 20]
     e = Engine(b, cfg, clock=lambda: clock[0])
+    e.cfg["trade_mode"] = "list"
+    e.base_params["max_trades_per_day"] = 2
     e._validated_once = True
     if gate:
         e.learner.put("gate", {"passed": True})
@@ -248,3 +250,15 @@ class Shadow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TradeEverywhere(unittest.TestCase):
+    def test_all_mode_trades_without_gate_or_daily_cap(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make(d, gate=False)
+            e.cfg["trade_mode"] = "all"
+            e.base_params["max_trades_per_day"] = 0
+            e.risk.state["day_trades"] = {ema_break.ny_day(e.clock()): 50}
+            e.tick()
+            self.assertEqual(len(b.pending), 1)
+            self.assertTrue(e.trade_allowed("EUR_USD", e.clock() + 10 * 3600))   # any chart, any hour

@@ -34,7 +34,8 @@
     "research_days": 365,
     "cell_min_unseen_trades": 30,
     "cell_min_unseen_pf": 1.2,
-    "cell_min_tuning_pf": 1.1
+    "cell_min_tuning_pf": 1.1,
+    "trade_mode": "all"
   },
   "strategy": {
     "ema_fast": 9,
@@ -43,7 +44,7 @@
     "min_stop_atr": 0.5,
     "max_stop_atr": 2.0,
     "reward_risk": 3.0,
-    "max_trades_per_day": 2
+    "max_trades_per_day": 0
   },
   "risk": {
     "risk_per_trade_pct": 0.5,

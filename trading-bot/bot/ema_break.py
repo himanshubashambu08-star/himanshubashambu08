@@ -26,7 +26,7 @@ DEFAULTS = {
     "max_stop_atr": 2.0,
     "reward_risk": 3.0,
     "window_ny": [["08:00", "12:00"]],
-    "max_trades_per_day": 2,
+    "max_trades_per_day": 0,          # 0 = no daily cap
 }
 
 
@@ -171,7 +171,7 @@ def backtest(candles, params=None, spread=0.0, windows=None):
             i += 1
             continue
         day = ny_day(nxt.time)
-        if per_day.get(day, 0) >= p["max_trades_per_day"]:
+        if p["max_trades_per_day"] and per_day.get(day, 0) >= p["max_trades_per_day"]:
             i += 1
             continue
         trig, stop = (c[i].h, c[i].l) if side > 0 else (c[i].l, c[i].h)
