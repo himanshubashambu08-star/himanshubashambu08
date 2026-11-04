@@ -259,3 +259,41 @@ class Universe(unittest.TestCase):
         night = datetime(2026, 11, 4, 4, 0, tzinfo=timezone.utc).timestamp()
         self.assertTrue(e.in_session(night, "NAS100_USD"))
         self.assertIsNone(e.why_no_new_trades(night, "NAS100_USD"))
+
+
+class OppositeAndCorrelated(unittest.TestCase):
+    def test_opposite_currency_bets_blocked(self):
+        r = RiskManager({"max_trades_per_currency": 9})
+        open_ = [Trade("1", "EUR_USD", 100, 1.1)]                       # long EUR, short USD
+        ok, why = r.can_open(Signal("USD_JPY", 1, 0.2, 0.1, "x"), open_, Price(150, 150.01))   # long USD
+        self.assertFalse(ok)
+        self.assertIn("opposite USD", why)
+        ok, _ = r.can_open(Signal("USD_JPY", -1, 0.2, 0.1, "x"), open_, Price(150, 150.01))    # short USD too
+        self.assertTrue(ok)
+        # an index priced in USD is not a USD bet
+        ok, _ = r.can_open(Signal("NAS100_USD", -1, 20, 10, "x"), open_, Price(20000, 20000.5),
+                           kinds={"NAS100_USD": "CFD", "EUR_USD": "CURRENCY"})
+        self.assertTrue(ok)
+
+    def test_correlation_same_bet_and_hedge(self):
+        r = RiskManager({"max_trades_per_currency": 9, "block_opposite_currency": False})
+        corr = {("XAU_JPY", "XAU_USD"): 0.9, ("USD_CHF", "EUR_USD"): -0.92}
+        f = lambda a, b: corr.get((a, b))
+        ok, why = r.can_open(Signal("XAU_JPY", -1, 300, 200, "x"), [Trade("1", "XAU_USD", -5, 2400)],
+                             Price(6e5, 6e5 + 10), corr=f)
+        self.assertFalse(ok)
+        self.assertIn("same bet", why)
+        # mirror pair, same side = trades cancel each other
+        ok, why = r.can_open(Signal("USD_CHF", 1, 0.002, 0.001, "x"), [Trade("1", "EUR_USD", 100, 1.1)],
+                             Price(0.9, 0.9001), corr=f)
+        self.assertFalse(ok)
+        self.assertIn("cancels", why)
+
+    def test_engine_correlation_math(self):
+        e = Engine(SimBroker(10_000), {"news": {"enabled": False}})
+        import math
+        a = [100 + 5 * math.sin(i / 7) + i * 0.01 for i in range(201)]
+        e._closes = {"A": a, "B": [x * 2 for x in a], "C": [300 - x for x in a]}
+        self.assertAlmostEqual(e.correlation("A", "B"), 1.0, places=6)
+        self.assertLess(e.correlation("A", "C"), -0.95)
+        self.assertIsNone(e.correlation("A", "Z"))

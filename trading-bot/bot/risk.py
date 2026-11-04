@@ -24,6 +24,8 @@ DEFAULTS = {
     "max_trades_per_instrument": 1,
     "max_trades_per_currency": 2,
     # pairs that move almost together count as one trade (only 1 open per group)
+    "max_correlation": 0.7,     # |corr| of hourly moves at/above this = same trade (or a hedge): only 1 open
+    "block_opposite_currency": True,   # never long and short the same currency at once
     "correlated_groups": [["AUD_USD", "NZD_USD"], ["AUD_JPY", "NZD_JPY"],
                           ["NAS100_USD", "SPX500_USD", "US30_USD"]],
     "max_spread_to_stop": 0.15,
@@ -82,7 +84,14 @@ class RiskManager:
         return None
 
     # ---- per-trade checks -------------------------------------------
-    def can_open(self, signal, open_trades, price):
+    @staticmethod
+    def exposure(instrument, side):
+        """{currency: +1 long / -1 short} for a trade. BUY EUR_USD = long EUR, short USD."""
+        base, quote = instrument.split("_", 1)
+        return {base: side, quote: -side}
+
+    def can_open(self, signal, open_trades, price, corr=None, kinds=None):
+        """corr(a, b) -> correlation of hourly returns or None; kinds: name -> instrument type."""
         if self.halted:
             return False, self.halted
         if len(open_trades) >= self.p["max_open_trades"]:
@@ -96,6 +105,24 @@ class RiskManager:
                 twin = [n for n in grp if n in open_names and n != signal.instrument]
                 if twin:
                     return False, f"correlated with open {twin[0]}"
+        # 1) one currency, two opposite bets (BUY EUR/USD = short USD, BUY USD/JPY = long USD)
+        kinds = kinds or {}
+        if self.p["block_opposite_currency"] and kinds.get(signal.instrument) != "CFD":
+            mine = self.exposure(signal.instrument, signal.side)
+            for t in open_trades:
+                if kinds.get(t.instrument) == "CFD":
+                    continue              # an index is only priced in USD, it is not a USD bet
+                for cur, d in self.exposure(t.instrument, t.side).items():
+                    if cur in mine and mine[cur] != d:
+                        return False, f"opposite {cur} bet vs open {t.instrument}"
+        # 2) pairs that move together (or mirror each other) on the real chart
+        if corr is not None:
+            for t in open_trades:
+                c = corr(signal.instrument, t.instrument)
+                if c is not None and abs(c) >= self.p["max_correlation"]:
+                    same_bet = c * signal.side * t.side > 0
+                    kind = "same bet as" if same_bet else "cancels"
+                    return False, f"{kind} open {t.instrument} (corr {c:+.2f})"
         for cur in _currencies(signal.instrument):
             n = sum(1 for t in open_trades if cur in _currencies(t.instrument))
             if n >= self.p["max_trades_per_currency"]:

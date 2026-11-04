@@ -76,6 +76,17 @@ def hinglish_reason(reason):
     }
     if r in fixed:
         return fixed[r]
+    if r.startswith("opposite ") and " bet vs open " in r:
+        cur, other = r[9:].split(" bet vs open ")
+        return (f"Ulta daav: {other.replace('_', '/')} wala open trade {cur} pe ulti side hai. Dono saath liye to ek "
+                f"doosre ko kaat denge, isliye nahi liya")
+    if r.startswith("same bet as open "):
+        other, c = r[17:].split(" (corr ")
+        return f"Double daav: yeh pair {other.replace('_', '/')} jaisa hi chalta hai (mel {c[:-1]}), wahi trade pehle se open hai"
+    if r.startswith("cancels open "):
+        other, c = r[13:].split(" (corr ")
+        return (f"Ulta daav: yeh pair {other.replace('_', '/')} ke ulta chalta hai (mel {c[:-1]}), yeh trade us open "
+                f"trade ko kaat deta")
     if r.startswith("correlated with open "):
         return f"{r[21:].replace('_', '/')} pehle se open hai, aur yeh pair uske saath hi chalta hai (double risk se bachne ke liye)"
     if r.startswith("too much ") and r.endswith(" exposure"):
@@ -108,6 +119,7 @@ class Engine:
         self.agents = AgentLog(agents_path, clock=clock)
         self.news = NewsCalendar(config.get("news", {}), news_path, clock=clock, fetcher=news_fetcher)
         self._news_active = set()
+        self._closes = {}          # instrument -> recent closed H1 closes, for correlation
         self.brain = Brain(config.get("brain", {}), self.brain_context, brain_path, clock=clock, client=brain_client)
         self.seen_path = seen_path
         self.seen = []
@@ -270,6 +282,7 @@ class Engine:
                 ltf = self.broker.candles(inst.name, tf_name, n)
                 htf = self.broker.candles(inst.name, self.cfg["trend_timeframe"], n)
                 board[inst.name] = strategy.read_chart(inst.name, htf, ltf, params)
+                self._closes[inst.name] = [c.c for c in ltf if c.complete][-201:]
                 if look_for_trades:
                     if self.cfg["learn"]:
                         self.learner.resolve(inst.name, ltf, tf_s, self.reward_risk(), self.cfg["breakeven_at_r"])
@@ -351,7 +364,8 @@ class Engine:
                  + (f" · {self.risk.halted}" if self.risk.halted else ""), "bad" if self.risk.halted else "ok")
         A.plan("risk", f"Har trade pe {rp['risk_per_trade_pct']}% risk · max {rp['max_open_trades']} open trades · "
                f"ek pair mein {rp['max_trades_per_instrument']} · ek currency mein max {rp['max_trades_per_currency']} · "
-               f"spread SL ke {int(rp['max_spread_to_stop'] * 100)}% se kam · daily loss {rp['daily_loss_limit_pct']}% · "
+               f"spread SL ke {int(rp['max_spread_to_stop'] * 100)}% se kam · ek currency pe ulta daav nahi · "
+               f"{int(rp['max_correlation'] * 100)}%+ saath/ulta chalne wale pairs mein ek hi trade · daily loss {rp['daily_loss_limit_pct']}% · "
                f"max drawdown {rp['max_drawdown_pct']}%")
         A.status("executor", f"Aaj {ec.get('orders', 0)} orders lage", "ok" if ec.get("orders") else "idle")
         A.plan("executor", "Risk Manager se approve hote hi market order, SL aur TP ek saath broker pe. "
@@ -391,7 +405,8 @@ class Engine:
             A.handoff("timer", "risk", f"{name} size aur limits ke liye", ref)
 
             # Risk Manager
-            ok, why = self.risk.can_open(sig, self.broker.open_trades(), price)
+            ok, why = self.risk.can_open(sig, self.broker.open_trades(), price, corr=self.correlation,
+                                         kinds={i.name: i.type for i in self.universe()})
             if not ok:
                 return self._skip(inst, sig, "risk", why)
             units = self.risk.size(account.balance, sig.stop_distance, self.broker.quote_to_home(inst.name), inst)
@@ -683,6 +698,24 @@ class Engine:
             log.error("live prices failed: %s", e)
             self._live = {"t": now, "prices": (cache or {}).get("prices", {}), "error": str(e)}
         return self._live
+
+    def correlation(self, a, b, n=200):
+        """Correlation of hourly % moves over the last n candles, or None without enough data."""
+        if a == b:
+            return 1.0
+        ca, cb = self._closes.get(a), self._closes.get(b)
+        if not ca or not cb:
+            return None
+        m = min(len(ca), len(cb), n + 1)
+        if m < 50:
+            return None
+        ra = [ca[-m + i + 1] / ca[-m + i] - 1 for i in range(m - 1)]
+        rb = [cb[-m + i + 1] / cb[-m + i] - 1 for i in range(m - 1)]
+        ma, mb = sum(ra) / len(ra), sum(rb) / len(rb)
+        cov = sum((x - ma) * (y - mb) for x, y in zip(ra, rb))
+        va = sum((x - ma) ** 2 for x in ra) ** 0.5
+        vb = sum((y - mb) ** 2 for y in rb) ** 0.5
+        return cov / (va * vb) if va and vb else None
 
     def mark_seen(self, keys):
         keys = [str(k)[:200] for k in keys or [] if k][:100]
