@@ -70,8 +70,8 @@ class LearnFilters(unittest.TestCase):
         self.L.learn_filters("2026-11-04")
         self.assertNotIn("late_session", self.L.filters())
         texts = [l["text"] for l in self.L.lessons()]
-        self.assertTrue(any(t.startswith("New rule") for t in texts))
-        self.assertTrue(any(t.startswith("Rule removed") for t in texts))
+        self.assertTrue(any(t.startswith("Naya rule") for t in texts))
+        self.assertTrue(any(t.startswith("Rule hataya") for t in texts))
 
     def test_needs_enough_samples(self):
         for _ in range(5):
@@ -120,7 +120,7 @@ class LearnFilters(unittest.TestCase):
             self.assertGreaterEqual(te, 0)
             self.assertIn("unseen", lesson)
         else:
-            self.assertIn("No change", lesson)
+            self.assertIn("Koi badlav nahi", lesson)
             self.assertEqual(self.L.params(), {})
 
 
@@ -322,3 +322,19 @@ class EngineReportCard(unittest.TestCase):
             card = e.learner.get("report_card")
             self.assertIn(card["verdict"], ("pass", "weak", "few"))
             self.assertEqual(card["in_session"]["n"] + card["off_session"]["n"], card["all"]["n"])
+
+
+class Candidates(unittest.TestCase):
+    def test_candidates_show_progress_and_states(self):
+        with tempfile.TemporaryDirectory() as d:
+            L = Learner({"min_samples": 20, "reports_dir": d}, clock=lambda: NOW)
+            for i in range(30):
+                add_done(L, sig(trend_strength=0.05), -1.0)
+            for i in range(30):
+                add_done(L, sig(trend_strength=0.5), 2.0 if i % 2 else -1.0)
+            c = {x["name"]: x for x in L.candidates()}
+            self.assertEqual(c["weak_trend"]["state"], "next_review")
+            self.assertEqual(c["weak_trend"]["n"], 30)
+            L.learn_filters("d")
+            self.assertEqual({x["name"]: x for x in L.candidates()}["weak_trend"]["state"], "active")
+            self.assertTrue(any(l["text"].startswith("Naya rule") and "Agle signal se" in l["text"] for l in L.lessons()))

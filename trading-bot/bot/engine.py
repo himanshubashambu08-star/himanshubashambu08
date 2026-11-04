@@ -9,7 +9,7 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from . import strategy
@@ -20,7 +20,7 @@ from .models import GRANULARITY_SECONDS
 from .news import NewsCalendar
 from .brain import Brain
 import json
-from .risk import RiskManager
+from .risk import RiskManager, trading_day
 
 log = logging.getLogger("bot")
 NY = ZoneInfo("America/New_York")
@@ -761,6 +761,14 @@ class Engine:
             out.append(d)
         return out
 
+    def next_review_time(self):
+        """Unix time of the next 17:00 New York (trading-day roll = daily review)."""
+        ny = datetime.fromtimestamp(self.clock(), timezone.utc).astimezone(NY)
+        t = ny.replace(hour=17, minute=0, second=0, microsecond=0)
+        if t <= ny:
+            t = t + timedelta(days=1)
+        return t.timestamp()
+
     def live_prices(self, max_age=2.0):
         """Fresh bid/ask/mid for every watched chart, cached for `max_age` seconds (one broker call)."""
         now = time.time()
@@ -818,6 +826,9 @@ class Engine:
                 "journal": self.journal.rows[-30:][::-1], **self.agents.snapshot(),
                 **({} if light else {"brain": self.brain.snapshot(), "seen": list(self.seen),
                                      "closed": self.learner.closed_trades(200),
+                                     "closed_days": self.learner.closed_by_day(trading_day),
+                                     "candidates": self.learner.candidates(12),
+                                     "next_review": self.next_review_time(),
                                      "closed_stats": {"day": self.learner.closed_summary(self.clock() - 86400),
                                                       "week": self.learner.closed_summary(self.clock() - 7 * 86400),
                                                       "all": self.learner.closed_summary(0)}})}

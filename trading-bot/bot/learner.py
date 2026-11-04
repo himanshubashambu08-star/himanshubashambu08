@@ -38,20 +38,20 @@ DEFAULTS = {
 
 # conditions the learner may switch on as filters: name -> (test, plain words)
 CONDITIONS = {
-    "weak_trend": (lambda f, s: f.get("trend_strength", 9) < 0.15, "higher-timeframe trend was weak"),
+    "weak_trend": (lambda f, s: f.get("trend_strength", 9) < 0.15, "H4 ka trend kamzor tha"),
     "overextended_rsi": (lambda f, s: (f.get("rsi", 50) > 65) if s > 0 else (f.get("rsi", 50) < 35),
-                         "RSI was already stretched in the trade direction"),
-    "far_from_ema": (lambda f, s: f.get("dist_ema_atr", 0) > 0.8, "entry was far from the EMA (late entry)"),
-    "big_candle_chase": (lambda f, s: f.get("body_atr", 0) > 1.5, "entered after a very big candle (chasing)"),
-    "wide_spread": (lambda f, s: f.get("spread_ratio", 0) > 0.08, "spread was large compared with the stop"),
-    "late_session": (lambda f, s: 15 <= f.get("hour_ny", 12) < 17, "entry late in the New York session"),
-    "early_session": (lambda f, s: 8 <= f.get("hour_ny", 12) < 9, "entry in the first hour of New York"),
-    "friday": (lambda f, s: f.get("dow") == 4, "Friday entry"),
+                         "RSI pehle se trade ki disha mein bahut khinch chuka tha"),
+    "far_from_ema": (lambda f, s: f.get("dist_ema_atr", 0) > 0.8, "entry EMA se door thi (der se entry)"),
+    "big_candle_chase": (lambda f, s: f.get("body_atr", 0) > 1.5, "bahut badi candle ke baad entry (peeche bhaagna)"),
+    "wide_spread": (lambda f, s: f.get("spread_ratio", 0) > 0.08, "spread SL ke mukable bada tha"),
+    "late_session": (lambda f, s: 15 <= f.get("hour_ny", 12) < 17, "New York session ke aakhri ghante mein entry"),
+    "early_session": (lambda f, s: 8 <= f.get("hour_ny", 12) < 9, "New York ke pehle ghante mein entry"),
+    "friday": (lambda f, s: f.get("dow") == 4, "Friday ki entry"),
 }
 
 MISTAKE_WORDS = {
-    "stopped_fast": "stopped out within 2 candles: entry too early, wait for more confirmation",
-    "gave_back": "was +1R or more, then closed at 0 or a loss",
+    "stopped_fast": "2 candle ke andar SL lag gaya: entry jaldi thi, aur confirmation chahiye tha",
+    "gave_back": "+1R ya zyada profit mein tha, phir 0 ya loss pe band hua",
     **{k: v[1] for k, v in CONDITIONS.items()},
 }
 
@@ -105,7 +105,7 @@ def describe(name):
     if name in MISTAKE_WORDS:
         return MISTAKE_WORDS[name]
     k, v = name.split(":", 1)
-    return f"trading {v}" if k == "instrument" else f"entries at {v}:00 New York"
+    return f"{v.replace('_', '/')} pe trade" if k == "instrument" else f"{v}:00 New York ki entries"
 
 
 def tag_mistakes(row, r, bars_held, max_r):
@@ -306,13 +306,64 @@ class Learner:
         self.put("filters", sorted(active))
         for kind, name, m, n, base in changes:
             if kind == "filter_on":
-                txt = (f"New rule: avoid {describe(name)}. Over {n} setups it averaged {m:+.2f}R "
-                       f"vs {base:+.2f}R for the rest.")
+                txt = (f"Naya rule: {describe(name)} se bachna hai. {n} setups mein iska average {m:+.2f}R tha, "
+                       f"baaki setups ka {base:+.2f}R. Agle signal se laagu.")
             else:
-                txt = (f"Rule removed: {describe(name)} is now averaging {m:+.2f}R over {n} setups, "
-                       f"so it is allowed again.")
+                txt = (f"Rule hataya: {describe(name)} ab {n} setups mein {m:+.2f}R average de raha hai, "
+                       f"isliye phir se allowed.")
             self.lesson(day, kind, txt, {"condition": name, "avg_r": m, "n": n})
         return changes
+
+    def candidates(self, limit=10):
+        """Every condition the learner is watching: how much data it has and how close it is to a rule."""
+        since = self.clock() - self.p["window_days"] * 86400
+        rows = self._rows("status='done' AND time>=?", (since,))
+        names = set(CONDITIONS)
+        for r in rows:
+            names.update(c for c in _dyn_conditions(r) if learnable(r, c))
+        active, need, out = set(self.filters()), self.p["min_samples"], []
+        for name in names:
+            pool = [r for r in rows if learnable(r, name)]
+            w = [r["r"] for r in pool if matches(name, r)]
+            wo = [r["r"] for r in pool if not matches(name, r)]
+            if not w:
+                continue
+            m, se = _mean_se(w) if len(w) > 1 else (w[0], 0.0)
+            base = sum(wo) / len(wo) if wo else 0.0
+            if name in active:
+                state = "active"
+            elif len(w) < need:
+                state = "collecting"
+            elif m + se < 0 and m < base - self.p["margin_r"]:
+                state = "next_review"
+            elif m < base:
+                state = "watching"
+            else:
+                state = "fine"
+            out.append({"name": name, "text": describe(name), "n": len(w), "need": need, "avg_r": round(m, 2),
+                        "base_r": round(base, 2), "state": state})
+        order = {"active": 0, "next_review": 1, "watching": 2}
+        main = sorted([c for c in out if c["state"] in order], key=lambda c: (order[c["state"]], c["avg_r"] - c["base_r"]))
+        # of the ones still collecting data, only the 3 closest to having enough (and losing): less noise
+        coll = sorted([c for c in out if c["state"] == "collecting" and c["avg_r"] < c["base_r"]],
+                      key=lambda c: (-c["n"], c["avg_r"]))[:3]
+        return (main + coll)[:limit]
+
+    def closed_by_day(self, day_of, days=14):
+        """Closed trades grouped by trading day (newest first), each with its trades."""
+        groups = {}
+        for c in self.closed_trades(500):
+            d = day_of(c["closed"] or 0)
+            groups.setdefault(d, []).append(c)
+        out = []
+        for d in sorted(groups, reverse=True)[:days]:
+            ts = groups[d]
+            pls = [t["pl"] for t in ts if t["pl"] is not None]
+            out.append({"day": d, **_card_r([t["r"] or 0 for t in ts]),
+                        "wins": sum(1 for t in ts if (t["r"] or 0) > 0.05),
+                        "losses": sum(1 for t in ts if (t["r"] or 0) < -0.05),
+                        "pl": round(sum(pls), 2), "trades": ts})
+        return out
 
     # ---- learning: parameter tuning (walk-forward) ----------------------
     def tune(self, day, history, base_params, base_rr, instruments, breakeven_at_r=1.0):
@@ -366,16 +417,16 @@ class Learner:
                     if best is None or tr > best[2]:
                         best = (key, new, tr, te, now)
         if not best:
-            self.lesson(day, "tune", f"Checked {len(TUNABLE) * 2} small setting changes on "
-                        f"{len(data)} charts; none beat the current settings on unseen data. No change.",
+            self.lesson(day, "tune", f"{len(TUNABLE) * 2} chhote setting badlav {len(data)} charts pe test kiye; koi bhi "
+                        f"naye (unseen) data pe abhi wali settings se behtar nahi nikla. Koi badlav nahi.",
                         {"train_r": base[0], "test_r": base[1]})
             return None
         key, new, tr, te, old = best
         learned = self.params()
         learned[key] = new
         self.put("params", learned)
-        self.lesson(day, "tune", f"Setting {key}: {old} -> {new}. Older data {base[0]:+.1f}R -> {tr:+.1f}R, "
-                    f"unseen recent data {base[1]:+.1f}R -> {te:+.1f}R.",
+        self.lesson(day, "tune", f"Setting badli {key}: {old} -> {new}. Purana data {base[0]:+.1f}R -> {tr:+.1f}R, "
+                    f"naya unseen data {base[1]:+.1f}R -> {te:+.1f}R. Agle scan se laagu.",
                     {"key": key, "old": old, "new": new})
         return best
 

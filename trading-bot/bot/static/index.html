@@ -163,6 +163,10 @@ details summary{cursor:pointer;font-weight:600}
 .imp.High{background:var(--bad-soft);color:var(--bad)}.imp.Medium{background:var(--warn-soft);color:var(--warn)}
 .otr{padding:10px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:3px}.otr:first-of-type{border-top:none}
 .otr a{color:var(--gold);font-weight:600;text-decoration:none}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:5px 0 3px}.bar span{display:block;height:100%;background:var(--gold-hi)}
+.dayrow{border-top:1px solid var(--line);padding:8px 0}.dayrow:first-of-type{border-top:none}
+.dayrow summary{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;cursor:pointer;font-size:14px}
+.dayrow summary .dname{font-weight:700;min-width:84px}.dayrow summary b{margin-left:auto}
 .rc{display:flex;flex-direction:column;gap:1px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
 .rc:first-child{border-top:none}.rc b{font:500 14px var(--f-num)}
 .chat{display:flex;flex-direction:column;gap:8px}
@@ -189,7 +193,7 @@ details summary{cursor:pointer;font-weight:600}
     <button role="tab" data-view="closed" aria-selected="false">📒 Band trades</button>
     <button role="tab" data-view="ask" aria-selected="false">💬 Pucho</button>
     <button role="tab" data-view="news" aria-selected="false">📰 News</button>
-    <button role="tab" data-view="learn" aria-selected="false">🧠 Seekhna</button>
+    <button role="tab" data-view="learn" aria-selected="false">🧠 Seekhna & hisaab</button>
   </div>
 </header>
 <main id="view" class="wrap"><p class="empty">Bot se data aa raha hai…</p></main>
@@ -585,22 +589,51 @@ function viewClosed(){
       <div class="small"><a href="#chart/${id}" data-go="chart/${id}">🔍 Chart</a>${c.ref ? ` · <a href="#journeys" data-ref="${esc(c.ref)}">🧭 Safar</a>` : ''}</div></div>`; }).join('')}</div>`
     : `<p class="empty">${all.length ? 'Is filter mein koi trade nahi.' : 'Abhi tak koi trade band nahi hua. Jaise hi koi trade SL ya TP pe band hoga, yahan aa jayega.'}</p>`}`;
 }
+function dayName(d){ const [y, m, dd] = d.split('-').map(Number); return new Date(Date.UTC(y, m - 1, dd, 12)).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'}); }
+const CSTATE = {active:['good','✅ LAAGU HAI'], next_review:['bad','🔜 AGLE REVIEW MEIN BANEGA'], watching:['info','👀 NAZAR MEIN'], collecting:['info','📥 DATA JAMA HO RAHA'], fine:['good','👍 THEEK HAI']};
 function viewLearn(){
-  const L = S.learning || {}, st = L.stats_30d || {};
-  const params = Object.entries(L.params || {});
-  return `<div class="card"><h2>🧠 Bot kya seekh raha hai</h2>
-    <p class="small muted" style="margin:0">Time Machine har setup ko chart pe follow karta hai (liya ho ya roka ho). Roz 17:00 New York pe: jo cheez baar-baar loss deti hai uska "avoid" rule banata hai, aur ek setting ko thoda badal ke purane + naye data pe test karta hai. Risk ki limits kabhi khud nahi badalta. Session ke bahar ke setups se bhi setup ke rules seekhta hai; sirf time wale rules (jaise "3 baje ke baad mat lo") session ke andar ke data se bante hain.</p></div>
+  const L = S.learning || {}, st = L.stats_30d || {}, ccy = (S.status || {}).currency || '';
+  const params = Object.entries(L.params || {}), nr = S.next_review;
+  const mins = nr ? Math.max(0, Math.round((nr - Date.now() / 1000) / 60)) : null;
+  const days = S.closed_days || [], cands = S.candidates || [];
+  return `<div class="card"><h2>🧠 Seekhna aur hisaab</h2>
+    <div class="status open"><span class="dot"></span><span>⏰ Agla review: ${nr ? nyDT(nr) + ' NY' : '17:00 NY'}${mins != null ? ` (${Math.floor(mins / 60)}h ${mins % 60}m mein)` : ''}<small>Isi waqt naye rule bante/hatte hain aur report card dobara banta hai.</small></span></div>
+    <ul class="steps" style="margin-top:10px">
+      <li class="pass"><b>Har ghante</b> (candle close pe): naye setups record hote hain, purane setups ka chart pe result dekha jaata hai (SL lagta ya TP).</li>
+      <li class="info"><b>Roz 17:00 NY</b>: galtiyan gini jaati hain. Jo cheez ${cands[0]?.need || 20}+ setups mein baar-baar nuksaan de, uska naya rule banta hai; jo rule ab nuksaan nahi deta woh hat jaata hai. Ek setting ka bhi test hota hai.</li>
+      <li class="pass"><b>Laagu kab?</b> Naya rule review ke <b>turant baad agle signal se</b>, aur badli setting <b>agle scan se</b>. Har badlav neeche "Seekhe hue sabak" mein likha jaata hai.</li>
+    </ul></div>
+
+  <div class="card" id="c-days"><h2>📅 Din ke hisaab se trades</h2>
+    ${days.length ? days.map((d, i) => `<details ${i === 0 ? 'open' : ''} class="dayrow"><summary><span class="dname">${esc(dayName(d.day))}</span>
+        <span>${d.n} trade · <span class="good">${d.wins}✅</span> <span class="bad">${d.losses}❌</span></span>
+        <b class="num ${d.total_r >= 0 ? 'good' : 'bad'}">${d.total_r >= 0 ? '+' : ''}${d.total_r.toFixed(2)}R · ${d.pl >= 0 ? '+' : ''}${money(d.pl)} ${ccy}</b></summary>
+        ${d.trades.map(c => `<div class="otr"><div class="row"><span>${c.r > 0.05 ? '✅' : c.r < -0.05 ? '❌' : '➖'} <b>${esc(pair(c.instrument))}</b> ${c.side > 0 ? '<span class="good">BUY</span>' : '<span class="bad">SELL</span>'} <span class="small muted">${nyT(c.closed)} · ${esc(c.how || '')}</span></span>
+          <b class="num ${c.r > 0.05 ? 'good' : c.r < -0.05 ? 'bad' : ''}">${c.r >= 0 ? '+' : ''}${Number(c.r).toFixed(2)}R${c.pl != null ? ' · ' + (c.pl >= 0 ? '+' : '') + money(c.pl) : ''}</b></div>
+          <div class="small"><a href="#chart/${esc(c.instrument)}" data-go="chart/${esc(c.instrument)}">🔍 Chart</a>${c.ref ? ` · <a href="#journeys" data-ref="${esc(c.ref)}">🧭 Safar</a>` : ''}</div></div>`).join('')}
+      </details>`).join('') : '<p class="empty">Abhi tak koi trade band nahi hua. Band hote hi har din ka hisaab yahan aayega.</p>'}
+    <div class="small" style="margin-top:6px"><a href="#closed" data-go="closed" style="color:var(--gold);font-weight:600">📒 Saare band trades (filter ke saath) ›</a></div></div>
+
+  <div class="card" id="c-cands"><h2>🧪 Kaunse rule ban sakte hain</h2>
+    <p class="small muted" style="margin:0 0 6px">Bot har cheez pe nazar rakhta hai. Rule tab banta hai jab kam se kam ${cands[0]?.need || 20} setups ho jayein aur woh cheez baaki setups se saaf zyada nuksaan de.</p>
+    ${cands.length ? cands.map(c => { const [cls, lbl] = CSTATE[c.state] || ['info', c.state]; const pct = Math.min(100, Math.round(100 * c.n / c.need));
+      return `<div class="otr"><div class="row"><span>${esc(c.text)}</span><span class="pill ${cls}">${lbl}</span></div>
+        <div class="bar"><span style="width:${pct}%"></span></div>
+        <div class="small muted">${c.n}/${c.need} setups · inka average <b class="${c.avg_r >= 0 ? 'good' : 'bad'}">${c.avg_r >= 0 ? '+' : ''}${c.avg_r}R</b> vs baaki <b>${c.base_r >= 0 ? '+' : ''}${c.base_r}R</b></div></div>`; }).join('')
+      : '<p class="empty">Abhi data nahi hai. Setups follow hote hi yahan dikhega.</p>'}</div>
+
+  <div class="card" id="c-rules"><h2>🚫 Laagu rules (bot ne khud banaye)</h2>${(L.filters || []).length ? `<ul class="plain">${L.filters.map(f => `<li>Bachna hai: ${esc(f.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi. Upar "Kaunse rule ban sakte hain" mein dekho kaun sa kitna kareeb hai.</p>'}</div>
+
   ${reportCard(L.report_card, st)}
   <div class="daybar">
-    <div><span class="lbl">Setups follow</span><b>${st.setups_followed ?? 0}</b></div>
+    <div><span class="lbl">Setups follow (30 din)</span><b>${st.setups_followed ?? 0}</b></div>
     <div><span class="lbl">Bot trades</span><b>${st.bot_trades ?? 0}</b></div>
-    <div><span class="lbl">Bot ka R</span><b class="${(st.bot_total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.bot_total_r ?? 0).toFixed ? (st.bot_total_r >= 0 ? '+' : '') + st.bot_total_r.toFixed(2) : st.bot_total_r}</b></div>
+    <div><span class="lbl">Bot ka R</span><b class="${(st.bot_total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.bot_total_r >= 0 ? '+' : '') + Number(st.bot_total_r || 0).toFixed(2)}</b></div>
     <div><span class="lbl">Sab setups ka R</span><b class="${(st.all_setups_total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.all_setups_total_r >= 0 ? '+' : '') + Number(st.all_setups_total_r || 0).toFixed(2)}</b></div>
   </div>
   <div class="grid2">
-    <div class="card" id="c-lessons"><h2>📜 Seekhe hue sabak</h2>${(L.lessons || []).length ? `<ul class="tl">${L.lessons.map(l => `<li><span class="t">${esc(l.day.slice(5))}</span><span>${esc(l.text)}</span></li>`).join('')}</ul>` : '<p class="empty">Abhi koi sabak nahi. Pehla review aaj 17:00 New York ke baad, aur pehle rules ~20 milte-julte setups ke baad aayenge.</p>'}</div>
+    <div class="card" id="c-lessons"><h2>📜 Seekhe hue sabak</h2>${(L.lessons || []).length ? `<ul class="tl">${L.lessons.map(l => `<li><span class="t">${esc(l.day.slice(5))}</span><span>${esc(l.text)}</span></li>`).join('')}</ul>` : '<p class="empty">Abhi koi sabak nahi.</p>'}</div>
     <div class="wrap">
-      <div class="card" id="c-rules"><h2>🚫 Khud banaye rules</h2>${(L.filters || []).length ? `<ul class="plain">${L.filters.map(f => `<li>Avoid: ${esc(f.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi.</p>'}</div>
       <div class="card"><h2>⚠️ Sabse zyada galtiyan (30 din)</h2>${(L.mistakes_30d || []).length ? `<ul class="plain">${L.mistakes_30d.map(m => `<li><b class="num">${m.count}×</b> ${esc(m.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi.</p>'}</div>
       <div class="card"><h2>⚙️ Badli hui settings</h2>${params.length ? `<div class="kv">${params.map(([k,v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join('')}</div>` : '<p class="empty">Sab default hain.</p>'}</div>
     </div>
@@ -636,7 +669,7 @@ window.addEventListener('resize', () => { if (bubble.hidden) robotHome(); });
 const IMPORTANT = {executor:['good','bad'], manager:['good','bad','info'], learner:['good'], budget:['good','bad']};
 function evItem(aid, e){
   if (e.kind !== 'did' || !(IMPORTANT[aid] || []).includes(e.tone)) return null;
-  if (aid === 'learner' && !/rule|Setting|sabak|New rule|Rule removed/i.test(e.text)) return null;
+  if (aid === 'learner' && !/rule|Setting|sabak|Report card/i.test(e.text)) return null;
   if (aid === 'manager' && !/close/.test(e.text) && e.tone !== 'good') return null;
   const head = {executor:'Naya trade laga', manager: /close/.test(e.text) ? 'Trade band hua' : 'Trade sambhala', learner:'Bot ne kuch seekha', budget:'Account ki khabar'}[aid];
   const it = {key:`ev:${aid}:${e.t}:${e.text.length}`, t:e.t, tone: e.tone === 'bad' ? 'bad' : e.tone === 'good' ? 'good' : 'info', title: head, text: e.text, agent: aid};
