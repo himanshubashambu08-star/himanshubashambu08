@@ -87,6 +87,7 @@ def main(argv=None):
         return
 
     engine = Engine(broker, cfg, state_path=f"state-{env}.json", journal_path=f"journal-{env}.csv", agents_path=f"agents-{env}.json",
+                    news_path="news-cache.json",
                     memory_path=f"memory-{env}.db")
     if a.mode == "review":
         from bot.risk import trading_day

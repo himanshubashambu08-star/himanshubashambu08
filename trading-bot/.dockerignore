@@ -7,3 +7,4 @@ __pycache__/
 memory-*.db
 reports/
 agents-*.json
+news-cache.json

@@ -118,7 +118,7 @@ def read_chart(instrument, htf_candles, ltf_candles, params=None, bars=80):
     closed = _closed(ltf_candles)
     x = _ltf(closed, p)
     out = {"instrument": instrument, "state": "none", "bias": bias, "score": 0,
-           "note": "Not enough data", "price": ltf_candles[-1].c if ltf_candles else None}
+           "note": "Abhi kaafi data nahi hai", "price": ltf_candles[-1].c if ltf_candles else None}
     show = ltf_candles[-bars:]
     out["candles"] = [[c.time, c.o, c.h, c.l, c.c] for c in show]
     if not x:
@@ -136,7 +136,7 @@ def read_chart(instrument, htf_candles, ltf_candles, params=None, bars=80):
                trend_strength=round(strength, 3))
 
     if bias == 0:
-        out.update(state="none", score=0, note="No clear trend on the higher timeframe - sit out")
+        out.update(state="none", score=0, note="H4 pe koi saaf trend nahi hai, door raho")
         return out
 
     zone = (ema_now - 0.25 * a, ema_now + 0.25 * a)
@@ -144,21 +144,21 @@ def read_chart(instrument, htf_candles, ltf_candles, params=None, bars=80):
     out["stop_hint"] = round(ema_now - bias * p["atr_stop_mult"] * a, dec)
     dist = (price - ema_now) * bias / a           # >0 = on the trend side of the EMA
     word = "Buy" if bias == 1 else "Sell"
-    trend = "Uptrend" if bias == 1 else "Downtrend"
+    trend = "Upar ka trend" if bias == 1 else "Neeche ka trend"
     out["dist_atr"] = round(dist, 2)
 
     if evaluate(instrument, htf_candles, ltf_candles, p):
         out.update(state="signal", score=100,
-                   note=f"{word} signal now: pullback to EMA{p['ltf_ema_pullback']} rejected, RSI {r:.0f}")
+                   note=f"{word} signal abhi: price EMA{p['ltf_ema_pullback']} tak aaya aur wapas mud gaya, RSI {r:.0f}")
     elif -0.5 <= dist <= p["forming_atr"]:
         out.update(state="forming", score=round(60 + 30 * (1 - max(dist, 0) / p["forming_atr"])),
-                   note=f"{trend}: price {dist:.1f} ATR from the EMA. {word} zone forming at "
-                        f"{zone[0]:.{dec}f}-{zone[1]:.{dec}f}; wait for a rejection candle")
+                   note=f"{trend}: price EMA se {dist:.1f} ATR door. {word} zone ban raha hai "
+                        f"{zone[0]:.{dec}f}-{zone[1]:.{dec}f}; wahan se mudne wali candle ka intezaar")
     elif dist > p["forming_atr"]:
         out.update(state="watch", score=round(max(5, 40 - 5 * dist)),
-                   note=f"{trend} but stretched ({dist:.1f} ATR away). {word} only on a pullback "
-                        f"near {ema_now:.{dec}f}")
+                   note=f"{trend}, lekin price bahut door nikal gaya ({dist:.1f} ATR). {word} sirf jab "
+                        f"wapas {ema_now:.{dec}f} ke paas aaye")
     else:
         out.update(state="watch", score=10,
-                   note=f"{trend} on HTF, but price is {abs(dist):.1f} ATR through the EMA - trend may be breaking")
+                   note=f"H4 pe {trend.lower()}, lekin price EMA ke {abs(dist):.1f} ATR paar chala gaya: trend toot sakta hai")
     return out

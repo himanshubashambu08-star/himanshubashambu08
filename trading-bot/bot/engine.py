@@ -17,6 +17,7 @@ from .agents import AgentLog
 from .journal import Journal
 from .learner import Learner, MISTAKE_WORDS, describe
 from .models import GRANULARITY_SECONDS
+from .news import NewsCalendar
 from .risk import RiskManager
 
 log = logging.getLogger("bot")
@@ -68,6 +69,8 @@ def hinglish_reason(reason):
         return fixed[r]
     if r.startswith("too much ") and r.endswith(" exposure"):
         return f"{r[9:-9]} mein pehle se kaafi trades hain (ek currency pe zyada risk nahi)"
+    if r.startswith("news: "):
+        return "Bada news aa raha hai: " + r[6:] + " · 15 min pehle se 15 min baad tak naya trade nahi"
     if r.startswith("learned filter: avoid "):
         return "Seekha hua rule: " + r[len("learned filter: avoid "):] + " se bachna hai"
     if r.startswith("daily loss limit"):
@@ -83,7 +86,7 @@ def ref_for(instrument, signal_time):
 
 class Engine:
     def __init__(self, broker, config, state_path=None, journal_path=None, memory_path=":memory:",
-                 agents_path=None, clock=time.time):
+                 agents_path=None, news_path=None, news_fetcher=None, clock=time.time):
         self.broker = broker
         self.cfg = {**DEFAULTS, **config.get("engine", {})}
         self.base_params = config.get("strategy", {})
@@ -91,6 +94,8 @@ class Engine:
         self.journal = Journal(journal_path)
         self.learner = Learner(config.get("learning", {}), memory_path, clock=clock)
         self.agents = AgentLog(agents_path, clock=clock)
+        self.news = NewsCalendar(config.get("news", {}), news_path, clock=clock, fetcher=news_fetcher)
+        self._news_active = set()
         self.clock = clock
         self.last_bucket = None
         self.last_board = 0.0
@@ -168,6 +173,7 @@ class Engine:
         self.risk.update(account, now)
         self.agents.set_day(self.risk.state["day"])
         self.report_budget(account)
+        self.report_news(now)
         trades = self.broker.open_trades()
         self._spot_closed(trades)
         self.risk.forget_closed([t.id for t in trades])
@@ -333,7 +339,9 @@ class Engine:
             sig.features["spread_ratio"] = round(price.spread / sig.stop_distance, 4)
 
             # Entry Timer
-            reason = blocked_now or (self.learner.blocked(sig) if self.cfg["learn"] else None)
+            ev = None if blocked_now else self.news.blocking(inst.name, self.clock())
+            reason = blocked_now or (f"news: {ev['currency']} {ev['title']} {ny_time(ev['time'])} NY (High)" if ev else None) \
+                or (self.learner.blocked(sig) if self.cfg["learn"] else None)
             if reason:
                 return self._skip(inst, sig, "timer", reason)
             A.step(ref, "timer", "pass", "GO: US session khula, news blackout nahi, koi seekha hua rule nahi roka")
@@ -398,6 +406,60 @@ class Engine:
             A.handoff(agent, "learner", f"{pair(inst.name)} ko shadow mein follow karne ko (result se seekhega)", ref)
             A.step(ref, "learner", "info", "Time Machine is setup ko chart pe follow karega: SL lagta ya TP?")
         return None
+
+    # ---- News Monitor ------------------------------------------------------
+    def report_news(self, now):
+        A, N = self.agents, self.news
+        if not N.p["enabled"]:
+            A.status("news", "Band hai (config mein news.enabled = false)", "idle")
+            return
+        if N.refresh():
+            curs = self._currencies()
+            wk = [e for e in N.upcoming(now, 24 * 7, curs) if e["impact"] == "High"]
+            A.did("news", f"Calendar update: is hafte {len(wk)} bade (High) news aapke pairs ke liye")
+        if N.error and not N.events:
+            A.status("news", f"Calendar nahi mil raha ({N.error}). Trades chalte rahenge, news block band hai.", "warn")
+            return
+        curs = self._currencies()
+        nxt = [e for e in N.upcoming(now, 24 * 7, curs) if e["impact"] == "High" and e["time"] >= now]
+        active = [e for e in N.active(now) if e["currency"] in curs]
+        keys = {f"{e['currency']}|{e['title']}|{e['time']}" for e in active}
+        for e in active:
+            k = f"{e['currency']}|{e['title']}|{e['time']}"
+            if k not in self._news_active:
+                pairs = [pair(i.name) for i in self.universe() if e["currency"] in i.name.split("_")]
+                A.did("news", f"{e['currency']} {e['title']} {ny_time(e['time'])} NY: {', '.join(pairs)} ke naye trades band", tone="bad")
+                A.handoff("news", "timer", f"{e['currency']} ke trades rokne ko ({e['title']})")
+        for k in self._news_active - keys:
+            cur, title, _ = k.split("|", 2)
+            A.did("news", f"{cur} {title} ka time nikal gaya: {cur} pairs pe trades phir allowed", tone="good")
+        self._news_active = keys
+        if active:
+            e = active[0]
+            A.status("news", f"Abhi BLOCK: {e['currency']} {e['title']} ({ny_time(e['time'])} NY)", "bad")
+        elif nxt:
+            e = nxt[0]
+            mins = int((e["time"] - now) // 60)
+            A.status("news", f"Agla bada news: {e['currency']} {e['title']} {ny_time(e['time'])} NY "
+                     f"({mins // 60}h {mins % 60}m mein)", "warn" if mins < 60 else "ok")
+        else:
+            A.status("news", "Is hafte aapke pairs ke liye koi bada news nahi bacha", "ok")
+        A.plan("news", f"High news pe us currency ke naye trades {N.p['before_min']} min pehle se "
+               f"{N.p['after_min']} min baad tak band. Calendar har {N.p['refresh_minutes']} min update. "
+               "Open trades ka SL/TP broker pe laga rehta hai.")
+
+    def _currencies(self):
+        return {c for i in self.universe() for c in i.name.split("_")}
+
+    def news_list(self, now):
+        curs = self._currencies()
+        out = []
+        for e in self.news.upcoming(now, 24 * 7, curs):
+            a, b = self.news.window(e)
+            out.append({**e, "block": e["impact"] in self.news.p["block_impacts"], "from": a, "to": b,
+                        "active": a <= now <= b and e["impact"] in self.news.p["block_impacts"],
+                        "pairs": [i.name for i in self.universe() if e["currency"] in i.name.split("_")]})
+        return out
 
     # ---- Exit Planner ------------------------------------------------------
     def _spot_closed(self, open_trades):
@@ -527,6 +589,7 @@ class Engine:
             charts = sorted(self.board.values(), key=lambda r: -r.get("score", 0))
             status = dict(self.status)
         return {"status": status, "charts": charts, "learning": self.learner.snapshot(),
+                "news": self.news_list(self.clock()), "news_error": self.news.error,
                 "journal": self.journal.rows[-30:][::-1], **self.agents.snapshot()}
 
     def run_forever(self):

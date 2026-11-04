@@ -22,6 +22,7 @@ AGENTS = [
     ("executor", "🚀", "Order Executor", "Broker pe order lagata hai, SL aur TP ek saath."),
     ("manager", "🎯", "Exit Planner", "Open trades sambhalta hai: breakeven, trailing stop, aur close hone pe result nikalta hai."),
     ("learner", "🧠", "Time Machine", "Har setup ka result dekhta hai, galtiyan pakadta hai, roz naye rules aur settings seekhta hai."),
+    ("news", "📰", "News Monitor", "Economic calendar dekhta hai (CPI, NFP, Fed…). Bade news se 15 min pehle se 15 min baad tak us currency ke naye trades rokta hai."),
     ("budget", "💰", "Budget Manager", "Account ki health: aaj ka P&L, daily loss limit, drawdown, aur kitna risk bacha hai."),
 ]
 NAMES = {a[0]: f"{a[1]} {a[2]}" for a in AGENTS}

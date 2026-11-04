@@ -128,7 +128,7 @@ class EngineTests(unittest.TestCase):
         cfg = {"engine": {"instruments": ["XAU_USD"], "kill_file": os.path.join(tmp or ".", "STOP_TEST"),
                           "entry_sessions_ny": []},
                "strategy": {"rsi_buy_min": 0, "rsi_buy_max": 100, "rsi_sell_min": 0, "rsi_sell_max": 100},
-               "risk": {"risk_per_trade_pct": 1.0}}
+               "risk": {"risk_per_trade_pct": 1.0}, "news": {"enabled": False}}
         clock = [ltf[-1].time + 3600 + 30]
         e = Engine(b, cfg, clock=lambda: clock[0])
         return b, e, clock

@@ -129,7 +129,7 @@ class ChartReader(unittest.TestCase):
         far = trend_candles(80, start=2400, step=3.0)
         r = strategy.read_chart("XAU_USD", htf, far)
         self.assertEqual(r["state"], "watch")
-        self.assertIn("stretched", r["note"])
+        self.assertIn("bahut door", r["note"])
 
     def test_forming(self):
         htf, _ = pullback_setup(1)
@@ -142,7 +142,7 @@ class ChartReader(unittest.TestCase):
             ltf.append(last)
         r = strategy.read_chart("XAU_USD", htf, ltf)
         self.assertEqual(r["state"], "forming")
-        self.assertIn("zone forming", r["note"])
+        self.assertIn("zone ban raha", r["note"])
 
 
 def make_engine(tmp, side=1, sessions=None):
@@ -153,7 +153,7 @@ def make_engine(tmp, side=1, sessions=None):
     cfg = {"engine": {"instruments": ["XAU_USD"], "kill_file": os.path.join(tmp, "STOP"),
                       "entry_sessions_ny": sessions if sessions is not None else []},
            "strategy": {"rsi_buy_min": 0, "rsi_buy_max": 100, "rsi_sell_min": 0, "rsi_sell_max": 100},
-           "learning": {"reports_dir": os.path.join(tmp, "reports")}}
+           "learning": {"reports_dir": os.path.join(tmp, "reports")}, "news": {"enabled": False}}
     clock = [ltf[-1].time + 3600 + 30]
     return b, Engine(b, cfg, clock=lambda: clock[0]), clock
 
