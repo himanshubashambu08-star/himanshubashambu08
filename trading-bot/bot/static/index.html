@@ -138,7 +138,7 @@ details summary{cursor:pointer;font-weight:600}
 @keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
 @keyframes glow{50%{opacity:.3}}
 @keyframes jump{50%{transform:translateY(-16px)}}
-#bubble{position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:19;
+#bubble{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:19;
  width:min(560px,calc(100% - 24px));max-height:52vh;overflow:auto;background:var(--surface);border:1px solid var(--gold);
  border-radius:14px;padding:14px;box-shadow:0 14px 40px -12px rgba(0,0,0,.45)}
 #bubble[hidden]{display:none}
@@ -182,25 +182,57 @@ details summary{cursor:pointer;font-weight:600}
 .hl{outline:3px solid var(--gold-hi);outline-offset:3px;border-radius:12px;animation:pulse 1.3s infinite}
 @keyframes pulse{50%{outline-color:transparent}}
 @media (prefers-reduced-motion:reduce){#robot,#robot *,.hl{animation:none!important;transition:none!important}}
+
+/* ---- clean app layout ---- */
+header.top{position:static;padding:6px 0 4px}
+.brand h1{font-size:22px}
+.app{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+.bnav{position:fixed;left:0;right:0;bottom:0;z-index:15;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+.bnav button{background:none;border:0;color:var(--muted);font:600 12px var(--f-body);display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:10px;cursor:pointer}
+.bnav button span{font-size:20px;line-height:1}
+.bnav button.on{color:var(--gold);background:var(--gold-soft)}
+.menu{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mi{display:grid;grid-template-columns:40px 1fr auto 14px;gap:10px;align-items:center;padding:12px 12px;border:0;border-top:1px solid var(--line);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;width:100%}
+.mi:first-child{border-top:none}
+.mi:active,.mi:hover{background:var(--bg)}
+.mi .ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:20px;background:var(--bg);border:1px solid var(--line)}
+.mi .tt{font-weight:600;font-size:15px}.mi .ss{font-size:12.5px;color:var(--muted);margin-top:1px}
+.mi .bd{font:600 12px var(--f-num);padding:3px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.mi .bd.good{color:var(--good);border-color:var(--good);background:var(--good-soft)}.mi .bd.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.mi .bd.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.mi .ch{color:var(--muted);font-size:18px}
+.mgroup{font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 2px -4px}
+.phead{display:flex;align-items:center;gap:10px}
+.phead .back{padding:6px 10px}
+.phead h2{margin:0;font-size:22px}
+.phead .sub{font-size:12.5px;color:var(--muted)}
+details.sec{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+details.sec>summary{list-style:none;display:grid;grid-template-columns:1fr auto 14px;gap:8px;align-items:center;padding:13px 14px;cursor:pointer}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary .st{font-weight:600}details.sec>summary .sm{font-size:12.5px;color:var(--muted);text-align:right}
+details.sec>summary::after{content:"›";color:var(--muted);font-size:18px;transition:transform .15s}
+details.sec[open]>summary::after{transform:rotate(90deg)}
+details.sec>.sb{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px}
+details.sec>.sb>.card{border:0;padding:0;background:none}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kpi b{display:block;font:500 20px var(--f-num);margin-top:2px}
+.status.slim{padding:10px 12px;font-size:14px}
 </style>
 </head>
 <body>
 <div class="app">
 <header class="top">
   <div class="brand"><h1>Forex <span>Trade Bot</span></h1><span class="sym" id="sym">OANDA · demo</span></div>
-  <div class="tabs" role="tablist">
-    <button role="tab" data-view="home" aria-selected="true">🏠 Aaj</button>
-    <button role="tab" data-view="agents" aria-selected="false">🤖 Agents</button>
-    <button role="tab" data-view="journeys" aria-selected="false">🧭 Trades ka safar</button>
-    <button role="tab" data-view="charts" aria-selected="false">📈 Charts</button>
-    <button role="tab" data-view="closed" aria-selected="false">📒 Band trades</button>
-    <button role="tab" data-view="ask" aria-selected="false">💬 Pucho</button>
-    <button role="tab" data-view="news" aria-selected="false">📰 News</button>
-    <button role="tab" data-view="learn" aria-selected="false">🧠 Seekhna & hisaab</button>
-  </div>
 </header>
 <main id="view" class="wrap"><p class="empty">Bot se data aa raha hai…</p></main>
 </div>
+<nav class="bnav" id="bnav">
+  <button data-go="home" data-nav="home"><span>🏠</span>Home</button>
+  <button data-go="trades" data-nav="trades"><span>🎯</span>Trades</button>
+  <button data-go="charts" data-nav="charts"><span>📈</span>Charts</button>
+  <button data-go="menu" data-nav="menu"><span>☰</span>Menu</button>
+</nav>
 <button id="robot" aria-label="Manager robot: khabrein dikhao" data-mood="info">
 <svg viewBox="0 0 64 76" width="64" height="76" aria-hidden="true">
  <defs><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D57E"/><stop offset="1" stop-color="#C8901A"/></linearGradient></defs>
@@ -238,7 +270,6 @@ const agent = id => (S?.agents || []).find(a => a.id === id) || {id, emoji:'•'
 const aname = id => { const a = agent(id); return `${a.emoji} ${a.name}`; };
 const countVal = (k, v) => k === 'r_x100' ? (v/100 >= 0 ? '+' : '') + (v/100).toFixed(2) + 'R' : v;
 
-document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.view); });
 window.addEventListener('hashchange', () => { route = location.hash.slice(1) || 'home'; render(); if (!BOT.guiding) window.scrollTo(0,0); });
 function go(r){ if (location.hash.slice(1) === r) { route = r; render(); } else location.hash = r; }
 document.addEventListener('click', e => {
@@ -248,10 +279,9 @@ document.addEventListener('click', e => {
 
 function render(){
   const brainOn = !!(S && S.brain && S.brain.available);
-  const askTab = document.querySelector('.tabs [data-view=ask]'); if (askTab) askTab.hidden = !brainOn;
   if (route === 'ask' && S && !brainOn) { route = 'home'; history.replaceState(null, '', '#home'); }
   const base = route.split('/')[0];
-  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === (base === 'agent' ? 'agents' : base === 'chart' ? 'charts' : base))));
+  document.querySelectorAll('#bnav button').forEach(b => b.classList.toggle('on', b.dataset.nav === navKey(base)));
   if (!S) return;
   const sym = $('#sym'); if (sym && S.version) sym.textContent = `OANDA · demo · v${S.version.app} · ${(S.mode || {}).strategy === 'ema_break' ? 'EMA9/15' : 'R' + S.version.rules}`;
   const v = $('#view');
@@ -264,6 +294,11 @@ function render(){
   else if (base === 'news') v.innerHTML = viewNews();
   else if (base === 'closed') v.innerHTML = viewClosed();
   else if (base === 'ask') { const q = document.getElementById('q')?.value || ''; v.innerHTML = viewAsk(); const t = document.getElementById('q'); if (t) t.value = q; }
+  else if (base === 'menu') v.innerHTML = viewMenu();
+  else if (base === 'trades') v.innerHTML = viewTrades();
+  else if (base === 'strategy') v.innerHTML = viewStrategy();
+  else if (base === 'shadow') v.innerHTML = viewShadow();
+  else if (base === 'settings') v.innerHTML = viewSettings();
   else v.innerHTML = viewHome();
   if (v.querySelector('canvas[data-inst]')) { applyLive(false); drawCharts(); }
   applyHL();
@@ -271,7 +306,7 @@ function render(){
 
 function statusBanner(st){
   const blocked = st.no_new_trades;
-  let cls = 'ok', text = 'Bot chal raha hai · entry window khuli hai', sub = st.session_text || '';
+  let cls = 'ok', text = (S.mode || {}).trade_mode === 'all' && (S.mode || {}).strategy === 'ema_break' ? 'Bot chal raha hai · har chart, 24 ghante' : 'Bot chal raha hai · entry window khuli hai', sub = st.session_text || '';
   if (blocked && blocked !== 'outside US session') { cls = 'lock'; text = 'Naye trades band'; sub = blocked; }
   else if (blocked) { cls = 'open'; text = 'Sirf dekh raha hai (US session band)'; sub = st.session_text; }
   return `<div class="status ${cls}"><span class="dot"></span><span>${esc(text)}<small>${esc(sub)} · update ${nyT(st.time)} NY · agla scan ${nyT(st.next_scan)}</small></span></div>`;
@@ -299,10 +334,87 @@ function versionCard(){
     <span>Pairs mode</span><b>${(S.learning || {}).universe === 'liquid' ? 'Sirf bade pairs' : 'Saare charts'}</b></div>
     ${H.length ? `<div class="lbl" style="margin-top:8px">Rules kab badle</div><ul class="tl">${H.slice(0, 6).map(h => `<li><span class="t">R${h.v}</span><span>${esc(h.why)} <span class="small muted">· ${nyDT(h.time)}</span></span></li>`).join('')}</ul>` : '<p class="small muted" style="margin:6px 0 0">R1 = shuru wale rules. Bot jab bhi rule ya setting badlega, number badhega aur yahan likha jayega.</p>'}</div>`;
 }
+
+function navKey(base){ return base === 'home' ? 'home' : ['trades','closed'].includes(base) ? 'trades' : ['charts','chart'].includes(base) ? 'charts' : 'menu'; }
+function pageHead(title, sub, back){
+  return `<div class="phead">${back ? `<button class="back" data-go="${back}">‹</button>` : ''}<div><h2>${title}</h2>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
+}
+function sec(id, title, summary, body, open){
+  return `<details class="sec" id="${id}" ${open ? 'open' : ''}><summary><span class="st">${title}</span><span class="sm">${summary || ''}</span></summary><div class="sb">${body}</div></details>`;
+}
+function menuItems(){
+  const st = S.status || {}, T = S.today || {}, ch = S.charts || [], M = S.mode || {}, L = S.learning || {};
+  const n = s => ch.filter(c => c.state === s).length;
+  const tr = st.open_trades || [], upl = tr.reduce((a, t) => a + (t.unrealized_pl || 0), 0);
+  const N = (S.news || []).filter(e => e.block && e.time > Date.now() / 1000);
+  const act = (S.news || []).filter(e => e.active);
+  const nr = S.next_review, mins = nr ? Math.max(0, Math.round((nr - Date.now() / 1000) / 60)) : null;
+  const ema = M.strategy === 'ema_break';
+  const G = M.gate || {};
+  const it = (go, ic, tt, ss, bd, cls) => ({go, ic, tt, ss, bd, cls});
+  return [
+    ['Trading', [
+      it('trades', '🎯', 'Chal rahe trades', tr.length ? tr.slice(0, 3).map(t => pair(t.instrument) + (t.units > 0 ? ' BUY' : ' SELL')).join(', ') : 'Abhi koi trade open nahi', tr.length ? `${tr.length} · ${upl >= 0 ? '+' : ''}${money(upl)}` : '0', tr.length ? (upl >= 0 ? 'good' : 'bad') : ''),
+      it('closed', '📒', 'Band trades', `Aaj ${T.closed || 0} band · ${T.wins || 0} jeete · ${T.losses || 0} haare`, `${(T.pl || 0) >= 0 ? '+' : ''}${money(T.pl || 0)}`, (T.pl || 0) > 0 ? 'good' : (T.pl || 0) < 0 ? 'bad' : ''),
+      it('journeys', '🧭', 'Signals ka safar', 'Har signal kahan pass hua, kahan ruka', String((S.journeys || []).length)),
+      it('charts', '📈', 'Charts', `${n('signal')} signal · ${n('forming')} ban rahe · ${n('watch')} watch`, String(ch.length)),
+    ]],
+    ['Strategy aur seekhna', [
+      it('strategy', '🥇', 'Strategy & backtest', ema ? (M.trade_mode === 'all' ? 'EMA 9/15 · har jagah trade mode' : 'EMA 9/15 · sirf trading list') : 'Purani pullback strategy', ema ? (M.trade_mode === 'all' ? '⚡ ON' : G.passed ? '✅ PASS' : '🔒') : '', ema ? (M.trade_mode === 'all' || G.passed ? 'good' : 'warn') : ''),
+      ...(ema ? [it('shadow', '🌙', 'Shadow vs asli · Research', 'Kaunse pair aur ghante kaam karte hain', String(((L.trade_list) || []).length) + ' list')] : []),
+      it('learn', '🧠', 'Seekhna', 'Din ka hisaab, sabak, galtiyan, naye rule', mins != null ? `${Math.floor(mins / 60)}h ${mins % 60}m` : ''),
+    ]],
+    ['Bot ke andar', [
+      it('agents', '🤖', 'Agents', 'Har agent kya kar raha hai, kya plan hai', String((S.agents || []).length)),
+      it('news', '📰', 'News calendar', act.length ? 'Abhi news ki wajah se kuch pairs band' : N.length ? `Agla: ${N[0].currency} ${N[0].title} ${nyT(N[0].time)} NY` : 'Aage koi bada news nahi', act.length ? '⛔' : N.length ? inTxt(N[0].time) : '', act.length ? 'bad' : ''),
+      ...((S.brain || {}).available ? [it('ask', '💬', 'Manager se pucho', 'Market ya bot ke baare mein kuch bhi', '')] : []),
+      it('settings', '⚙️', 'Settings & version', `Risk ${(st.risk || {}).risk_per_trade_pct ?? '-'}%/trade · daily limit ${(st.risk || {}).daily_loss_limit_pct ?? '-'}%`, 'v' + ((S.version || {}).app || '?')),
+    ]],
+  ];
+}
+function menuList(groups){
+  return groups.map(([g, items]) => `<div class="mgroup">${g}</div><div class="menu">${items.map(i => `<button class="mi" data-go="${i.go}"><span class="ic">${i.ic}</span><span><div class="tt">${i.tt}</div><div class="ss">${esc(i.ss)}</div></span>${i.bd ? `<span class="bd ${i.cls || ''}">${esc(i.bd)}</span>` : '<span></span>'}<span class="ch">›</span></button>`).join('')}</div>`).join('');
+}
 function viewHome(){
-  const st = S.status || {}, ccy = st.currency || '';
+  const st = S.status || {}, T = S.today || {}, ccy = st.currency || '';
   const pl = st.nav != null && st.day_start_nav ? st.nav - st.day_start_nav : null;
-  const today = (S.journeys || []).filter(j => j.created && (Date.now()/1000 - j.created) < 86400);
+  return `${statusBanner(st).replace('class="status ', 'class="status slim ')}
+  <div class="kpis">
+    <div class="kpi"><span class="lbl">Equity</span><b>${money(st.nav)} <span class="small muted">${ccy}</span></b></div>
+    <div class="kpi"><span class="lbl">Aaj P&amp;L</span><b class="${pl == null ? '' : pl >= 0 ? 'good' : 'bad'}">${pl == null ? '-' : (pl >= 0 ? '+' : '') + money(pl)}</b></div>
+    <div class="kpi"><span class="lbl">Chal rahe</span><b>${(st.open_trades || []).length}</b></div>
+    <div class="kpi"><span class="lbl">Aaj band</span><b>${T.closed || 0} <span class="small"><span class="good">${T.wins || 0}✅</span> <span class="bad">${T.losses || 0}❌</span></span></b></div>
+  </div>
+  ${menuList(menuItems())}`;
+}
+function viewMenu(){ return pageHead('Menu', 'Sab kuch yahan se khulta hai') + menuList(menuItems()); }
+function viewTrades(){
+  return `${pageHead('🎯 Trades', 'Chal rahe aur aaj ka hisaab')}
+  ${todayCard()}
+  ${openList()}
+  ${(S.mode || {}).pending && S.mode.pending.length ? `<div class="card"><h2>⏳ Pending stop orders</h2>${S.mode.pending.map(o => `<div class="small">${o.side > 0 ? 'BUY' : 'SELL'} ${esc(pair(o.instrument))} jab price ${px(o.entry)} tode · SL ${px(o.stop)} · TP ${px(o.tp)} · ${nyT(o.expire)} NY tak</div>`).join('')}</div>` : ''}
+  <div class="menu"><button class="mi" data-go="closed"><span class="ic">📒</span><span><div class="tt">Saare band trades</div><div class="ss">Jeete / haare / breakeven filter</div></span><span></span><span class="ch">›</span></button></div>`;
+}
+function viewStrategy(){
+  const L = S.learning || {}, st = L.stats_30d || {};
+  return pageHead('🥇 Strategy & backtest', '', 'menu') + ((S.mode || {}).strategy === 'ema_break' ? emaCard(false) : reportCard(L.report_card, st) + experimentsCard(L.experiments));
+}
+function viewShadow(){ return pageHead('🌙 Shadow vs asli', 'Aur research: kahan kaam karti hai strategy', 'menu') + shadowCard() + researchCard(); }
+function viewSettings(){
+  const r = (S.status || {}).risk || {}, b = agent('budget'), params = Object.entries((S.learning || {}).params || {});
+  return `${pageHead('⚙️ Settings & version', '', 'menu')}
+  ${versionCard()}
+  <div class="card"><h2>🛡️ Risk limits</h2><div class="kv">
+    <span>Risk per trade</span><b>${r.risk_per_trade_pct ?? '-'}%</b>
+    <span>Daily loss limit (open risk ke saath)</span><b>${r.daily_loss_limit_pct ?? '-'}%</b>
+    <span>Max drawdown (bot rukega)</span><b>${r.max_drawdown_pct ?? '-'}%</b>
+    <span>Max open trades</span><b>${r.max_open_trades ?? '-'}</b>
+    <span>Spread SL ke max</span><b>${r.max_spread_to_stop != null ? Math.round(r.max_spread_to_stop * 100) + '%' : '-'}</b></div></div>
+  <div class="card"><h2>💰 Paisa aur limits (abhi)</h2><p style="margin:0 0 6px"><span class="tone ${b.tone}"></span>${esc(b.status)}</p><div class="plan">${esc(b.plan)}</div></div>
+  ${params.length ? `<div class="card"><h2>⚙️ Bot ne badli settings</h2><div class="kv">${params.map(([k, v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join('')}</div></div>` : ''}`;
+}
+
+function flowCard(){
   const rows = FLOW.map((id, i) => {
     const a = agent(id); const c = a.counts || {};
     const key = {scanner:'charts',reader:'signals',rules:'passed',timer:'go',risk:'approved',executor:'orders',manager:'closed',learner:'followed'}[id];
@@ -311,31 +423,11 @@ function viewHome(){
       <span><span class="name"><span class="tone ${a.tone}"></span>${esc(a.name)}</span><span class="st">${esc(a.status)}</span></span>
       <span class="big">${countVal(key, c[key] || 0)}<small>${COUNT_LABELS[key]}</small></span></button>`;
   }).join('');
-  const b = agent('budget');
-  return `${statusBanner(st)}
-  ${emaCard(true)}
-  ${(S.mode || {}).strategy === 'ema_break' ? shadowCard() : ''}
-  ${todayCard()}
-  <div class="daybar">
-    <div><span class="lbl">Equity</span><b>${money(st.nav, ccy)}</b></div>
-    <div><span class="lbl">Aaj P&amp;L</span><b class="${pl == null ? '' : pl >= 0 ? 'good' : 'bad'}">${pl == null ? '-' : (pl >= 0 ? '+' : '') + money(pl)}</b></div>
-    <div><span class="lbl">Open trades</span><b>${(st.open_trades || []).length}</b></div>
-    <div><span class="lbl">Aaj signals</span><b>${today.length}</b></div>
-  </div>
-  <div class="grid2">
-    <div class="card" id="c-flow"><h2>Kaam kaise chal raha hai</h2>
+  return `<div class="card" id="c-flow">
       <p class="small muted" style="margin:0 0 10px">Har signal upar se neeche jaata hai. Har agent apna kaam karke agle ko bhejta hai. Kisi pe bhi tap karo: usne kya kiya, kya plan hai, kisko bheja.</p>
       <div class="flow">${rows}</div>
       <div class="side-note">Saath mein: <a href="#agent/budget" data-go="agent/budget">${esc(aname('budget'))}</a> account ki limits pe, aur <a href="#agent/news" data-go="agent/news">${esc(aname('news'))}</a> bade news pe nazar rakhta hai.</div>
-    </div>
-    <div class="wrap">
-      <div class="card" id="c-budget"><h2>💰 Paisa aur limits</h2><p style="margin:0 0 6px"><span class="tone ${b.tone}"></span>${esc(b.status)}</p><div class="plan">${esc(b.plan)}</div></div>
-      <div class="card" id="c-open"><h2>🎯 Open trades</h2>${openTrades(st)}</div>
-      ${newsMini()}
-      <div class="card"><div class="row"><h2>🧭 Abhi ke signals</h2><a href="#journeys" data-go="journeys" class="small">Sab dekho ›</a></div>
-        ${(S.journeys || []).slice(0,3).map(journeyCard).join('') || '<p class="empty">Abhi koi signal nahi aaya. Chart Reader har candle pe check karta hai.</p>'}</div>
-    </div>
-  </div>`;
+    </div>`;
 }
 
 function openTrades(st){
@@ -354,7 +446,8 @@ function agentChips(a){
 
 function viewAgents(){
   const order = [...FLOW, 'news', 'budget'];
-  return `<div class="card"><h2>🤖 9 agents, har ek ka apna kaam</h2><p class="small muted" style="margin:0">Card pe tap karo: poori history, plan, aur kisko kya bheja.</p></div>
+  return `${pageHead('🤖 Agents', 'Har agent ka kaam, plan aur history', 'menu')}
+  ${sec('c-flow-sec', '🔁 Kaam kaise chal raha hai', '', flowCard(), false)}<div class="card"><h2>🤖 9 agents, har ek ka apna kaam</h2><p class="small muted" style="margin:0">Card pe tap karo: poori history, plan, aur kisko kya bheja.</p></div>
   <div class="agents">${order.map(id => { const a = agent(id), ch = agentChips(a), last = (a.events || [])[0];
     return `<button class="card acard" data-go="agent/${id}">
       <div class="head"><span class="emo">${a.emoji}</span><div><h3>${esc(a.name)}</h3><div class="small muted"><span class="tone ${a.tone}"></span>${esc(a.status)}</div></div></div>
@@ -410,7 +503,7 @@ function viewJourneys(){
   const all = S.journeys || [];
   const list = all.filter(j => jfilter === 'all' || (jfilter === 'taken' ? j.taken : jfilter === 'blocked' ? !j.taken : j.r != null));
   const btn = (k, t) => `<button class="${jfilter === k ? 'on' : ''}" onclick="jfilter='${k}';render()">${t}</button>`;
-  return `<div class="card"><h2>🧭 Har signal ka safar</h2><p class="small muted" style="margin:0 0 8px">Signal kis agent se kis agent tak gaya, kahan pass hua (✓), kahan roka gaya (✗), aur end mein result kya raha. Roke gaye signals ko bhi Time Machine chart pe follow karta hai, taaki pata chale rokna sahi tha ya nahi.</p>
+  return `${pageHead('🧭 Signals ka safar', '', 'menu')}<div class="card"><h2>🧭 Har signal ka safar</h2><p class="small muted" style="margin:0 0 8px">Signal kis agent se kis agent tak gaya, kahan pass hua (✓), kahan roka gaya (✗), aur end mein result kya raha. Roke gaye signals ko bhi Time Machine chart pe follow karta hai, taaki pata chale rokna sahi tha ya nahi.</p>
     <div class="seg">${btn('all','Sab')}${btn('taken','Bot ne liye')}${btn('blocked','Roke gaye')}${btn('done','Result aa gaya')}</div></div>
   ${list.map(journeyCard).join('') || '<p class="empty">Is group mein abhi kuch nahi.</p>'}`;
 }
@@ -488,7 +581,7 @@ function viewCharts(){
   const charts = (S.charts || []).filter(c => cfilter === 'all' || (cfilter === 'open' ? openSet.has(c.instrument) : c.state === cfilter));
   const n = s => (S.charts || []).filter(c => c.state === s).length;
   const btn = (k, t) => `<button class="${cfilter === k ? 'on' : ''}" onclick="cfilter='${k}';render()">${t}</button>`;
-  return `<div class="card" id="c-charts"><div class="row"><h2>📈 Saare charts (${(S.charts || []).length})</h2><span id="livenote">${liveNote()}</span></div>
+  return `${pageHead('📈 Charts', (S.charts || []).length + ' charts live')}<div class="card" id="c-charts"><div class="row"><h2>Filter</h2><span id="livenote">${liveNote()}</span></div>
     <div class="legend" style="margin-bottom:8px"><span><b class="good">SIGNAL</b>: abhi rules poore</span><span><b style="color:var(--gold-hi)">BAN RAHA</b>: price zone ki taraf aa raha</span><span><b style="color:#4c7bd9">WATCH</b>: trend hai, price door</span><span><b>KUCH NAHI</b>: trend nahi</span><span>Peeli patti = entry zone · Purple line = ${emaName()} · Aakhri candle live chalti hai</span></div>
     <div class="seg">${btn('all','Sab')}${btn('open','🎯 Open trades '+openSet.size)}${btn('signal','Signal '+n('signal'))}${btn('forming','Ban raha '+n('forming'))}${btn('watch','Watch '+n('watch'))}${btn('none','Kuch nahi '+n('none'))}</div></div>
   ${openSet.size || cfilter === 'open' ? openList() : ''}
@@ -568,7 +661,7 @@ function viewNews(){
   const groups = {};
   N.forEach((e, i) => { const d = dayfmt.format(new Date(e.time*1000)); (groups[d] = groups[d] || []).push([e, i]); });
   const act = N.filter(e => e.active);
-  return `<div class="card"><h2>📰 Economic calendar (is hafte)</h2>
+  return `${pageHead('📰 News calendar', '', 'menu')}<div class="card"><h2>📰 Economic calendar (is hafte)</h2>
     <p class="small muted" style="margin:0">Sirf aapke pairs ki currencies ke <b>High</b> aur <b>Medium</b> news. Time New York ka. <span class="imp High">High</span> news pe ${esc(aname('news'))} us currency ke naye trades 15 min pehle se 15 min baad tak band karta hai. Open trades ka SL/TP broker pe laga rehta hai.</p>
     ${S.news_error ? `<div class="status open" style="margin-top:8px"><span class="dot"></span><span>Calendar update nahi hua: ${esc(S.news_error)}<small>Purana saved calendar use ho raha hai (agar hai). Bot trading rokta nahi.</small></span></div>` : ''}
     ${act.length ? `<div class="status lock" style="margin-top:8px" id="c-news-now"><span class="dot"></span><span>Abhi band: ${esc(act.map(e => e.currency + ' ' + e.title).join(', '))}</span></div>` : ''}</div>
@@ -601,7 +694,7 @@ function viewClosed(){
   const list = all.filter(c => (c.closed || 0) >= since).filter(c => kfilter === 'all' || (kfilter === 'win' ? c.r > 0.05 : kfilter === 'loss' ? c.r < -0.05 : Math.abs(c.r) <= 0.05));
   const b = (k, t, v, cur) => `<button class="${cur === k ? 'on' : ''}" onclick="${v}='${k}';render()">${t}</button>`;
   const n = f => all.filter(c => (c.closed || 0) >= since).filter(f).length;
-  return `<div class="card"><h2>📒 Band hue trades</h2>
+  return `${pageHead('📒 Band trades', '', 'trades')}<div class="card"><h2>📒 Band hue trades</h2>
     <p class="small muted" style="margin:0 0 8px">Bot ke asli (demo) trades jo SL, TP, breakeven ya trailing SL pe band hue. Paisa aapke account currency mein, OANDA ke hisaab se.</p>
     <div class="seg" style="margin-bottom:8px">${b('day','Aaj (5PM se)','kperiod',kperiod)}${b('week','7 din','kperiod',kperiod)}${b('all','Shuru se','kperiod',kperiod)}</div>
     <div class="daybar">
@@ -676,52 +769,33 @@ function researchCard(){
 }
 function viewLearn(){
   const L = S.learning || {}, st = L.stats_30d || {}, ccy = (S.status || {}).currency || '';
-  const params = Object.entries(L.params || {}), nr = S.next_review;
+  const nr = S.next_review;
   const mins = nr ? Math.max(0, Math.round((nr - Date.now() / 1000) / 60)) : null;
   const days = S.closed_days || [], cands = S.candidates || [];
-  return `<div class="card"><h2>🧠 Seekhna aur hisaab</h2>
-    <div class="status open"><span class="dot"></span><span>⏰ Agla review: ${nr ? nyDT(nr) + ' NY' : '17:00 NY'}${mins != null ? ` (${Math.floor(mins / 60)}h ${mins % 60}m mein)` : ''}<small>Isi waqt naye rule bante/hatte hain aur report card dobara banta hai.</small></span></div>
+  return `${pageHead('🧠 Seekhna', 'Bot kya seekh raha hai, aur har din ka hisaab', 'menu')}
+  ${sec('s-review', '⏰ Agla review aur kab kya hota hai', mins != null ? `${Math.floor(mins / 60)}h ${mins % 60}m mein` : '', `<div class="status open"><span class="dot"></span><span>⏰ Agla review: ${nr ? nyDT(nr) + ' NY' : '17:00 NY'}${mins != null ? ` (${Math.floor(mins / 60)}h ${mins % 60}m mein)` : ''}<small>Isi waqt naye rule bante/hatte hain aur report card dobara banta hai.</small></span></div>
     <ul class="steps" style="margin-top:10px">
       <li class="pass"><b>Har ghante</b> (candle close pe): naye setups record hote hain, purane setups ka chart pe result dekha jaata hai (SL lagta ya TP).</li>
       <li class="info"><b>Roz 17:00 NY</b>: galtiyan gini jaati hain. Jo cheez ${cands[0]?.need || 20}+ setups mein baar-baar nuksaan de, uska naya rule banta hai; jo rule ab nuksaan nahi deta woh hat jaata hai. Ek setting ka bhi test hota hai.</li>
       <li class="pass"><b>Laagu kab?</b> Naya rule review ke <b>turant baad agle signal se</b>, aur badli setting <b>agle scan se</b>. Har badlav neeche "Seekhe hue sabak" mein likha jaata hai.</li>
-    </ul></div>
-
-  <div class="card" id="c-days"><h2>📅 Din ke hisaab se trades</h2>
-    ${days.length ? days.map((d, i) => `<details ${i === 0 ? 'open' : ''} class="dayrow"><summary><span class="dname">${esc(dayName(d.day))}</span>
+    </ul>`, true)}
+  ${sec('c-days', '📅 Din ke hisaab se trades', days.length ? `${days[0].n} trade aaj · ${days[0].total_r >= 0 ? '+' : ''}${days[0].total_r.toFixed(1)}R` : 'abhi koi nahi', `${days.length ? days.map((d, i) => `<details ${i === 0 ? 'open' : ''} class="dayrow"><summary><span class="dname">${esc(dayName(d.day))}</span>
         <span>${d.n} trade · <span class="good">${d.wins}✅</span> <span class="bad">${d.losses}❌</span></span>
         <b class="num ${d.total_r >= 0 ? 'good' : 'bad'}">${d.total_r >= 0 ? '+' : ''}${d.total_r.toFixed(2)}R · ${d.pl >= 0 ? '+' : ''}${money(d.pl)} ${ccy}</b></summary>
         ${d.trades.map(c => `<div class="otr"><div class="row"><span>${c.r > 0.05 ? '✅' : c.r < -0.05 ? '❌' : '➖'} <b>${esc(pair(c.instrument))}</b> ${c.side > 0 ? '<span class="good">BUY</span>' : '<span class="bad">SELL</span>'} <span class="small muted">${nyT(c.closed)} · ${esc(c.how || '')}</span></span>
           <b class="num ${c.r > 0.05 ? 'good' : c.r < -0.05 ? 'bad' : ''}">${c.r >= 0 ? '+' : ''}${Number(c.r).toFixed(2)}R${c.pl != null ? ' · ' + (c.pl >= 0 ? '+' : '') + money(c.pl) : ''}</b></div>
           <div class="small"><a href="#chart/${esc(c.instrument)}" data-go="chart/${esc(c.instrument)}">🔍 Chart</a>${c.ref ? ` · <a href="#journeys" data-ref="${esc(c.ref)}">🧭 Safar</a>` : ''}</div></div>`).join('')}
       </details>`).join('') : '<p class="empty">Abhi tak koi trade band nahi hua. Band hote hi har din ka hisaab yahan aayega.</p>'}
-    <div class="small" style="margin-top:6px"><a href="#closed" data-go="closed" style="color:var(--gold);font-weight:600">📒 Saare band trades (filter ke saath) ›</a></div></div>
-
-  <div class="card" id="c-cands"><h2>🧪 Kaunse rule ban sakte hain</h2>
-    <p class="small muted" style="margin:0 0 6px">Bot har cheez pe nazar rakhta hai. Rule tab banta hai jab kam se kam ${cands[0]?.need || 20} setups ho jayein aur woh cheez baaki setups se saaf zyada nuksaan de.</p>
+    <div class="small" style="margin-top:6px"><a href="#closed" data-go="closed" style="color:var(--gold);font-weight:600">📒 Saare band trades (filter ke saath) ›</a></div>`)}
+  ${sec('c-lessons', '📜 Seekhe hue sabak', `${(L.lessons || []).length}`, `${(L.lessons || []).length ? `<ul class="tl">${L.lessons.map(l => `<li><span class="t">${esc(l.day.slice(5))}</span><span>${esc(l.text)}</span></li>`).join('')}</ul>` : '<p class="empty">Abhi koi sabak nahi.</p>'}`)}
+  ${sec('c-mistakes', '⚠️ Sabse zyada galtiyan (30 din)', `${(L.mistakes_30d || []).length}`, `${(L.mistakes_30d || []).length ? `<ul class="plain">${L.mistakes_30d.map(m => `<li><b class="num">${m.count}×</b> ${esc(m.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi.</p>'}`)}
+  ${sec('c-cands', '🧪 Kaunse rule ban sakte hain', `${cands.length}`, `<p class="small muted" style="margin:0 0 6px">Bot har cheez pe nazar rakhta hai. Rule tab banta hai jab kam se kam ${cands[0]?.need || 20} setups ho jayein aur woh cheez baaki setups se saaf zyada nuksaan de.</p>
     ${cands.length ? cands.map(c => { const [cls, lbl] = CSTATE[c.state] || ['info', c.state]; const pct = Math.min(100, Math.round(100 * c.n / c.need));
       return `<div class="otr"><div class="row"><span>${esc(c.text)}</span><span class="pill ${cls}">${lbl}</span></div>
         <div class="bar"><span style="width:${pct}%"></span></div>
         <div class="small muted">${c.n}/${c.need} setups · inka average <b class="${c.avg_r >= 0 ? 'good' : 'bad'}">${c.avg_r >= 0 ? '+' : ''}${c.avg_r}R</b> vs baaki <b>${c.base_r >= 0 ? '+' : ''}${c.base_r}R</b></div></div>`; }).join('')
-      : '<p class="empty">Abhi data nahi hai. Setups follow hote hi yahan dikhega.</p>'}</div>
-
-  <div class="card" id="c-rules"><h2>🚫 Laagu rules (bot ne khud banaye)</h2>${(L.filters || []).length ? `<ul class="plain">${L.filters.map(f => `<li>Bachna hai: ${esc(f.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi. Upar "Kaunse rule ban sakte hain" mein dekho kaun sa kitna kareeb hai.</p>'}</div>
-
-  ${(S.mode || {}).strategy === 'ema_break' ? emaCard(false) + shadowCard() + researchCard() : reportCard(L.report_card, st) + experimentsCard(L.experiments)}
-  <div class="daybar">
-    <div><span class="lbl">Setups follow (30 din)</span><b>${st.setups_followed ?? 0}</b></div>
-    <div><span class="lbl">Bot trades</span><b>${st.bot_trades ?? 0}</b></div>
-    <div><span class="lbl">Bot ka R</span><b class="${(st.bot_total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.bot_total_r >= 0 ? '+' : '') + Number(st.bot_total_r || 0).toFixed(2)}</b></div>
-    <div><span class="lbl">Sab setups ka R</span><b class="${(st.all_setups_total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.all_setups_total_r >= 0 ? '+' : '') + Number(st.all_setups_total_r || 0).toFixed(2)}</b></div>
-  </div>
-  <div class="grid2">
-    <div class="card" id="c-lessons"><h2>📜 Seekhe hue sabak</h2>${(L.lessons || []).length ? `<ul class="tl">${L.lessons.map(l => `<li><span class="t">${esc(l.day.slice(5))}</span><span>${esc(l.text)}</span></li>`).join('')}</ul>` : '<p class="empty">Abhi koi sabak nahi.</p>'}</div>
-    <div class="wrap">
-      <div class="card"><h2>⚠️ Sabse zyada galtiyan (30 din)</h2>${(L.mistakes_30d || []).length ? `<ul class="plain">${L.mistakes_30d.map(m => `<li><b class="num">${m.count}×</b> ${esc(m.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi.</p>'}</div>
-      ${versionCard()}
-      <div class="card"><h2>⚙️ Badli hui settings</h2>${params.length ? `<div class="kv">${params.map(([k,v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join('')}</div>` : '<p class="empty">Sab default hain.</p>'}</div>
-    </div>
-  </div>`;
+      : '<p class="empty">Abhi data nahi hai. Setups follow hote hi yahan dikhega.</p>'}`)}
+  ${sec('c-rules', '🚫 Bot ke khud banaye rules', `${(L.filters || []).length}`, `${(L.filters || []).length ? `<ul class="plain">${L.filters.map(f => `<li>Bachna hai: ${esc(f.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi. Upar "Kaunse rule ban sakte hain" mein dekho kaun sa kitna kareeb hai.</p>'}`)}`;
 }
 
 async function poll(){
@@ -739,7 +813,7 @@ function applyHL(){ document.querySelectorAll('.hl').forEach(e => e.classList.re
   if (BOT.hl) document.querySelector(BOT.hl)?.classList.add('hl'); }
 function robotTo(x, y){
   const bh = bubble.hidden ? 0 : bubble.offsetHeight + 16;
-  x = Math.max(6, Math.min(innerWidth - 70, x)); y = Math.max(64, Math.min(innerHeight - bh - 84, y));
+  x = Math.max(6, Math.min(innerWidth - 70, x)); y = Math.max(64, Math.min(innerHeight - bh - 84 - 70, y));
   robot.style.transform = `translate(${x}px,${y}px)`;
   robot.classList.add('walking'); clearTimeout(robotTo.t); robotTo.t = setTimeout(() => robot.classList.remove('walking'), 1150);
 }
@@ -775,7 +849,7 @@ function buildBriefing(){
   (S.agents || []).forEach(a => (a.events || []).forEach(e => { if (e.t > day) { const it = evItem(a.id, e); if (it) out.push(it); } }));
   const tr = st.open_trades || [];
   if (tr.length) { const pl = tr.reduce((s, t) => s + (t.unrealized_pl || 0), 0);
-    out.push({key:'open:' + tr.map(t => t.id).sort().join(','), tone: pl >= 0 ? 'good' : 'bad', title: `${tr.length} trade open`, text: `Abhi ${pl >= 0 ? '+' : ''}${money(pl, st.currency)} · ` + tr.map(t => pair(t.instrument) + (t.units > 0 ? ' BUY' : ' SELL')).join(', '), go:'home', sel:'#c-open'}); }
+    out.push({key:'open:' + tr.map(t => t.id).sort().join(','), tone: pl >= 0 ? 'good' : 'bad', title: `${tr.length} trade open`, text: `Abhi ${pl >= 0 ? '+' : ''}${money(pl, st.currency)} · ` + tr.map(t => pair(t.instrument) + (t.units > 0 ? ' BUY' : ' SELL')).join(', '), go:'trades', sel:'#c-open-list'}); }
   const blocked = (S.journeys || []).filter(j => j.created > day && !j.taken);
   if (blocked.length) out.push({key:'blocked:' + blocked[0].ref, tone:'info', title:`${blocked.length} signal roke gaye (24 ghante)`, text: 'Kyun roke, har ek ka safar dekho. Time Machine inka result bhi follow kar raha hai.',
     go:'journeys', sel:'#j-' + CSS.escape(blocked[0].ref), prep: () => { jfilter = 'blocked'; openJ.add(blocked[0].ref); }});
@@ -893,7 +967,7 @@ function viewAsk(){
   const off = !B.available ? `<div class="status open"><span class="dot"></span><span>Robot ka dimaag abhi band hai: ${esc(B.reason || '')}<small>Chalu karne ke liye Termius mein ek baar: bash ~/himanshubashambu08/trading-bot/deploy/enable-brain.sh (Anthropic API key chahiye, paid).</small></span></div>` : '';
   const briefs = (B.briefs || []).slice(0, 2).map((b, i) => `<div class="card" id="b-${i}"><div class="row"><h2>🌍 World brief</h2><span class="small muted">${nyDT(b.time)} NY</span></div><div class="small">${md(b.text)}</div>${srcList(b.sources)}</div>`).join('');
   const msgs = CHAT.map(m => `<div class="msg ${m.role}">${m.role === 'user' ? esc(m.text) : md(m.text) + srcList(m.sources)}</div>`).join('');
-  return `<div class="card"><h2>💬 Manager se pucho</h2><p class="small muted" style="margin:0">Bot ke baare mein kuch bhi, ya market/duniya ki koi bhi latest baat. Manager bot ka poora data padhta hai aur internet pe khud dhoondhta hai. Woh trade nahi lagata aur settings nahi badalta, sirf jawab deta hai.</p>${off}</div>
+  return `${pageHead('💬 Manager se pucho', '', 'menu')}<div class="card"><h2>💬 Manager se pucho</h2><p class="small muted" style="margin:0">Bot ke baare mein kuch bhi, ya market/duniya ki koi bhi latest baat. Manager bot ka poora data padhta hai aur internet pe khud dhoondhta hai. Woh trade nahi lagata aur settings nahi badalta, sirf jawab deta hai.</p>${off}</div>
   ${briefs}
   <div class="card wrap"><div class="chat" id="chat">${msgs || '<p class="empty">Neeche koi sawaal chuno ya likho.</p>'}${ASKING ? '<div class="msg assistant muted">🤖 Soch raha hai, internet pe dhoondh raha hai…</div>' : ''}</div>
     <div class="chips">${SUGGEST.map(q => `<span class="chip to" data-q="${esc(q)}">${esc(q)}</span>`).join('')}</div>

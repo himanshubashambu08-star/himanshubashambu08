@@ -2,7 +2,7 @@
 import subprocess
 import os
 
-VERSION = "4.2"          # bump on every release that changes behaviour
+VERSION = "4.3"          # bump on every release that changes behaviour
 
 
 def build():
