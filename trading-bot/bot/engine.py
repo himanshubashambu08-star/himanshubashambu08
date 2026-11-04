@@ -135,9 +135,18 @@ class Engine:
             want = self.cfg["instruments"]
             all_ = {i.name: i for i in self.broker.instruments()}
             if want == "ALL":
-                self._universe = [i for i in all_.values() if i.type in self.cfg["instrument_types"]]
-            else:
-                self._universe = [all_[n] for n in want if n in all_]
+                want = [f"ALL:{t}" for t in self.cfg["instrument_types"]]
+            picked = {}
+            for n in want:                      # "ALL:CURRENCY" / "ALL:METAL" = every such instrument on the account
+                if n.startswith("ALL:"):
+                    for i in sorted(all_.values(), key=lambda i: i.name):
+                        if i.type == n[4:]:
+                            picked[i.name] = i
+                elif n in all_:
+                    picked[n] = all_[n]
+                else:
+                    log.warning("%s is not available on this account, skipped", n)
+            self._universe = list(picked.values())
             log.info("watching %d charts", len(self._universe))
         return self._universe
 

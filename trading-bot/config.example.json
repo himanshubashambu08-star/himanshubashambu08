@@ -1,19 +1,8 @@
 {
   "engine": {
     "instruments": [
-      "EUR_USD",
-      "GBP_USD",
-      "USD_JPY",
-      "USD_CAD",
-      "AUD_USD",
-      "NZD_USD",
-      "USD_CHF",
-      "EUR_JPY",
-      "GBP_JPY",
-      "EUR_GBP",
-      "AUD_JPY",
-      "EUR_AUD",
-      "XAU_USD",
+      "ALL:CURRENCY",
+      "ALL:METAL",
       "NAS100_USD",
       "SPX500_USD",
       "US30_USD"
@@ -23,26 +12,14 @@
     ],
     "entry_timeframe": "H1",
     "trend_timeframe": "H4",
-    "entry_sessions_ny": [
-      [
-        "08:00",
-        "16:00"
-      ]
-    ],
+    "entry_sessions_ny": [],
     "board_refresh_seconds": 60,
     "breakeven_at_r": 1.0,
     "trail_start_r": 1.5,
     "trail_atr_mult": 1.0,
     "blackout_utc": [],
     "learn": true,
-    "entry_sessions_by_type": {
-      "CFD": [
-        [
-          "09:30",
-          "16:00"
-        ]
-      ]
-    }
+    "entry_sessions_by_type": {}
   },
   "strategy": {
     "htf_ema_fast": 50,

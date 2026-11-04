@@ -239,3 +239,23 @@ class Correlated(unittest.TestCase):
         self.assertIn("correlated", why)
         ok, _ = r.can_open(sig, [Trade("1", "EUR_USD", -100, 1.1)], Price(0.6, 0.6001))
         self.assertTrue(ok)
+
+
+class Universe(unittest.TestCase):
+    def test_all_by_type_plus_named(self):
+        insts = [Instrument("EUR_USD", "CURRENCY"), Instrument("USD_JPY", "CURRENCY"), Instrument("XAG_USD", "METAL"),
+                 Instrument("XAU_USD", "METAL"), Instrument("NAS100_USD", "CFD"), Instrument("DE30_EUR", "CFD")]
+        b = SimBroker(10_000, instruments=insts)
+        e = Engine(b, {"engine": {"instruments": ["ALL:CURRENCY", "ALL:METAL", "NAS100_USD", "AAPL_USD"]},
+                       "news": {"enabled": False}})
+        names = [i.name for i in e.universe()]
+        self.assertEqual(sorted(names), ["EUR_USD", "NAS100_USD", "USD_JPY", "XAG_USD", "XAU_USD"])
+
+    def test_no_session_limit_means_always_open(self):
+        e = Engine(SimBroker(10_000, instruments=[Instrument("NAS100_USD", "CFD")]),
+                   {"engine": {"instruments": ["NAS100_USD"], "entry_sessions_ny": [], "entry_sessions_by_type": {}},
+                    "news": {"enabled": False}})
+        from datetime import datetime, timezone
+        night = datetime(2026, 11, 4, 4, 0, tzinfo=timezone.utc).timestamp()
+        self.assertTrue(e.in_session(night, "NAS100_USD"))
+        self.assertIsNone(e.why_no_new_trades(night, "NAS100_USD"))
