@@ -8,3 +8,5 @@ memory-*.db
 reports/
 agents-*.json
 news-cache.json
+brain-*.json
+seen-*.json

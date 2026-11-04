@@ -156,6 +156,13 @@ details summary{cursor:pointer;font-weight:600}
 .cur{font:600 12px var(--f-num);padding:1px 6px;border-radius:5px;background:var(--bg);border:1px solid var(--line)}
 .imp{font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;text-transform:uppercase}
 .imp.High{background:var(--bad-soft);color:var(--bad)}.imp.Medium{background:var(--warn-soft);color:var(--warn)}
+.chat{display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 12px;border-radius:12px;font-size:14.5px;max-width:92%;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:var(--on-gold)}
+.msg.assistant{align-self:flex-start;background:var(--bg);border:1px solid var(--line)}
+.msg a,.card a{color:var(--gold)}
+.askrow{display:flex;gap:8px;align-items:flex-end}
+.askrow textarea{flex:1;font:15px var(--f-body);padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical;min-height:44px}
 .hl{outline:3px solid var(--gold-hi);outline-offset:3px;border-radius:12px;animation:pulse 1.3s infinite}
 @keyframes pulse{50%{outline-color:transparent}}
 @media (prefers-reduced-motion:reduce){#robot,#robot *,.hl{animation:none!important;transition:none!important}}
@@ -170,6 +177,7 @@ details summary{cursor:pointer;font-weight:600}
     <button role="tab" data-view="agents" aria-selected="false">🤖 Agents</button>
     <button role="tab" data-view="journeys" aria-selected="false">🧭 Trades ka safar</button>
     <button role="tab" data-view="charts" aria-selected="false">📈 Charts</button>
+    <button role="tab" data-view="ask" aria-selected="false">💬 Pucho</button>
     <button role="tab" data-view="news" aria-selected="false">📰 News</button>
     <button role="tab" data-view="learn" aria-selected="false">🧠 Seekhna</button>
   </div>
@@ -232,6 +240,7 @@ function render(){
   else if (base === 'charts') { v.innerHTML = viewCharts(); drawCharts(); }
   else if (base === 'learn') v.innerHTML = viewLearn();
   else if (base === 'news') v.innerHTML = viewNews();
+  else if (base === 'ask') { const q = document.getElementById('q')?.value || ''; v.innerHTML = viewAsk(); const t = document.getElementById('q'); if (t) t.value = q; }
   else v.innerHTML = viewHome();
   applyHL();
 }
@@ -447,13 +456,13 @@ function viewLearn(){
 }
 
 async function poll(){
-  try { const r = await fetch('/api/state', {cache:'no-store'}); if (r.ok) { S = await r.json(); render(); botAfterPoll(); } } catch (e) {}
+  try { const r = await fetch('/api/state', {cache:'no-store'}); if (r.ok) { S = await r.json(); if (!(route === 'ask' && document.activeElement && document.activeElement.id === 'q')) render(); botAfterPoll(); } } catch (e) {}
   setTimeout(poll, 15000);
 }
 window.addEventListener('resize', () => { if (route === 'charts' && S) drawCharts(); });
 
 /* ================= Manager robot ================= */
-const BOT = {items:[], i:-1, auto:null, hl:null, live:0, started:false, guiding:false, mode:'brief'};
+const BOT = {items:[], i:-1, auto:null, hl:null, started:false, guiding:false, mode:'brief', fresh:0};
 const robot = document.getElementById('robot'), bubble = document.getElementById('bubble');
 function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
@@ -478,43 +487,58 @@ function evItem(aid, e){
   if (aid === 'learner' && !/rule|Setting|sabak|New rule|Rule removed/i.test(e.text)) return null;
   if (aid === 'manager' && !/close/.test(e.text) && e.tone !== 'good') return null;
   const head = {executor:'Naya trade laga', manager: /close/.test(e.text) ? 'Trade band hua' : 'Trade sambhala', learner:'Bot ne kuch seekha', budget:'Account ki khabar'}[aid];
-  const it = {t:e.t, tone: e.tone === 'bad' ? 'bad' : e.tone === 'good' ? 'good' : 'info', title: head, text: e.text, agent: aid};
+  const it = {key:`ev:${aid}:${e.t}:${e.text.length}`, t:e.t, tone: e.tone === 'bad' ? 'bad' : e.tone === 'good' ? 'good' : 'info', title: head, text: e.text, agent: aid};
   if (e.ref) { it.go = 'journeys'; it.sel = '#j-' + CSS.escape(e.ref); it.prep = () => openJ.add(e.ref); }
   else if (aid === 'learner') { it.go = 'learn'; it.sel = '#c-lessons'; }
   else { it.go = 'agent/' + aid; it.sel = '.hero'; }
   return it;
 }
-function buildBriefing(since){
-  const st = S.status || {}, out = [];
+function briefItem(b){
+  const txt = String(b.text || '').replace(/[#*_`]/g, '').replace(/\s+/g, ' ');
+  return {key:'brief:' + b.slot, t:b.time, tone:'info', title:'🌍 Duniya ki market khabar', text: txt.length > 220 ? txt.slice(0, 220) + '…' : txt, go:'ask', sel:'#b-0'};
+}
+/* Everything the robot could mention right now. Each item has a stable key, so once you have
+   seen it the robot does not repeat it (the keys are saved on the bot server). */
+function buildBriefing(){
+  const st = S.status || {}, out = [], now = Date.now() / 1000, day = now - 86400;
   const nb = st.no_new_trades;
-  if (nb && nb !== 'outside US session') out.push({tone:'bad', title:'Naye trades band hain', text: nb, go:'agent/budget', sel:'.hero'});
-  (S.agents || []).forEach(a => (a.events || []).forEach(e => { if (e.t > since) { const it = evItem(a.id, e); if (it) out.push(it); } }));
+  if (nb && nb !== 'outside US session') out.push({key:'halt:' + nb, tone:'bad', title:'Naye trades band hain', text: nb, go:'agent/budget', sel:'.hero'});
+  (S.agents || []).forEach(a => (a.events || []).forEach(e => { if (e.t > day) { const it = evItem(a.id, e); if (it) out.push(it); } }));
   const tr = st.open_trades || [];
   if (tr.length) { const pl = tr.reduce((s, t) => s + (t.unrealized_pl || 0), 0);
-    out.push({tone: pl >= 0 ? 'good' : 'bad', title: `${tr.length} trade open`, text: `Abhi ${pl >= 0 ? '+' : ''}${money(pl, st.currency)} · ` + tr.map(t => pair(t.instrument) + (t.units > 0 ? ' BUY' : ' SELL')).join(', '), go:'home', sel:'#c-open'}); }
-  const blocked = (S.journeys || []).filter(j => j.created > since && !j.taken);
-  if (blocked.length) out.push({tone:'info', title:`${blocked.length} signal roke gaye`, text: 'Kyun roke, har ek ka safar dekho. Time Machine inka result bhi follow kar raha hai.',
+    out.push({key:'open:' + tr.map(t => t.id).sort().join(','), tone: pl >= 0 ? 'good' : 'bad', title: `${tr.length} trade open`, text: `Abhi ${pl >= 0 ? '+' : ''}${money(pl, st.currency)} · ` + tr.map(t => pair(t.instrument) + (t.units > 0 ? ' BUY' : ' SELL')).join(', '), go:'home', sel:'#c-open'}); }
+  const blocked = (S.journeys || []).filter(j => j.created > day && !j.taken);
+  if (blocked.length) out.push({key:'blocked:' + blocked[0].ref, tone:'info', title:`${blocked.length} signal roke gaye (24 ghante)`, text: 'Kyun roke, har ek ka safar dekho. Time Machine inka result bhi follow kar raha hai.',
     go:'journeys', sel:'#j-' + CSS.escape(blocked[0].ref), prep: () => { jfilter = 'blocked'; openJ.add(blocked[0].ref); }});
   const forming = (S.charts || []).filter(c => c.state === 'forming');
-  if (forming.length) out.push({tone:'info', title:`${forming.length} chart pe setup ban raha hai`, text: forming.slice(0,4).map(c => pair(c.instrument) + (c.bias > 0 ? ' buy' : ' sell')).join(', ') + ' · price entry zone ki taraf aa raha',
+  if (forming.length) out.push({key:'forming:' + forming.map(c => c.instrument).sort().join(','), tone:'info', title:`${forming.length} chart pe setup ban raha hai`, text: forming.slice(0,4).map(c => pair(c.instrument) + (c.bias > 0 ? ' buy' : ' sell')).join(', ') + ' · price entry zone ki taraf aa raha',
     go:'charts', sel:'#c-charts', prep: () => { cfilter = 'forming'; }});
-  const now = Date.now() / 1000, N = S.news || [];
+  const N = S.news || [];
   const act = N.filter(e => e.active);
-  if (act.length) out.push({tone:'bad', title:'News ki wajah se trades band', text: act.map(e => `${e.currency} ${e.title} ${nyT(e.time)} NY`).join(', ') + ' · in pairs pe abhi naya trade nahi',
+  if (act.length) out.push({key:'nact:' + act.map(e => e.currency + e.time).join(','), tone:'bad', title:'News ki wajah se trades band', text: act.map(e => `${e.currency} ${e.title} ${nyT(e.time)} NY`).join(', ') + ' · in pairs pe abhi naya trade nahi',
     go:'news', sel:'#c-news-now'});
   const soon = N.filter(e => e.block && e.time > now && e.time < now + 24 * 3600);
-  if (soon.length) out.push({tone:'info', title:`Agle 24 ghante mein ${soon.length} bada news`, text: soon.slice(0, 3).map(e => `${e.currency} ${e.title} ${nyT(e.time)} NY (${inTxt(e.time)})`).join(' · '),
+  if (soon.length) out.push({key:'nsoon:' + soon.map(e => e.currency + e.time).join(','), tone:'info', title:`Agle 24 ghante mein ${soon.length} bada news`, text: soon.slice(0, 3).map(e => `${e.currency} ${e.title} ${nyT(e.time)} NY (${inTxt(e.time)})`).join(' · '),
     go:'news', sel:'#n-' + N.indexOf(soon[0])});
+  ((S.brain || {}).briefs || []).filter(b => b.time > day).slice(0, 1).forEach(b => out.push(briefItem(b)));
   const rank = {bad:0, good:1, info:2};
   out.sort((a, b) => rank[a.tone] - rank[b.tone] || (b.t || 0) - (a.t || 0));
-  return out.slice(0, 7);
+  return out;
+}
+let SEEN = new Set();
+function loadSeen(){ (S.seen || []).forEach(k => SEEN.add(k)); try { JSON.parse(lsGet('tb_seen') || '[]').forEach(k => SEEN.add(k)); } catch (e) {} }
+function markSeen(items){
+  const keys = items.map(i => i.key).filter(k => k && !SEEN.has(k)); if (!keys.length) return;
+  keys.forEach(k => SEEN.add(k)); lsSet('tb_seen', JSON.stringify([...SEEN].slice(-400)));
+  fetch('/api/seen', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({keys})}).catch(() => {});
 }
 const PILL = {good:'Achi khabar', bad:'Buri khabar', info:'Dhyan do'};
 function startBriefing(manual){
-  const last = +lsGet('tb_last_seen') || 0, now = Date.now() / 1000;
-  const since = manual ? Math.max(last, now - 86400) : (last || now - 12 * 3600);
-  BOT.items = buildBriefing(manual ? now - 86400 : since); BOT.mode = 'brief';
-  lsSet('tb_last_seen', String(now));
+  const all = buildBriefing();
+  const fresh = all.filter(i => !SEEN.has(i.key));
+  if (!manual && !fresh.length) { jump(); return; }          // nothing new: stay quiet
+  BOT.items = (manual ? all : fresh).slice(0, 7); BOT.mode = 'brief'; BOT.fresh = fresh.length;
+  markSeen(BOT.items);
   showIntro(manual);
 }
 function showIntro(manual){
@@ -523,15 +547,18 @@ function showIntro(manual){
   const hr = +tfmt.format(new Date()).slice(0, 2);
   const hello = hr < 12 ? 'Good morning' : hr < 17 ? 'Namaste' : 'Good evening';
   mood(b ? 'bad' : g ? 'good' : 'info');
+  const ask = '<button class="btn" data-b="ask">💬 Kuch pucho</button>';
   if (!BOT.items.length) {
     bubble.innerHTML = `<div class="bhead"><b>🤖 Manager</b><button class="bx" data-b="close" aria-label="Band karo">×</button></div>
-      <div>${hello}! Sab shaant hai. Koi nayi khabar nahi. Bot ${(S.charts || []).length} charts dekh raha hai.<br><span class="small muted">${esc(S.status?.session_text || '')}</span></div>
-      <div class="btns"><button class="btn pri" data-b="close">Theek hai</button></div>`;
+      <div>${hello}! Koi nayi khabar nahi. Bot ${(S.charts || []).length} charts dekh raha hai.<br><span class="small muted">${esc(S.status?.session_text || '')}</span></div>
+      <div class="btns"><button class="btn pri" data-b="close">Theek hai</button>${ask}</div>`;
   } else {
+    const head = manual ? (BOT.fresh ? `<b>${BOT.fresh} nayi</b> baat, baaki pehle dekhi hui (24 ghante):` : 'Koi nayi khabar nahi. Pichhle 24 ghante ki baatein phir se:')
+                        : `Aapke jaane ke baad <b>${BOT.items.length} nayi baatein</b>${g ? `, <span class="good">${g} achi</span>` : ''}${b ? `, <span class="bad">${b} buri</span>` : ''}:`;
     bubble.innerHTML = `<div class="bhead"><b>🤖 Manager</b><button class="bx" data-b="close" aria-label="Band karo">×</button></div>
-      <div>${hello}! ${manual ? 'Pichhle 24 ghante mein' : 'Aapke jaane ke baad'} <b>${BOT.items.length} baatein</b> hui${g ? `, <span class="good">${g} achi</span>` : ''}${b ? `, <span class="bad">${b} buri</span>` : ''}:</div>
+      <div>${hello}! ${head}</div>
       <ul class="news">${BOT.items.map((it, i) => `<li data-b="item" data-i="${i}"><span class="pill ${it.tone}">${PILL[it.tone]}</span><span><b>${esc(it.title)}</b><br><span class="small muted">${esc(it.text)}</span></span></li>`).join('')}</ul>
-      <div class="btns"><button class="btn pri" data-b="tour">▶ Mujhe khud dikhao</button><button class="btn" data-b="close">Baad mein</button></div>`;
+      <div class="btns"><button class="btn pri" data-b="tour">▶ Mujhe khud dikhao</button>${ask}<button class="btn" data-b="close">Baad mein</button></div>`;
   }
   bubble.hidden = false; jump(); robotHome();
 }
@@ -543,7 +570,7 @@ function showItem(i, auto){
     <div style="margin-top:6px"><b>${esc(it.title)}</b><br>${esc(it.text)}</div>
     <div class="btns">${BOT.auto ? '<button class="btn" data-b="stop">⏸ Ruko</button>' : ''}
       ${i + 1 < BOT.items.length ? '<button class="btn pri" data-b="next">Agla →</button>' : '<button class="btn pri" data-b="close">Ho gaya ✓</button>'}
-      ${BOT.mode === 'brief' ? '<button class="btn" data-b="list">Saari list</button>' : ''}</div>`;
+      ${BOT.mode === 'brief' ? '<button class="btn" data-b="list">Saari list</button>' : ''}<button class="btn" data-b="ask">💬 Pucho</button></div>`;
   bubble.hidden = false;
   guide(it);
 }
@@ -566,32 +593,60 @@ bubble.addEventListener('click', e => {
   const t = e.target.closest('[data-b]'); if (!t) return; const b = t.dataset.b;
   if (b === 'close') closeBot();
   else if (b === 'list') showIntro(true);
+  else if (b === 'ask') { closeBot(); go('ask'); setTimeout(() => document.getElementById('q')?.focus(), 200); }
   else if (b === 'item') { stopAuto(); showItem(+t.dataset.i); }
   else if (b === 'next') showItem(BOT.i + 1);
   else if (b === 'stop') { stopAuto(); showItem(BOT.i); }
   else if (b === 'tour') { BOT.auto = setInterval(() => BOT.i + 1 < BOT.items.length ? showItem(BOT.i + 1) : endTour(), 6500); showItem(0); }
 });
-BOT.newsAlerted = new Set();
-function newsAlert(){
-  const now = Date.now() / 1000, N = S.news || [];
-  const e = N.find(e => e.block && e.time > now && e.time - now < 30 * 60 && !BOT.newsAlerted.has(e.currency + e.time));
-  if (!e || !bubble.hidden) return false;
-  BOT.newsAlerted.add(e.currency + e.time);
-  BOT.items = [{tone:'bad', title:`${inTxt(e.time)}: ${e.currency} ${e.title}`, text:`Bada news aa raha hai. ${nyT(e.from)}–${nyT(e.to)} NY tak ${e.pairs.map(pair).join(', ')} pe naya trade nahi lagega.`, go:'news', sel:'#n-' + N.indexOf(e)}];
-  BOT.mode = 'live'; jump(); showItem(0); return true;
-}
 function botAfterPoll(){
-  if (BOT.started && newsAlert()) return;
-  const latest = Math.max(0, ...(S.agents || []).flatMap(a => (a.events || []).map(e => e.t)));
-  if (!BOT.started) { BOT.started = true; BOT.live = latest; setTimeout(() => startBriefing(false), 600); return; }
-  if (latest <= BOT.live) return;
-  const fresh = [];
-  (S.agents || []).forEach(a => (a.events || []).forEach(e => { if (e.t > BOT.live) { const it = evItem(a.id, e); if (it) fresh.push(it); } }));
-  BOT.live = latest;
-  if (!fresh.length || !bubble.hidden) return;
-  BOT.items = fresh; BOT.mode = 'live'; lsSet('tb_last_seen', String(Date.now() / 1000));
+  if (!BOT.started) { BOT.started = true; loadSeen(); setTimeout(() => startBriefing(false), 600); return; }
+  if (!bubble.hidden || route === 'ask') return;
+  const now = Date.now() / 1000, N = S.news || [];
+  const e = N.find(e => e.block && e.time > now && e.time - now < 30 * 60 && !SEEN.has('nalert:' + e.currency + e.time));
+  let fresh = e ? [{key:'nalert:' + e.currency + e.time, tone:'bad', title:`${inTxt(e.time)}: ${e.currency} ${e.title}`, text:`Bada news aa raha hai. ${nyT(e.from)}–${nyT(e.to)} NY tak ${e.pairs.map(pair).join(', ')} pe naya trade nahi lagega.`, go:'news', sel:'#n-' + N.indexOf(e)}] : [];
+  if (!fresh.length) fresh = buildBriefing().filter(i => !SEEN.has(i.key) && (i.key.startsWith('ev:') || i.key.startsWith('brief:') || i.key.startsWith('halt:') || i.key.startsWith('nact:')));
+  if (!fresh.length) return;
+  BOT.items = fresh.slice(0, 5); BOT.mode = 'live'; markSeen(BOT.items);
   jump(); showItem(0);
 }
+
+/* ================= 💬 Pucho (chat with the Manager's brain) ================= */
+let CHAT = []; try { CHAT = JSON.parse(lsGet('tb_chat') || '[]'); } catch (e) { CHAT = []; }
+let ASKING = false;
+const SUGGEST = ['Aaj forex market kaisa hai?', 'Bot ne aaj kya kiya aur kyun?', 'Is hafte ke bade news ka mere pairs pe kya asar hoga?', 'USD abhi strong hai ya weak? Kyun?', 'Bot ki sabse badi galti kya rahi?'];
+function md(t){ return esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^#+\s*(.+)$/gm, '<b>$1</b>').replace(/^\s*[-*]\s+/gm, '• ').replace(/\n/g, '<br>'); }
+function srcList(s){ return (s || []).length ? `<div class="small" style="margin-top:6px">Sources: ${s.map((x, i) => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${i + 1}. ${esc((x.title || x.url).slice(0, 60))}</a>`).join(' · ')}</div>` : ''; }
+function viewAsk(){
+  const B = S.brain || {};
+  const off = !B.available ? `<div class="status open"><span class="dot"></span><span>Robot ka dimaag abhi band hai: ${esc(B.reason || '')}<small>Chalu karne ke liye Termius mein ek baar: bash ~/himanshubashambu08/trading-bot/deploy/enable-brain.sh (Anthropic API key chahiye, paid).</small></span></div>` : '';
+  const briefs = (B.briefs || []).slice(0, 2).map((b, i) => `<div class="card" id="b-${i}"><div class="row"><h2>🌍 World brief</h2><span class="small muted">${nyDT(b.time)} NY</span></div><div class="small">${md(b.text)}</div>${srcList(b.sources)}</div>`).join('');
+  const msgs = CHAT.map(m => `<div class="msg ${m.role}">${m.role === 'user' ? esc(m.text) : md(m.text) + srcList(m.sources)}</div>`).join('');
+  return `<div class="card"><h2>💬 Manager se pucho</h2><p class="small muted" style="margin:0">Bot ke baare mein kuch bhi, ya market/duniya ki koi bhi latest baat. Manager bot ka poora data padhta hai aur internet pe khud dhoondhta hai. Woh trade nahi lagata aur settings nahi badalta, sirf jawab deta hai.</p>${off}</div>
+  ${briefs}
+  <div class="card wrap"><div class="chat" id="chat">${msgs || '<p class="empty">Neeche koi sawaal chuno ya likho.</p>'}${ASKING ? '<div class="msg assistant muted">🤖 Soch raha hai, internet pe dhoondh raha hai…</div>' : ''}</div>
+    <div class="chips">${SUGGEST.map(q => `<span class="chip to" data-q="${esc(q)}">${esc(q)}</span>`).join('')}</div>
+    <form id="askf" class="askrow"><textarea id="q" rows="2" placeholder="Kuch bhi pucho…" ${ASKING || !B.available ? 'disabled' : ''}></textarea><button class="btn pri" ${ASKING || !B.available ? 'disabled' : ''}>Bhejo</button></form>
+    ${CHAT.length ? '<button class="btn" data-clear="1" style="align-self:flex-start">Chat saaf karo</button>' : ''}</div>`;
+}
+async function ask(q){
+  q = (q || '').trim(); if (!q || ASKING || !(S.brain || {}).available) return;
+  const history = CHAT.slice(-12).map(m => ({role: m.role, text: m.text}));
+  CHAT.push({role:'user', text:q}); ASKING = true; render(); mood('info'); robot.classList.add('walking');
+  try {
+    const r = await fetch('/api/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question:q, history})});
+    const a = await r.json(); CHAT.push({role:'assistant', text:a.text, sources:a.sources}); mood(a.error ? 'bad' : 'good');
+  } catch (e) { CHAT.push({role:'assistant', text:'Bot server se baat nahi ho payi. Internet/Tailscale check karo.'}); mood('bad'); }
+  ASKING = false; robot.classList.remove('walking'); jump();
+  CHAT = CHAT.slice(-30); lsSet('tb_chat', JSON.stringify(CHAT)); render();
+  setTimeout(() => document.getElementById('chat')?.lastElementChild?.scrollIntoView({block:'start', behavior:'smooth'}), 100);
+}
+document.addEventListener('submit', e => { if (e.target.id === 'askf') { e.preventDefault(); ask(document.getElementById('q').value); } });
+document.addEventListener('keydown', e => { if (e.target.id === 'q' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(e.target.value); } });
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-q]'); if (c) ask(c.dataset.q);
+  if (e.target.closest('[data-clear]')) { CHAT = []; lsSet('tb_chat', '[]'); render(); }
+});
 robotHome();
 render(); poll();
 </script>

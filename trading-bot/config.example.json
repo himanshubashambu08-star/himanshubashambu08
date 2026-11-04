@@ -55,5 +55,24 @@
     "tune_bars": 3000,
     "tune_instruments": 8,
     "test_fraction": 0.3
+  },
+  "news": {
+    "enabled": true,
+    "block_impacts": [
+      "High"
+    ],
+    "before_min": 15,
+    "after_min": 15,
+    "refresh_minutes": 60
+  },
+  "brain": {
+    "enabled": true,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "max_searches": 5,
+    "brief_times_ny": [
+      "07:30",
+      "16:30"
+    ]
   }
 }

@@ -18,6 +18,8 @@ from .journal import Journal
 from .learner import Learner, MISTAKE_WORDS, describe
 from .models import GRANULARITY_SECONDS
 from .news import NewsCalendar
+from .brain import Brain
+import json
 from .risk import RiskManager
 
 log = logging.getLogger("bot")
@@ -86,7 +88,8 @@ def ref_for(instrument, signal_time):
 
 class Engine:
     def __init__(self, broker, config, state_path=None, journal_path=None, memory_path=":memory:",
-                 agents_path=None, news_path=None, news_fetcher=None, clock=time.time):
+                 agents_path=None, news_path=None, news_fetcher=None, brain_path=None, seen_path=None,
+                 brain_client=None, clock=time.time):
         self.broker = broker
         self.cfg = {**DEFAULTS, **config.get("engine", {})}
         self.base_params = config.get("strategy", {})
@@ -96,6 +99,15 @@ class Engine:
         self.agents = AgentLog(agents_path, clock=clock)
         self.news = NewsCalendar(config.get("news", {}), news_path, clock=clock, fetcher=news_fetcher)
         self._news_active = set()
+        self.brain = Brain(config.get("brain", {}), self.brain_context, brain_path, clock=clock, client=brain_client)
+        self.seen_path = seen_path
+        self.seen = []
+        if seen_path and os.path.exists(seen_path):
+            try:
+                with open(seen_path) as f:
+                    self.seen = json.load(f)
+            except Exception:
+                self.seen = []
         self.clock = clock
         self.last_bucket = None
         self.last_board = 0.0
@@ -190,6 +202,7 @@ class Engine:
         if self.cfg["learn"] and prev_day and prev_day != self.risk.state["day"] \
                 and self.learner.get("last_review_day") != prev_day:
             self.review(prev_day)
+        self.brain.maybe_brief(now, self._brief_done)
         self.agents.save()
 
     # ---- Budget Manager ----------------------------------------------------
@@ -583,14 +596,51 @@ class Engine:
             log.exception("review failed: %s", e)
             A.did("learner", f"Review fail: {e}", tone="bad")
 
+    # ---- Manager robot: brain + memory of what was already shown -------------
+    def _brief_done(self, b):
+        self.agents.did("news", "World-market brief taiyaar (Manager robot ke paas)", tone="good")
+
+    def brain_context(self):
+        snap = self.snapshot(light=True)
+        st = snap["status"]
+        return {
+            "account": {k: st.get(k) for k in ("nav", "balance", "currency", "day_start_nav", "no_new_trades", "session_text")},
+            "open_trades": st.get("open_trades"),
+            "agents": [{"name": a["name"], "status": a["status"], "plan": a["plan"], "today": a["counts"],
+                        "last": [e["text"] for e in a["events"][:4]]} for a in snap["agents"]],
+            "signals": [{"pair": j["instrument"], "side": "BUY" if j["side"] > 0 else "SELL", "state": j["state"],
+                         "result": j["result"], "steps": [f"{s['agent']}:{s['verdict']}:{s['text']}" for s in j["steps"]]}
+                        for j in snap["journeys"][:12]],
+            "charts": [{"pair": c["instrument"], "state": c["state"], "note": c["note"]} for c in snap["charts"]],
+            "news": [{"cur": e["currency"], "title": e["title"], "impact": e["impact"], "time_ny": ny_time(e["time"]),
+                      "forecast": e["forecast"], "previous": e["previous"], "actual": e["actual"]} for e in snap["news"][:15]],
+            "learning": {k: snap["learning"][k] for k in ("filters", "lessons", "mistakes_30d", "stats_30d", "params")},
+            "settings": {"risk": st.get("risk"), "strategy": st.get("params"), "reward_risk": st.get("reward_risk")},
+        }
+
+    def mark_seen(self, keys):
+        keys = [str(k)[:200] for k in keys or [] if k][:100]
+        with self.lock:
+            for k in keys:
+                if k not in self.seen:
+                    self.seen.append(k)
+            self.seen = self.seen[-500:]
+            if self.seen_path:
+                tmp = self.seen_path + ".tmp"
+                with open(tmp, "w") as f:
+                    json.dump(self.seen, f)
+                os.replace(tmp, self.seen_path)
+        return len(self.seen)
+
     # ---- dashboard -----------------------------------------------------
-    def snapshot(self):
+    def snapshot(self, light=False):
         with self.lock:
             charts = sorted(self.board.values(), key=lambda r: -r.get("score", 0))
             status = dict(self.status)
         return {"status": status, "charts": charts, "learning": self.learner.snapshot(),
                 "news": self.news_list(self.clock()), "news_error": self.news.error,
-                "journal": self.journal.rows[-30:][::-1], **self.agents.snapshot()}
+                "journal": self.journal.rows[-30:][::-1], **self.agents.snapshot(),
+                **({} if light else {"brain": self.brain.snapshot(), "seen": list(self.seen)})}
 
     def run_forever(self):
         log.info("bot started")

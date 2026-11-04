@@ -29,6 +29,28 @@ def make_handler(engine):
             else:
                 self._send(404, b"not found", "text/plain")
 
+        def _json_body(self, limit=64_000):
+            n = int(self.headers.get("Content-Length") or 0)
+            if n <= 0 or n > limit:
+                return None
+            try:
+                return json.loads(self.rfile.read(n))
+            except ValueError:
+                return None
+
+        def do_POST(self):
+            body = self._json_body()
+            if body is None:
+                return self._send(400, b'{"error":"bad body"}', "application/json")
+            if self.path == "/api/ask":
+                out = engine.brain.ask(body.get("question"), body.get("history"))
+                self._send(200, json.dumps(out).encode(), "application/json")
+            elif self.path == "/api/seen":
+                n = engine.mark_seen(body.get("keys"))
+                self._send(200, json.dumps({"seen": n}).encode(), "application/json")
+            else:
+                self._send(404, b"not found", "text/plain")
+
         def log_message(self, *a):
             pass
     return Handler
