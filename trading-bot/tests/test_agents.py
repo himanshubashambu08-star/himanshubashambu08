@@ -131,3 +131,34 @@ class RestartSafety(unittest.TestCase):
             self.assertGreater(closed[0]["pl"], 0)
             self.assertEqual(e2.learner.closed_summary()["wins"], 1)
             self.assertNotIn(str(t.id), e2.risk.state["trades"])
+
+
+class TodayAndRecovery(unittest.TestCase):
+    def test_lost_close_is_recovered_and_tallied(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, clock = make_engine(d)
+            e.tick()
+            t = b.orders[0]
+            # simulate the old bug: the bot forgot the trade, then it hit TP
+            e.risk.state["trades"].clear()
+            e.known_trades.clear()
+            b.move("XAU_USD", t.take_profit + 0.1)
+            clock[0] += 30
+            e._last_recover = 0
+            e.tick()
+            closed = e.learner.closed_trades()
+            self.assertEqual(len(closed), 1)
+            self.assertAlmostEqual(closed[0]["r"], 2.0, places=1)
+            snap = e.snapshot()
+            T = snap["today"]
+            self.assertEqual((T["opened"], T["open_now"], T["closed"], T["missing"]), (1, 0, 1, 0))
+            self.assertEqual(snap["version"]["rules"], 1)
+            self.assertTrue(snap["version"]["app"])
+
+    def test_rules_version_bumps_on_change(self):
+        from bot.learner import Learner
+        L = Learner({})
+        self.assertEqual(L.rules_version(), 1)
+        L.bump_rules("test")
+        self.assertEqual(L.rules_version(), 2)
+        self.assertEqual(L.snapshot()["rules_history"][0]["why"], "test")

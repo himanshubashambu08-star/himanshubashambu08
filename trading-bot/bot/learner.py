@@ -252,6 +252,28 @@ class Learner:
             rows = self.db.execute("SELECT * FROM closed ORDER BY closed DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
 
+    def rules_version(self):
+        return self.get("rules_version", 1)
+
+    def bump_rules(self, why):
+        v = self.rules_version() + 1
+        self.put("rules_version", v)
+        hist = self.get("rules_history", [])
+        hist.insert(0, {"v": v, "time": self.clock(), "why": why})
+        self.put("rules_history", hist[:20])
+        return v
+
+    def untracked_taken(self, open_ids):
+        """Trades the bot opened whose close was never recorded (e.g. closed while an older version ran)."""
+        with self.lock:
+            rows = self.db.execute("SELECT s.* FROM signals s LEFT JOIN closed c ON c.trade_id = s.trade_id "
+                                   "WHERE s.taken=1 AND s.trade_id IS NOT NULL AND c.trade_id IS NULL").fetchall()
+        return [dict(r) for r in rows if str(r["trade_id"]) not in open_ids]
+
+    def taken_since(self, since):
+        with self.lock:
+            return self.db.execute("SELECT COUNT(*) FROM signals WHERE taken=1 AND time>=?", (since,)).fetchone()[0]
+
     def closed_summary(self, since=0):
         with self.lock:
             rows = self.db.execute("SELECT r, pl FROM closed WHERE closed>=?", (since,)).fetchall()
@@ -305,6 +327,8 @@ class Learner:
                 active.discard(name)
                 changes.append(("filter_off", name, m, len(w), base))
         self.put("filters", sorted(active))
+        if changes:
+            self.bump_rules(", ".join(("+" if k == "filter_on" else "-") + describe(nm) for k, nm, *_ in changes))
         for kind, name, m, n, base in changes:
             if kind == "filter_on":
                 txt = (f"Naya rule: {describe(name)} se bachna hai. {n} setups mein iska average {m:+.2f}R tha, "
@@ -426,6 +450,7 @@ class Learner:
         learned = self.params()
         learned[key] = new
         self.put("params", learned)
+        self.bump_rules(f"setting {key}: {old} -> {new}")
         self.lesson(day, "tune", f"Setting badli {key}: {old} -> {new}. Purana data {base[0]:+.1f}R -> {tr:+.1f}R, "
                     f"naya unseen data {base[1]:+.1f}R -> {te:+.1f}R. Agle scan se laagu.",
                     {"key": key, "old": old, "new": new})
@@ -501,6 +526,8 @@ class Learner:
             "report_card": self.get("report_card"),
             "experiments": self.get("experiments"),
             "universe": self.get("universe", "all"),
+            "rules_version": self.rules_version(),
+            "rules_history": self.get("rules_history", []),
         }
 
     # ---- experiments: several rule versions on the same real history -----------
@@ -594,6 +621,7 @@ class Learner:
             lp.update(confirm_candles=best["confirm"], atr_stop_mult=best["stop_mult"], reward_risk=best["rr"])
             self.put("params", lp)
             self.put("universe", best["universe"])
+            self.bump_rules(f"version: {best['name']}")
             self.lesson(day, "experiment", f"Naya version apnaya: \"{best['name']}\". Naye data pe "
                         f"{best['new']['total_r']:+.1f}R (PF {best['new']['pf']}) vs abhi wala "
                         f"{now_row['new']['total_r']:+.1f}R. Agle scan se laagu.", {"id": best["id"]})

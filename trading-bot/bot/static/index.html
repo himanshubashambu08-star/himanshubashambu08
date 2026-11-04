@@ -252,6 +252,7 @@ function render(){
   const base = route.split('/')[0];
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === (base === 'agent' ? 'agents' : base === 'chart' ? 'charts' : base))));
   if (!S) return;
+  const sym = $('#sym'); if (sym && S.version) sym.textContent = `OANDA · demo · v${S.version.app} · R${S.version.rules}`;
   const v = $('#view');
   if (base === 'agent') v.innerHTML = viewAgent(route.split('/')[1]);
   else if (base === 'agents') v.innerHTML = viewAgents();
@@ -275,6 +276,28 @@ function statusBanner(st){
   return `<div class="status ${cls}"><span class="dot"></span><span>${esc(text)}<small>${esc(sub)} · update ${nyT(st.time)} NY · agla scan ${nyT(st.next_scan)}</small></span></div>`;
 }
 
+function todayCard(){
+  const T = S.today; if (!T) return '';
+  const ccy = (S.status || {}).currency || '';
+  return `<div class="card" id="c-today"><div class="row"><h2>📊 Aaj ka hisaab</h2><span class="small muted">${nyDT(T.since)} NY se</span></div>
+    <div class="daybar">
+      <div><span class="lbl">Aaj khule</span><b>${T.opened}</b></div>
+      <div><span class="lbl">Abhi chal rahe</span><b>${T.open_now}</b></div>
+      <div><span class="lbl">Band hue</span><b>${T.closed} <span class="small"><span class="good">${T.wins}✅</span> <span class="bad">${T.losses}❌</span>${T.be ? ` ${T.be}➖` : ''}</span></b></div>
+      <div><span class="lbl">Band ka P&amp;L</span><b class="${T.pl >= 0 ? 'good' : 'bad'}">${T.pl >= 0 ? '+' : ''}${money(T.pl)} <span class="small">${ccy}</span></b></div>
+    </div>
+    <div class="small" style="margin-top:6px">Aaj bot ne <b>${T.opened}</b> trade khole, abhi <b>${T.open_now}</b> chal rahe hain. Aaj <b>${T.closed}</b> band hue (inme kal ke khule trade bhi ho sakte hain), kul <b class="${T.r >= 0 ? 'good' : 'bad'}">${T.r >= 0 ? '+' : ''}${T.r.toFixed(2)}R</b>.${T.missing ? ` <b class="warn">${T.missing} trade ka result abhi aa raha hai</b> (bot OANDA se khud laa raha hai, 10 min mein).` : ''}</div>
+    <div class="small" style="margin-top:4px"><a href="#charts" data-go="charts" onclick="cfilter='open'" style="color:var(--gold);font-weight:600">🎯 Chal rahe dekho ›</a> · <a href="#closed" data-go="closed" onclick="kperiod='day'" style="color:var(--gold);font-weight:600">📒 Band hue dekho ›</a></div></div>`;
+}
+function versionCard(){
+  const V = S.version || {}, H = (S.learning || {}).rules_history || [];
+  return `<div class="card" id="c-version"><h2>🏷️ Version</h2><div class="kv">
+    <span>App version</span><b>v${esc(V.app || '?')}</b>
+    <span>Code (server pe chal raha)</span><b>${esc(V.build || '-')}</b>
+    <span>Rules version</span><b>R${esc(V.rules || 1)}</b>
+    <span>Pairs mode</span><b>${(S.learning || {}).universe === 'liquid' ? 'Sirf bade pairs' : 'Saare charts'}</b></div>
+    ${H.length ? `<div class="lbl" style="margin-top:8px">Rules kab badle</div><ul class="tl">${H.slice(0, 6).map(h => `<li><span class="t">R${h.v}</span><span>${esc(h.why)} <span class="small muted">· ${nyDT(h.time)}</span></span></li>`).join('')}</ul>` : '<p class="small muted" style="margin:6px 0 0">R1 = shuru wale rules. Bot jab bhi rule ya setting badlega, number badhega aur yahan likha jayega.</p>'}</div>`;
+}
 function viewHome(){
   const st = S.status || {}, ccy = st.currency || '';
   const pl = st.nav != null && st.day_start_nav ? st.nav - st.day_start_nav : null;
@@ -289,6 +312,7 @@ function viewHome(){
   }).join('');
   const b = agent('budget');
   return `${statusBanner(st)}
+  ${todayCard()}
   <div class="daybar">
     <div><span class="lbl">Equity</span><b>${money(st.nav, ccy)}</b></div>
     <div><span class="lbl">Aaj P&amp;L</span><b class="${pl == null ? '' : pl >= 0 ? 'good' : 'bad'}">${pl == null ? '-' : (pl >= 0 ? '+' : '') + money(pl)}</b></div>
@@ -569,13 +593,13 @@ function reportCard(card, st){
 let kfilter = 'all', kperiod = 'week';
 function viewClosed(){
   const all = S.closed || [], st = (S.closed_stats || {})[kperiod] || {}, ccy = (S.status || {}).currency || '';
-  const since = {day: Date.now()/1000 - 86400, week: Date.now()/1000 - 7*86400, all: 0}[kperiod];
+  const since = {day: (S.today || {}).since || Date.now()/1000 - 86400, week: Date.now()/1000 - 7*86400, all: 0}[kperiod];
   const list = all.filter(c => (c.closed || 0) >= since).filter(c => kfilter === 'all' || (kfilter === 'win' ? c.r > 0.05 : kfilter === 'loss' ? c.r < -0.05 : Math.abs(c.r) <= 0.05));
   const b = (k, t, v, cur) => `<button class="${cur === k ? 'on' : ''}" onclick="${v}='${k}';render()">${t}</button>`;
   const n = f => all.filter(c => (c.closed || 0) >= since).filter(f).length;
   return `<div class="card"><h2>📒 Band hue trades</h2>
     <p class="small muted" style="margin:0 0 8px">Bot ke asli (demo) trades jo SL, TP, breakeven ya trailing SL pe band hue. Paisa aapke account currency mein, OANDA ke hisaab se.</p>
-    <div class="seg" style="margin-bottom:8px">${b('day','24 ghante','kperiod',kperiod)}${b('week','7 din','kperiod',kperiod)}${b('all','Shuru se','kperiod',kperiod)}</div>
+    <div class="seg" style="margin-bottom:8px">${b('day','Aaj (5PM se)','kperiod',kperiod)}${b('week','7 din','kperiod',kperiod)}${b('all','Shuru se','kperiod',kperiod)}</div>
     <div class="daybar">
       <div><span class="lbl">Trades</span><b>${st.n || 0}</b></div>
       <div><span class="lbl">Jeete / Haare</span><b><span class="good">${st.wins || 0}</span> / <span class="bad">${st.losses || 0}</span></b></div>
@@ -648,6 +672,7 @@ function viewLearn(){
     <div class="card" id="c-lessons"><h2>📜 Seekhe hue sabak</h2>${(L.lessons || []).length ? `<ul class="tl">${L.lessons.map(l => `<li><span class="t">${esc(l.day.slice(5))}</span><span>${esc(l.text)}</span></li>`).join('')}</ul>` : '<p class="empty">Abhi koi sabak nahi.</p>'}</div>
     <div class="wrap">
       <div class="card"><h2>⚠️ Sabse zyada galtiyan (30 din)</h2>${(L.mistakes_30d || []).length ? `<ul class="plain">${L.mistakes_30d.map(m => `<li><b class="num">${m.count}×</b> ${esc(m.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi.</p>'}</div>
+      ${versionCard()}
       <div class="card"><h2>⚙️ Badli hui settings</h2>${params.length ? `<div class="kv">${params.map(([k,v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join('')}</div>` : '<p class="empty">Sab default hain.</p>'}</div>
     </div>
   </div>`;
@@ -760,7 +785,7 @@ function showIntro(manual){
   }
   bubble.hidden = false; jump(); robotHome();
 }
-function showItem(i, auto){
+function showItem(i, auto, noGuide){
   const it = BOT.items[i]; if (!it) return endTour();
   BOT.i = i; mood(it.tone);
   bubble.innerHTML = `<div class="bhead"><b>🤖 Manager <span class="small muted">${i + 1}/${BOT.items.length}</span></b><button class="bx" data-b="close" aria-label="Band karo">×</button></div>
@@ -768,8 +793,9 @@ function showItem(i, auto){
     <div style="margin-top:6px"><b>${esc(it.title)}</b><br>${esc(it.text)}</div>
     <div class="btns">${BOT.auto ? '<button class="btn" data-b="stop">⏸ Ruko</button>' : ''}
       ${i + 1 < BOT.items.length ? '<button class="btn pri" data-b="next">Agla →</button>' : '<button class="btn pri" data-b="close">Ho gaya ✓</button>'}
-      ${BOT.mode === 'brief' ? '<button class="btn" data-b="list">Saari list</button>' : ''}${(S.brain || {}).available ? '<button class="btn" data-b="ask">💬 Pucho</button>' : ''}</div>`;
+      ${noGuide ? '<button class="btn" data-b="show">👀 Dikhao</button>' : ''}${BOT.mode === 'brief' ? '<button class="btn" data-b="list">Saari list</button>' : ''}${(S.brain || {}).available ? '<button class="btn" data-b="ask">💬 Pucho</button>' : ''}</div>`;
   bubble.hidden = false;
+  if (noGuide) { robotHome(); return; }     // live pop-up: never yank the page away; the user taps "Dikhao"
   guide(it);
 }
 function guide(it){
@@ -793,7 +819,8 @@ bubble.addEventListener('click', e => {
   else if (b === 'list') showIntro(true);
   else if (b === 'ask') { closeBot(); go('ask'); setTimeout(() => document.getElementById('q')?.focus(), 200); }
   else if (b === 'item') { stopAuto(); showItem(+t.dataset.i); }
-  else if (b === 'next') showItem(BOT.i + 1);
+  else if (b === 'next') showItem(BOT.i + 1, false, BOT.mode === 'live');
+  else if (b === 'show') showItem(BOT.i);
   else if (b === 'stop') { stopAuto(); showItem(BOT.i); }
   else if (b === 'tour') { BOT.auto = setInterval(() => BOT.i + 1 < BOT.items.length ? showItem(BOT.i + 1) : endTour(), 6500); showItem(0); }
 });
@@ -806,7 +833,7 @@ function botAfterPoll(){
   if (!fresh.length) fresh = buildBriefing().filter(i => !SEEN.has(i.key) && (i.key.startsWith('ev:') || i.key.startsWith('brief:') || i.key.startsWith('halt:') || i.key.startsWith('nact:')));
   if (!fresh.length) return;
   BOT.items = fresh.slice(0, 5); BOT.mode = 'live'; markSeen(BOT.items);
-  jump(); showItem(0);
+  jump(); showItem(0, false, true);
 }
 
 /* ================= 💬 Pucho (chat with the Manager's brain) ================= */

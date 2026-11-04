@@ -19,6 +19,7 @@ from .learner import Learner, MISTAKE_WORDS
 from .models import GRANULARITY_SECONDS
 from .news import NewsCalendar
 from .brain import Brain
+from . import VERSION, build as _git_build
 import json
 from .risk import RiskManager, trading_day
 
@@ -128,6 +129,7 @@ class Engine:
         self.agents = AgentLog(agents_path, clock=clock)
         self.news = NewsCalendar(config.get("news", {}), news_path, clock=clock, fetcher=news_fetcher)
         self._news_active = set()
+        self._build = _git_build()
         self._closes = {}          # instrument -> recent closed H1 closes, for correlation
         self.brain = Brain(config.get("brain", {}), self.brain_context, brain_path, clock=clock, client=brain_client)
         self.seen_path = seen_path
@@ -234,6 +236,14 @@ class Engine:
         self.report_news(now)
         trades = self.broker.open_trades()
         self._spot_closed(trades)
+        self.recover_untracked(trades)
+        if self.status:                       # keep the open-trades list fresh every tick, not only every minute
+            try:
+                view = self.open_trades_view()
+                with self.lock:
+                    self.status["open_trades"] = view
+            except Exception as e:
+                log.error("open trades view: %s", e)
         self.manage(trades)
 
         tf = GRANULARITY_SECONDS[self.cfg["entry_timeframe"]]
@@ -547,6 +557,56 @@ class Engine:
         return out
 
     # ---- Exit Planner ------------------------------------------------------
+    def trading_day_start(self):
+        """Unix time when the current trading day began (17:00 New York)."""
+        ny = datetime.fromtimestamp(self.clock(), timezone.utc).astimezone(NY)
+        t = ny.replace(hour=17, minute=0, second=0, microsecond=0)
+        if t > ny:
+            t -= timedelta(days=1)
+        return t.timestamp()
+
+    def recover_untracked(self, open_trades):
+        """Record the result of bot trades that closed without being recorded. Checks every 10 minutes."""
+        now = self.clock()
+        if now - getattr(self, "_last_recover", 0) < 600:
+            return 0
+        self._last_recover = now
+        open_ids = {str(t.id) for t in open_trades} | set(self.risk.state["trades"])
+        done = 0
+        for row in self.learner.untracked_taken(open_ids)[:20]:
+            tid = str(row["trade_id"])
+            try:
+                c = self.broker.closed_trade(tid)
+            except Exception as e:
+                log.error("recover %s: %s", tid, e)
+                continue
+            if not c or not row["stop_dist"]:
+                continue
+            side, entry, dist = row["side"], row["entry"], row["stop_dist"]
+            r = (c["price"] - entry) * side / dist
+            how = "SL 🛑" if r < -0.05 else ("Breakeven" if abs(r) <= 0.05 else
+                                             ("TP 🎯" if r > 1.5 * self.reward_risk() / 2 else "Trailing SL (profit)"))
+            ref = ref_for(row["instrument"], row["time"])
+            self.learner.set_real_result(tid, r)
+            self.learner.record_close(trade_id=tid, instrument=row["instrument"], side=side, units=c.get("units"),
+                                      entry=entry, exit=c["price"], stop=entry - side * dist, tp=None,
+                                      r=round(r, 3), pl=c.get("pl"), opened=None,
+                                      closed=c.get("time") or now, how=how, ref=ref)
+            self.agents.did("manager", f"{pair(row['instrument'])} ka chhoota hua result wapas laaya: {r:+.2f}R · {how}",
+                            ref, "good" if r > 0.05 else ("bad" if r < -0.05 else "info"))
+            self.agents.mark(ref, state="khatam", result=f"{r:+.2f}R", r=round(r, 2))
+            done += 1
+        return done
+
+    def today_tally(self, open_trades):
+        start = self.trading_day_start()
+        closed = self.learner.closed_summary(start)
+        opened = self.agents.agents["executor"]["counts"].get("orders", 0)
+        missing = max(0, opened - len(open_trades) - closed["n"])
+        return {"since": start, "opened": opened, "open_now": len(open_trades), "closed": closed["n"],
+                "wins": closed["wins"], "losses": closed["losses"], "be": closed["be"],
+                "r": closed["total_r"], "pl": closed["pl"], "missing": missing}
+
     def _spot_closed(self, open_trades):
         """A trade the bot opened is no longer open: record how it ended. Works across restarts, because the
         list of bot trades lives in the saved risk state, not only in memory."""
@@ -853,7 +913,10 @@ class Engine:
                                      "closed_days": self.learner.closed_by_day(trading_day),
                                      "candidates": self.learner.candidates(12),
                                      "next_review": self.next_review_time(),
-                                     "closed_stats": {"day": self.learner.closed_summary(self.clock() - 86400),
+                                     "today": self.today_tally(status.get("open_trades") or []),
+                                     "version": {"app": VERSION, "build": self._build,
+                                                 "rules": self.learner.rules_version()},
+                                     "closed_stats": {"day": self.learner.closed_summary(self.trading_day_start()),
                                                       "week": self.learner.closed_summary(self.clock() - 7 * 86400),
                                                       "all": self.learner.closed_summary(0)}})}
 
