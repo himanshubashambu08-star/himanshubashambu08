@@ -12,7 +12,8 @@
       "GBP_JPY",
       "EUR_GBP",
       "AUD_JPY",
-      "EUR_AUD"
+      "EUR_AUD",
+      "XAU_USD"
     ],
     "instrument_types": [
       "CURRENCY"
@@ -45,7 +46,17 @@
     "max_open_trades": 5,
     "max_trades_per_instrument": 1,
     "max_trades_per_currency": 2,
-    "reward_risk": 2.0
+    "reward_risk": 2.0,
+    "correlated_groups": [
+      [
+        "AUD_USD",
+        "NZD_USD"
+      ],
+      [
+        "AUD_JPY",
+        "NZD_JPY"
+      ]
+    ]
   },
   "learning": {
     "min_samples": 20,

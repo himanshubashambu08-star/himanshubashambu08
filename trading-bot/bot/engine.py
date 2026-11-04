@@ -69,6 +69,8 @@ def hinglish_reason(reason):
     }
     if r in fixed:
         return fixed[r]
+    if r.startswith("correlated with open "):
+        return f"{r[21:].replace('_', '/')} pehle se open hai, aur yeh pair uske saath hi chalta hai (double risk se bachne ke liye)"
     if r.startswith("too much ") and r.endswith(" exposure"):
         return f"{r[9:-9]} mein pehle se kaafi trades hain (ek currency pe zyada risk nahi)"
     if r.startswith("news: "):
@@ -556,7 +558,8 @@ class Engine:
             ref = ref_for(row["instrument"], row["time"])
             r = row["r"]
             mist = ", ".join(MISTAKE_WORDS.get(m, m) for m in row["mistakes"][:2])
-            who = "bot ka trade" if row["taken"] else "chhoda hua setup"
+            who = "bot ka trade" if row["taken"] else ("session ke bahar, isse seekhega nahi"
+                                                   if row.get("skip_reason") == "outside US session" else "chhoda hua setup")
             A.did("learner", f"{pair(row['instrument'])} ({who}) chart pe {r:+.2f}R hota"
                   + (f" · galti: {mist}" if mist else ""), ref, "good" if r > 0 else ("bad" if r < 0 else "info"))
             A.count("learner", "followed")

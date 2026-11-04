@@ -23,6 +23,8 @@ DEFAULTS = {
     "max_open_trades": 5,
     "max_trades_per_instrument": 1,
     "max_trades_per_currency": 2,
+    # pairs that move almost together count as one trade (only 1 open per group)
+    "correlated_groups": [["AUD_USD", "NZD_USD"], ["AUD_JPY", "NZD_JPY"]],
     "max_spread_to_stop": 0.15,
     "reward_risk": 2.0,
 }
@@ -87,6 +89,12 @@ class RiskManager:
         same = [t for t in open_trades if t.instrument == signal.instrument]
         if len(same) >= self.p["max_trades_per_instrument"]:
             return False, "already in this instrument"
+        open_names = {t.instrument for t in open_trades}
+        for grp in self.p["correlated_groups"]:
+            if signal.instrument in grp:
+                twin = [n for n in grp if n in open_names and n != signal.instrument]
+                if twin:
+                    return False, f"correlated with open {twin[0]}"
         for cur in _currencies(signal.instrument):
             n = sum(1 for t in open_trades if cur in _currencies(t.instrument))
             if n >= self.p["max_trades_per_currency"]:

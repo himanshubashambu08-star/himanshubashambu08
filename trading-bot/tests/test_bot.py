@@ -228,3 +228,14 @@ class LiveGuard(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Correlated(unittest.TestCase):
+    def test_aud_nzd_count_as_one(self):
+        r = RiskManager({"max_trades_per_currency": 5})
+        sig = Signal("NZD_USD", -1, 0.0020, 0.0013, "x")
+        ok, why = r.can_open(sig, [Trade("1", "AUD_USD", -100, 0.65)], Price(0.6, 0.6001))
+        self.assertFalse(ok)
+        self.assertIn("correlated", why)
+        ok, _ = r.can_open(sig, [Trade("1", "EUR_USD", -100, 1.1)], Price(0.6, 0.6001))
+        self.assertTrue(ok)

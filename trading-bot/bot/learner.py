@@ -43,8 +43,8 @@ CONDITIONS = {
     "far_from_ema": (lambda f, s: f.get("dist_ema_atr", 0) > 0.8, "entry was far from the EMA (late entry)"),
     "big_candle_chase": (lambda f, s: f.get("body_atr", 0) > 1.5, "entered after a very big candle (chasing)"),
     "wide_spread": (lambda f, s: f.get("spread_ratio", 0) > 0.08, "spread was large compared with the stop"),
-    "late_session": (lambda f, s: f.get("hour_ny", 12) >= 15, "entry late in the New York session"),
-    "early_session": (lambda f, s: f.get("hour_ny", 12) < 9, "entry in the first hour of New York"),
+    "late_session": (lambda f, s: 15 <= f.get("hour_ny", 12) < 17, "entry late in the New York session"),
+    "early_session": (lambda f, s: 8 <= f.get("hour_ny", 12) < 9, "entry in the first hour of New York"),
     "friday": (lambda f, s: f.get("dow") == 4, "Friday entry"),
 }
 
@@ -62,6 +62,15 @@ TUNABLE = {
     "rsi_sell_max": (50, 70, 5),
     "reward_risk": (1.0, 3.0, 0.5),
 }
+
+
+OFF_SESSION = "outside US session"
+
+
+def learnable(row):
+    """Only setups that happened while the bot was allowed to enter teach it anything.
+    Setups outside the entry window are still followed and shown, but never become rules."""
+    return (row.get("skip_reason") or "") != OFF_SESSION
 
 
 def _dyn_conditions(row):
@@ -92,7 +101,7 @@ def tag_mistakes(row, r, bars_held, max_r):
         tags.append("stopped_fast")
     if max_r >= 1.0 and r <= 0:
         tags.append("gave_back")
-    if r < 0:
+    if r < 0 and learnable(row):
         tags += [c for c in CONDITIONS if matches(c, row)]
     return tags
 
@@ -215,7 +224,7 @@ class Learner:
     # ---- learning: filters --------------------------------------------
     def learn_filters(self, day):
         since = self.clock() - self.p["window_days"] * 86400
-        rows = self._rows("status='done' AND time>=?", (since,))
+        rows = [r for r in self._rows("status='done' AND time>=?", (since,)) if learnable(r)]
         names = set(CONDITIONS)
         for r in rows:
             names.update(_dyn_conditions(r))
@@ -314,7 +323,7 @@ class Learner:
     def daily_review(self, day, history=None, base_params=None, base_rr=2.0, instruments=(),
                      breakeven_at_r=1.0):
         since = self.clock() - 86400 * 1.5
-        recent = self._rows("status='done' AND time>=?", (since,))
+        recent = [r for r in self._rows("status='done' AND time>=?", (since,)) if learnable(r)]
         counts = {}
         for r in recent:
             for m in r["mistakes"]:
@@ -355,7 +364,8 @@ class Learner:
     # ---- dashboard ------------------------------------------------------
     def snapshot(self):
         since = self.clock() - 30 * 86400
-        rows = self._rows("status='done' AND time>=?", (since,))
+        every = self._rows("status='done' AND time>=?", (since,))
+        rows = [r for r in every if learnable(r)]
         counts = {}
         for r in rows:
             for m in r["mistakes"]:
@@ -372,5 +382,6 @@ class Learner:
                 "bot_trades": len(taken),
                 "bot_total_r": round(sum((r["real_r"] if r["real_r"] is not None else r["r"]) for r in taken), 2),
                 "all_setups_total_r": round(sum(r["r"] for r in rows), 2),
+                "outside_session_followed": len(every) - len(rows),
             },
         }

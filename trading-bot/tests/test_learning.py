@@ -239,3 +239,23 @@ class EngineLearning(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SessionLearning(unittest.TestCase):
+    def test_off_session_setups_never_become_rules(self):
+        with tempfile.TemporaryDirectory() as d:
+            L = Learner({"min_samples": 20, "reports_dir": d}, clock=lambda: NOW)
+            for _ in range(40):                       # night setups that all lose
+                s = sig(hour_ny=22)
+                rid = L.record_signal(s, taken=False, skip_reason="outside US session")
+                L._update(rid, status="done", r=-1.0, bars_held=1, max_r=0.1, mistakes="[]")
+            for i in range(30):
+                add_done(L, sig(hour_ny=10), 2.0 if i % 2 else -1.0)
+            L.learn_filters("d")
+            self.assertEqual(L.filters(), [])
+            snap = L.snapshot()
+            self.assertEqual(snap["stats_30d"]["outside_session_followed"], 40)
+            self.assertEqual(snap["stats_30d"]["setups_followed"], 30)
+            row = {"instrument": "EUR_USD", "side": 1, "skip_reason": "outside US session",
+                   "features": {"hour_ny": 22, "rsi": 80}}
+            self.assertEqual(tag_mistakes(row, -1.0, 1, 0.1), ["stopped_fast"])

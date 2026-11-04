@@ -470,7 +470,8 @@ function viewLearn(){
   const L = S.learning || {}, st = L.stats_30d || {};
   const params = Object.entries(L.params || {});
   return `<div class="card"><h2>🧠 Bot kya seekh raha hai</h2>
-    <p class="small muted" style="margin:0">Time Machine har setup ko chart pe follow karta hai (liya ho ya roka ho). Roz 17:00 New York pe: jo cheez baar-baar loss deti hai uska "avoid" rule banata hai, aur ek setting ko thoda badal ke purane + naye data pe test karta hai. Risk ki limits kabhi khud nahi badalta.</p></div>
+    <p class="small muted" style="margin:0">Time Machine har setup ko chart pe follow karta hai (liya ho ya roka ho). Roz 17:00 New York pe: jo cheez baar-baar loss deti hai uska "avoid" rule banata hai, aur ek setting ko thoda badal ke purane + naye data pe test karta hai. Risk ki limits kabhi khud nahi badalta. Sirf entry window (US session) ke andar wale setups se seekhta hai.</p>
+    ${st.outside_session_followed ? `<p class="small" style="margin:6px 0 0">🌙 Session ke bahar ke <b>${st.outside_session_followed}</b> setups bhi chart pe follow kiye (Trades ka safar mein dikhte hain), lekin unse koi rule nahi banta.</p>` : ''}</div>
   <div class="daybar">
     <div><span class="lbl">Setups follow</span><b>${st.setups_followed ?? 0}</b></div>
     <div><span class="lbl">Bot trades</span><b>${st.bot_trades ?? 0}</b></div>
