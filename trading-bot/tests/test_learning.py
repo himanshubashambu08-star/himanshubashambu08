@@ -228,7 +228,7 @@ class EngineLearning(unittest.TestCase):
             port = srv.server_address[1]
             try:
                 html = urllib.request.urlopen(f"http://127.0.0.1:{port}/").read().decode()
-                self.assertIn("Chart Board", html)
+                self.assertIn("Trade Bot", html)
                 state = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/api/state").read())
                 self.assertEqual(state["charts"][0]["instrument"], "XAU_USD")
                 self.assertEqual(state["charts"][0]["state"], "signal")

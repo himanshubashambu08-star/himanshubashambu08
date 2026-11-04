@@ -108,6 +108,7 @@ class Learner:
     def __init__(self, params=None, path=":memory:", clock=time.time):
         self.p = {**DEFAULTS, **(params or {})}
         self.clock = clock
+        self.last_resolved = []
         self.lock = threading.Lock()
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
@@ -171,6 +172,7 @@ class Learner:
     def resolve(self, instrument, candles, gran_seconds, reward_risk=2.0, breakeven_at_r=1.0):
         """Follow every unfinished signal of this instrument on the chart."""
         done = 0
+        self.last_resolved = []
         closed = [c for c in candles if c.complete]
         for row in self._rows("instrument=? AND status='open'", (instrument,)):
             after = [c for c in closed if c.time >= row["time"] + gran_seconds]
@@ -183,8 +185,9 @@ class Learner:
             if res is None:
                 continue
             r, bars, max_r = res
-            self._update(row["id"], status="done", r=r, bars_held=bars, max_r=max_r,
-                         mistakes=json.dumps(tag_mistakes(row, r, bars, max_r)))
+            tags = tag_mistakes(row, r, bars, max_r)
+            self._update(row["id"], status="done", r=r, bars_held=bars, max_r=max_r, mistakes=json.dumps(tags))
+            self.last_resolved.append({**row, "r": r, "bars_held": bars, "max_r": max_r, "mistakes": tags})
             done += 1
         return done
 

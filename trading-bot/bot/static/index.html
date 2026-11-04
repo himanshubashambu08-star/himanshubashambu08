@@ -2,147 +2,360 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chart Board</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trade Bot">
+<title>Forex Trade Bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2230;--mute:#6b7280;--line:#e3e6eb;--up:#0f9d6b;--down:#d64545;
- --sig:#0f9d6b;--form:#d99a00;--watch:#4c7bd9;--none:#9aa1ad;--zone:rgba(217,154,0,.16);--ema:#7c5cd6}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#171b23;--ink:#e6e8ec;--mute:#8b93a1;--line:#272d38;
- --zone:rgba(217,154,0,.22);--ema:#a58cf0}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-header{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
-header h1{font-size:16px;margin:0 8px 0 0}.kpi b{font-variant-numeric:tabular-nums}.pill{padding:2px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
-.bad{color:var(--down)}.good{color:var(--up)}
-.filters{display:flex;gap:6px;margin-left:auto}.filters button{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer}
-.filters button.on{border-color:var(--ink)}
-main{display:grid;grid-template-columns:1fr 320px;gap:16px;padding:16px}
-@media (max-width:900px){main{grid-template-columns:1fr}}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;align-content:start}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;border-top:4px solid var(--none)}
-.card.signal{border-top-color:var(--sig)}.card.forming{border-top-color:var(--form)}.card.watch{border-top-color:var(--watch)}
-.row{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.name{font-weight:650}.badge{font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:6px;color:#fff;background:var(--none)}
-.signal .badge{background:var(--sig)}.forming .badge{background:var(--form)}.watch .badge{background:var(--watch)}
+:root{--bg:#F3F5FA;--surface:#FFFFFF;--ink:#141A2B;--muted:#5B6479;--line:#DDE2EC;--gold:#946500;--gold-hi:#C8901A;
+ --gold-soft:#FBF1D9;--on-gold:#FFFFFF;--good:#0F7A55;--good-soft:#DDF3EA;--bad:#C2352B;--bad-soft:#FBE4E1;
+ --warn:#9A5B00;--warn-soft:#FBEBD3;--up:#0F9D6B;--down:#D64545;--ema:#7C5CD6;--zone:rgba(200,144,26,.18);
+ --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+ --f-num:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0B1020;--surface:#141B2E;--ink:#ECEFF7;--muted:#8E98B2;--line:#25304A;
+ --gold:#E9B949;--gold-hi:#F7D57E;--gold-soft:#2E2817;--on-gold:#1A1300;--good:#3FD69A;--good-soft:#11291F;
+ --bad:#FF7A6E;--bad-soft:#331917;--warn:#F2B35A;--warn-soft:#30230F;--up:#3FD69A;--down:#FF7A6E;--ema:#A58CF0;--zone:rgba(233,185,73,.2)}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 var(--f-body)}
+.wrap{display:flex;flex-direction:column;gap:12px}
+.app{max-width:1100px;margin:0 auto;padding:12px 16px calc(28px + env(safe-area-inset-bottom))}
+header.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 10px;margin:0 0 6px;display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.brand h1{font:700 26px/1 var(--f-display);margin:0;letter-spacing:.01em}
+.brand h1 span{color:var(--gold)}
+.sym{font:500 12px var(--f-num);color:var(--muted)}
+.tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:1 0 auto;white-space:nowrap;font:600 14px var(--f-body);padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:var(--on-gold);border-color:transparent;box-shadow:0 4px 14px -6px var(--gold)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+h2{font:700 20px/1.1 var(--f-display);margin:0 0 8px;letter-spacing:.01em}
+h3{font:600 15px var(--f-body);margin:0}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}.small{font-size:13px}
+.num{font-family:var(--f-num)}
+.status{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;font-weight:600}
+.status .dot{width:10px;height:10px;border-radius:50%;background:currentColor;flex:none}
+.status small{display:block;font-weight:500;opacity:.85;font-size:13px}
+.status.ok{background:var(--good-soft);color:var(--good)}
+.status.open{background:var(--gold-soft);color:var(--gold)}
+.status.lock{background:var(--bad-soft);color:var(--bad)}
+.daybar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.daybar div{background:var(--surface);padding:10px 8px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.daybar b{font:500 17px var(--f-num);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:420px){.daybar{grid-template-columns:repeat(2,1fr)}}
+.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+/* pipeline */
+.flow{display:flex;flex-direction:column;gap:0}
+.flow .arrow{height:16px;margin-left:27px;border-left:2px dashed var(--line)}
+.agent-row{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;text-align:left;color:inherit;font:inherit;width:100%}
+.agent-row:hover{border-color:var(--gold)}
+.emo{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;font-size:22px;background:var(--bg);border:1px solid var(--line)}
+.agent-row .name{font-weight:600}
+.agent-row .st{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tone{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--muted);vertical-align:1px}
+.tone.ok{background:var(--good)}.tone.warn{background:var(--warn)}.tone.bad{background:var(--bad)}.tone.idle{background:var(--line)}
+.big{font:500 18px var(--f-num);text-align:right}
+.big small{display:block;font:600 10px var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.side-note{font-size:12px;color:var(--muted);margin-left:56px;padding:2px 0}
+/* agent cards */
+.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.acard{display:flex;flex-direction:column;gap:8px;cursor:pointer;text-align:left;color:inherit;font:inherit}
+.acard:hover{border-color:var(--gold)}
+.acard .head{display:flex;gap:10px;align-items:center}
+.plan{background:var(--gold-soft);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:13.5px}
+.plan b{color:var(--gold)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.chip.to{border-color:var(--gold);color:var(--gold);background:var(--gold-soft);cursor:pointer}
+/* agent detail */
+.back{align-self:flex-start;background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 12px;font:600 14px var(--f-body);cursor:pointer}
+.hero{display:flex;gap:12px;align-items:center}
+.hero .emo{width:56px;height:56px;font-size:28px}
+.hero h2{margin:0}
+.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.tl li{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.tl li:first-child{border-top:none}
+.tl .t{font:500 12px var(--f-num);color:var(--muted);padding-top:2px}
+.tl .to{font-size:12px;color:var(--gold);font-weight:600}
+.tl li.good .txt{color:var(--good)}.tl li.bad .txt{color:var(--bad)}.tl li.warn .txt{color:var(--warn)}
+.tl li[data-ref]{cursor:pointer}
+.tl li[data-ref] .txt::after{content:"  ›";color:var(--muted)}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+/* journeys */
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font:600 13px var(--f-body);cursor:pointer}
+.seg button.on{border-color:var(--gold);background:var(--gold-soft);color:var(--gold)}
+.jcard{display:flex;flex-direction:column;gap:8px}
+.jhead{display:flex;justify-content:space-between;gap:8px;align-items:center;cursor:pointer}
+.badge{font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 8px;border-radius:6px;text-transform:uppercase;white-space:nowrap}
+.b-open{background:var(--gold-soft);color:var(--gold)}.b-block{background:var(--warn-soft);color:var(--warn)}
+.b-win{background:var(--good-soft);color:var(--good)}.b-loss{background:var(--bad-soft);color:var(--bad)}.b-run{background:var(--bg);color:var(--muted)}
+.steps{list-style:none;margin:0;padding:0 0 0 6px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.steps li{position:relative;padding-left:14px;font-size:14px}
+.steps li::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--muted)}
+.steps li.pass::before{border-color:var(--good);background:var(--good)}
+.steps li.block::before{border-color:var(--bad);background:var(--bad)}
+.steps li.info::before{border-color:var(--gold)}
+.steps .who{font-weight:600}
+/* charts */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.ccard{border-top:4px solid var(--line)}
+.ccard.signal{border-top-color:var(--good)}.ccard.forming{border-top-color:var(--gold-hi)}.ccard.watch{border-top-color:#4c7bd9}
 canvas{width:100%;height:120px;display:block;margin:6px 0}
-.note{font-size:12.5px;color:var(--ink)}.meta{font-size:11.5px;color:var(--mute);margin-top:4px}
-aside section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
-aside h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute)}
-aside ul{margin:0;padding-left:18px}aside li{margin:4px 0;font-size:13px}
-.empty{color:var(--mute);font-size:13px}
+.cbadge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;color:#fff;background:var(--muted)}
+.signal .cbadge{background:var(--good)}.forming .cbadge{background:var(--gold-hi)}.watch .cbadge{background:#4c7bd9}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted)}
+ul.plain{margin:0;padding-left:18px}ul.plain li{margin:4px 0}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px}
+.kv b{font-family:var(--f-num);font-weight:500}
+details summary{cursor:pointer;font-weight:600}
 </style>
 </head>
 <body>
-<header>
-  <h1>Chart Board</h1>
-  <span class="kpi">Equity <b id="nav">-</b></span>
-  <span class="kpi">Today <b id="pl">-</b></span>
-  <span class="kpi">Open trades <b id="ot">-</b></span>
-  <span class="pill" id="sess">-</span>
-  <span class="pill" id="halt" hidden></span>
-  <div class="filters" id="filters">
-    <button data-f="all" class="on">All</button><button data-f="signal">Signals</button>
-    <button data-f="forming">Forming</button><button data-f="watch">Watch</button>
+<div class="app">
+<header class="top">
+  <div class="brand"><h1>Forex <span>Trade Bot</span></h1><span class="sym" id="sym">OANDA · demo</span></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-view="home" aria-selected="true">🏠 Aaj</button>
+    <button role="tab" data-view="agents" aria-selected="false">🤖 Agents</button>
+    <button role="tab" data-view="journeys" aria-selected="false">🧭 Trades ka safar</button>
+    <button role="tab" data-view="charts" aria-selected="false">📈 Charts</button>
+    <button role="tab" data-view="learn" aria-selected="false">🧠 Seekhna</button>
   </div>
 </header>
-<main>
-  <div class="grid" id="grid"><p class="empty">Waiting for the first scan...</p></div>
-  <aside>
-    <section><h2>Open trades</h2><div id="trades" class="empty">none</div></section>
-    <section><h2>What the bot learned</h2><ul id="lessons"></ul></section>
-    <section><h2>Rules it taught itself</h2><ul id="rules"></ul></section>
-    <section><h2>Top mistakes (30 days)</h2><ul id="mistakes"></ul></section>
-    <section><h2>Last 30 days</h2><div id="stats" class="empty"></div></section>
-    <section><h2>Latest decisions</h2><ul id="journal"></ul></section>
-  </aside>
-</main>
+<main id="view" class="wrap"><p class="empty">Bot se data aa raha hai…</p></main>
+</div>
 <script>
-let filter = 'all', last = null;
-document.getElementById('filters').addEventListener('click', e => {
-  if (!e.target.dataset.f) return;
-  filter = e.target.dataset.f;
-  document.querySelectorAll('#filters button').forEach(b => b.classList.toggle('on', b === e.target));
-  if (last) render(last);
-});
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const px = v => v == null ? '-' : Number(v).toFixed(Math.abs(v) < 20 ? 5 : Math.abs(v) < 1000 ? 3 : 2);
-const fmt = (x, d=2) => x == null ? '-' : Number(x).toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+const FLOW = ['scanner','reader','rules','timer','risk','executor','manager','learner'];
+const COUNT_LABELS = {scans:'Scans',charts:'Charts padhe',signals:'Signal mile',checked:'Checks',passed:'Pass hue',
+  blocked:'Roke',go:'GO diye',approved:'Approve kiye',orders:'Orders lage',closed:'Trades close',sl_moves:'SL move',
+  r_x100:'Kul R',followed:'Results dekhe'};
+const FEEDS = {scanner:[],reader:['scanner'],rules:['reader','learner'],timer:['rules','learner','budget'],risk:['timer'],
+  executor:['risk'],manager:['executor'],learner:['timer','risk','manager'],budget:[]};
+let S = null, route = location.hash.slice(1) || 'home', jfilter = 'all', cfilter = 'all', openJ = new Set();
 
-function draw(cv, ch) {
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const pair = n => String(n || '').replace('_','/');
+const money = (x, c) => x == null ? '-' : Number(x).toLocaleString(undefined,{maximumFractionDigits:0}) + (c ? ' ' + c : '');
+const px = v => v == null ? '-' : Number(v).toFixed(Math.abs(v) < 20 ? 5 : Math.abs(v) < 1000 ? 3 : 2);
+const tfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false});
+const dfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',day:'numeric',month:'short'});
+const nyT = ts => ts ? tfmt.format(new Date(ts*1000)) : '-';
+const nyDT = ts => ts ? dfmt.format(new Date(ts*1000)) + ' ' + tfmt.format(new Date(ts*1000)) : '-';
+const agent = id => (S?.agents || []).find(a => a.id === id) || {id, emoji:'•', name:id, counts:{}, handoffs:{}, events:[]};
+const aname = id => { const a = agent(id); return `${a.emoji} ${a.name}`; };
+const countVal = (k, v) => k === 'r_x100' ? (v/100 >= 0 ? '+' : '') + (v/100).toFixed(2) + 'R' : v;
+
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.view); });
+window.addEventListener('hashchange', () => { route = location.hash.slice(1) || 'home'; render(); window.scrollTo(0,0); });
+function go(r){ if (location.hash.slice(1) === r) { route = r; render(); } else location.hash = r; }
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-go]'); if (a) { e.preventDefault(); go(a.dataset.go); return; }
+  const j = e.target.closest('[data-ref]'); if (j) { openJ.add(j.dataset.ref); go('journeys'); setTimeout(() => document.getElementById('j-' + CSS.escape(j.dataset.ref))?.scrollIntoView({block:'center'}), 50); }
+});
+
+function render(){
+  const base = route.split('/')[0];
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === (base === 'agent' ? 'agents' : base))));
+  if (!S) return;
+  const v = $('#view');
+  if (base === 'agent') v.innerHTML = viewAgent(route.split('/')[1]);
+  else if (base === 'agents') v.innerHTML = viewAgents();
+  else if (base === 'journeys') v.innerHTML = viewJourneys();
+  else if (base === 'charts') { v.innerHTML = viewCharts(); drawCharts(); }
+  else if (base === 'learn') v.innerHTML = viewLearn();
+  else v.innerHTML = viewHome();
+}
+
+function statusBanner(st){
+  const blocked = st.no_new_trades;
+  let cls = 'ok', text = 'Bot chal raha hai · entry window khuli hai', sub = st.session_text || '';
+  if (blocked && blocked !== 'outside US session') { cls = 'lock'; text = 'Naye trades band'; sub = blocked; }
+  else if (blocked) { cls = 'open'; text = 'Sirf dekh raha hai (US session band)'; sub = st.session_text; }
+  return `<div class="status ${cls}"><span class="dot"></span><span>${esc(text)}<small>${esc(sub)} · update ${nyT(st.time)} NY · agla scan ${nyT(st.next_scan)}</small></span></div>`;
+}
+
+function viewHome(){
+  const st = S.status || {}, ccy = st.currency || '';
+  const pl = st.nav != null && st.day_start_nav ? st.nav - st.day_start_nav : null;
+  const today = (S.journeys || []).filter(j => j.created && (Date.now()/1000 - j.created) < 86400);
+  const rows = FLOW.map((id, i) => {
+    const a = agent(id); const c = a.counts || {};
+    const key = {scanner:'charts',reader:'signals',rules:'passed',timer:'go',risk:'approved',executor:'orders',manager:'closed',learner:'followed'}[id];
+    return `${i ? '<div class="arrow"></div>' : ''}<button class="agent-row" data-go="agent/${id}">
+      <span class="emo">${a.emoji}</span>
+      <span><span class="name"><span class="tone ${a.tone}"></span>${esc(a.name)}</span><span class="st">${esc(a.status)}</span></span>
+      <span class="big">${countVal(key, c[key] || 0)}<small>${COUNT_LABELS[key]}</small></span></button>`;
+  }).join('');
+  const b = agent('budget');
+  return `${statusBanner(st)}
+  <div class="daybar">
+    <div><span class="lbl">Equity</span><b>${money(st.nav, ccy)}</b></div>
+    <div><span class="lbl">Aaj P&amp;L</span><b class="${pl == null ? '' : pl >= 0 ? 'good' : 'bad'}">${pl == null ? '-' : (pl >= 0 ? '+' : '') + money(pl)}</b></div>
+    <div><span class="lbl">Open trades</span><b>${(st.open_trades || []).length}</b></div>
+    <div><span class="lbl">Aaj signals</span><b>${today.length}</b></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Kaam kaise chal raha hai</h2>
+      <p class="small muted" style="margin:0 0 10px">Har signal upar se neeche jaata hai. Har agent apna kaam karke agle ko bhejta hai. Kisi pe bhi tap karo: usne kya kiya, kya plan hai, kisko bheja.</p>
+      <div class="flow">${rows}</div>
+      <div class="side-note">Saath mein: <a href="#agent/budget" data-go="agent/budget">${esc(aname('budget'))}</a>, account ki limits pe nazar rakhta hai.</div>
+    </div>
+    <div class="wrap">
+      <div class="card"><h2>💰 Paisa aur limits</h2><p style="margin:0 0 6px"><span class="tone ${b.tone}"></span>${esc(b.status)}</p><div class="plan">${esc(b.plan)}</div></div>
+      <div class="card"><h2>🎯 Open trades</h2>${openTrades(st)}</div>
+      <div class="card"><div class="row"><h2>🧭 Abhi ke signals</h2><a href="#journeys" data-go="journeys" class="small">Sab dekho ›</a></div>
+        ${(S.journeys || []).slice(0,3).map(journeyCard).join('') || '<p class="empty">Abhi koi signal nahi aaya. Chart Reader har candle pe check karta hai.</p>'}</div>
+    </div>
+  </div>`;
+}
+
+function openTrades(st){
+  const tr = st.open_trades || [];
+  if (!tr.length) return '<p class="empty">Koi trade open nahi hai.</p>';
+  return tr.map(t => `<div class="kv" style="padding:6px 0;border-top:1px solid var(--line)"><span><b>${esc(pair(t.instrument))}</b> ${t.units > 0 ? 'BUY' : 'SELL'} ${Math.abs(t.units)}</span>
+    <b class="${t.unrealized_pl >= 0 ? 'good' : 'bad'}">${t.unrealized_pl >= 0 ? '+' : ''}${money(t.unrealized_pl)}</b>
+    <span class="small muted">Entry ${px(t.entry)} · SL ${px(t.stop)} · TP ${px(t.take_profit)}</span><span></span></div>`).join('');
+}
+
+function agentChips(a){
+  const counts = Object.entries(a.counts || {}).map(([k,v]) => `<span class="chip">${esc(COUNT_LABELS[k] || k)}: <b class="num">${countVal(k,v)}</b></span>`).join('');
+  const hand = Object.entries(a.handoffs || {}).map(([k,v]) => `<span class="chip to" data-go="agent/${k}">→ ${esc(aname(k))} · ${v}</span>`).join('');
+  return {counts: counts || '<span class="small muted">Aaj abhi kuch nahi</span>', hand: hand || '<span class="small muted">Aaj kisi ko kuch nahi bheja</span>'};
+}
+
+function viewAgents(){
+  const order = [...FLOW, 'budget'];
+  return `<div class="card"><h2>🤖 9 agents, har ek ka apna kaam</h2><p class="small muted" style="margin:0">Card pe tap karo: poori history, plan, aur kisko kya bheja.</p></div>
+  <div class="agents">${order.map(id => { const a = agent(id), ch = agentChips(a), last = (a.events || [])[0];
+    return `<button class="card acard" data-go="agent/${id}">
+      <div class="head"><span class="emo">${a.emoji}</span><div><h3>${esc(a.name)}</h3><div class="small muted"><span class="tone ${a.tone}"></span>${esc(a.status)}</div></div></div>
+      ${a.plan ? `<div class="plan"><b>Plan:</b> ${esc(a.plan)}</div>` : ''}
+      <div><div class="lbl">Aaj</div><div class="chips">${ch.counts}</div></div>
+      <div><div class="lbl">Aage bheja</div><div class="chips">${ch.hand}</div></div>
+      ${last ? `<div class="small"><span class="muted">${nyT(last.t)}</span> ${esc(last.text)}</div>` : ''}
+    </button>`; }).join('')}</div>`;
+}
+
+function viewAgent(id){
+  const a = agent(id), ch = agentChips(a);
+  const from = (FEEDS[id] || []).map(f => `<span class="chip to" data-go="agent/${f}">${esc(aname(f))}</span>`).join('') || '<span class="small muted">Koi nahi, yeh khud shuru karta hai</span>';
+  const ev = (a.events || []).map(e => `<li class="${e.tone || ''}" ${e.ref ? `data-ref="${esc(e.ref)}"` : ''}><span class="t">${nyT(e.t)}</span>
+    <span>${e.kind === 'handoff' ? `<span class="to">→ ${esc(aname(e.to))} ko bheja</span><br>` : ''}<span class="txt">${esc(e.text)}</span></span></li>`).join('');
+  return `<button class="back" data-go="agents">‹ Saare agents</button>
+  <div class="card wrap">
+    <div class="hero"><span class="emo">${a.emoji}</span><div><h2>${esc(a.name)}</h2><div class="small muted">Iska kaam: ${esc(a.role)}</div></div></div>
+    <div class="status ${a.tone === 'bad' ? 'lock' : a.tone === 'warn' ? 'open' : 'ok'}"><span class="dot"></span><span>Abhi: ${esc(a.status)}</span></div>
+    ${a.plan ? `<div class="plan"><b>Aage ka plan:</b> ${esc(a.plan)}</div>` : ''}
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>📊 Aaj ke numbers</h2><div class="chips">${ch.counts}</div></div>
+    <div class="card"><h2>🔀 Kaun deta hai / kisko bheja</h2>
+      <div class="lbl">Isko kaam kaun deta hai</div><div class="chips" style="margin:4px 0 10px">${from}</div>
+      <div class="lbl">Aaj aage bheja</div><div class="chips" style="margin-top:4px">${ch.hand}</div></div>
+  </div>
+  <div class="card"><h2>📝 Kya kiya (naya upar)</h2><p class="small muted" style="margin:0 0 6px">Time New York ka hai. › wali line pe tap karo to us signal ka poora safar khulega.</p>
+    ${ev ? `<ul class="tl">${ev}</ul>` : '<p class="empty">Abhi tak kuch record nahi hua.</p>'}</div>`;
+}
+
+function badgeFor(j){
+  if (j.r != null) return j.r > 0 ? `<span class="badge b-win">${esc(j.result)}</span>` : j.r < 0 ? `<span class="badge b-loss">${esc(j.result)}</span>` : `<span class="badge b-run">${esc(j.result)}</span>`;
+  if (j.taken) return '<span class="badge b-open">Trade open</span>';
+  if (j.state === 'roka gaya') return '<span class="badge b-block">Roka gaya</span>';
+  return '<span class="badge b-run">Chal raha</span>';
+}
+function journeyCard(j){
+  const open = openJ.has(j.ref);
+  const blockedBy = (j.steps || []).find(s => s.verdict === 'block');
+  return `<div class="card jcard" id="j-${esc(j.ref)}">
+    <div class="jhead" data-toggle="${esc(j.ref)}"><div><b>${esc(pair(j.instrument))} ${j.side > 0 ? '▲ BUY' : '▼ SELL'}</b>
+      <div class="small muted">${nyDT(j.time + 3600)} NY · ${j.taken ? 'Bot ne trade liya' : blockedBy ? 'Roka: ' + esc(aname(blockedBy.agent)) : ''}</div></div>${badgeFor(j)}</div>
+    ${open ? `<ul class="steps">${(j.steps || []).map(s => `<li class="${s.verdict}"><span class="who">${esc(aname(s.agent))}</span> <span class="small muted">${nyT(s.t)}</span><br>${esc(s.text)}</li>`).join('')}</ul>`
+           : `<div class="small muted">${(j.steps || []).map(s => agent(s.agent).emoji + (s.verdict === 'block' ? '✗' : s.verdict === 'pass' ? '✓' : '')).join(' → ')} <span style="color:var(--gold)">· tap karke poora safar</span></div>`}
+  </div>`;
+}
+document.addEventListener('click', e => { const t = e.target.closest('[data-toggle]'); if (!t) return; const r = t.dataset.toggle; openJ.has(r) ? openJ.delete(r) : openJ.add(r); render(); });
+
+function viewJourneys(){
+  const all = S.journeys || [];
+  const list = all.filter(j => jfilter === 'all' || (jfilter === 'taken' ? j.taken : jfilter === 'blocked' ? !j.taken : j.r != null));
+  const btn = (k, t) => `<button class="${jfilter === k ? 'on' : ''}" onclick="jfilter='${k}';render()">${t}</button>`;
+  return `<div class="card"><h2>🧭 Har signal ka safar</h2><p class="small muted" style="margin:0 0 8px">Signal kis agent se kis agent tak gaya, kahan pass hua (✓), kahan roka gaya (✗), aur end mein result kya raha. Roke gaye signals ko bhi Time Machine chart pe follow karta hai, taaki pata chale rokna sahi tha ya nahi.</p>
+    <div class="seg">${btn('all','Sab')}${btn('taken','Bot ne liye')}${btn('blocked','Roke gaye')}${btn('done','Result aa gaya')}</div></div>
+  ${list.map(journeyCard).join('') || '<p class="empty">Is group mein abhi kuch nahi.</p>'}`;
+}
+
+function viewCharts(){
+  const charts = (S.charts || []).filter(c => cfilter === 'all' || c.state === cfilter);
+  const n = s => (S.charts || []).filter(c => c.state === s).length;
+  const btn = (k, t) => `<button class="${cfilter === k ? 'on' : ''}" onclick="cfilter='${k}';render()">${t}</button>`;
+  const label = {signal:'SIGNAL', forming:'BAN RAHA', watch:'WATCH', none:'KUCH NAHI'};
+  return `<div class="card"><h2>📈 Saare charts (${(S.charts || []).length})</h2>
+    <div class="legend" style="margin-bottom:8px"><span><b class="good">SIGNAL</b>: abhi rules poore</span><span><b style="color:var(--gold-hi)">BAN RAHA</b>: price zone ki taraf aa raha</span><span><b style="color:#4c7bd9">WATCH</b>: trend hai, price door</span><span><b>KUCH NAHI</b>: trend nahi</span><span>Peeli patti = entry zone · Purple line = EMA</span></div>
+    <div class="seg">${btn('all','Sab')}${btn('signal','Signal '+n('signal'))}${btn('forming','Ban raha '+n('forming'))}${btn('watch','Watch '+n('watch'))}${btn('none','Kuch nahi '+n('none'))}</div></div>
+  <div class="cgrid">${charts.map((c, i) => `<div class="card ccard ${c.state}">
+    <div class="row"><b>${esc(pair(c.instrument))} <span class="${c.bias > 0 ? 'good' : c.bias < 0 ? 'bad' : ''}">${c.bias > 0 ? '▲' : c.bias < 0 ? '▼' : '•'}</span></b><span class="cbadge">${label[c.state] || c.state}</span></div>
+    <canvas data-i="${i}"></canvas><div class="small">${esc(c.note)}</div>
+    <div class="small muted" style="margin-top:4px">Price ${px(c.price)} · RSI ${esc(c.rsi ?? '-')}</div>
+    ${c.ref ? `<div class="small" data-ref="${esc(c.ref)}" style="cursor:pointer;color:var(--gold)">Bot: ${c.decision === 'open' ? 'trade liya' : 'roka - ' + esc(c.decision_reason || '')} ›</div>` : ''}
+  </div>`).join('') || '<p class="empty">Is group mein abhi koi chart nahi.</p>'}</div>`;
+}
+function drawCharts(){
+  const charts = (S.charts || []).filter(c => cfilter === 'all' || c.state === cfilter);
+  document.querySelectorAll('canvas[data-i]').forEach(cv => draw(cv, charts[+cv.dataset.i]));
+}
+function draw(cv, ch){
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
-  cv.width = w * dpr; cv.height = h * dpr;
-  const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  cv.width = w*dpr; cv.height = h*dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
   const c = ch.candles || []; if (!c.length) return;
   let lo = Math.min(...c.map(x => x[3])), hi = Math.max(...c.map(x => x[2]));
   (ch.ema || []).forEach(v => { if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
   if (ch.zone) { lo = Math.min(lo, ch.zone[0]); hi = Math.max(hi, ch.zone[1]); }
-  const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  const pad = (hi - lo) * .06 || 1; lo -= pad; hi += pad;
   const y = v => h - (v - lo) / (hi - lo) * h, bw = w / c.length;
   if (ch.zone) { g.fillStyle = css('--zone'); g.fillRect(0, y(ch.zone[1]), w, y(ch.zone[0]) - y(ch.zone[1])); }
-  g.strokeStyle = css('--line'); g.setLineDash([3,3]);
-  [ch.swing_high, ch.swing_low].forEach(v => { if (v != null) { g.beginPath(); g.moveTo(0, y(v)); g.lineTo(w, y(v)); g.stroke(); } });
-  g.setLineDash([]);
-  c.forEach((k, i) => {
-    const [t, o, hh, l, cl] = k, x = i * bw + bw / 2, col = cl >= o ? css('--up') : css('--down');
+  c.forEach((k, i) => { const [t,o,hh,l,cl] = k, x = i*bw + bw/2, col = cl >= o ? css('--up') : css('--down');
     g.strokeStyle = col; g.fillStyle = col; g.beginPath(); g.moveTo(x, y(hh)); g.lineTo(x, y(l)); g.stroke();
-    const top = y(Math.max(o, cl)), bh = Math.max(1, Math.abs(y(o) - y(cl)));
-    g.fillRect(x - Math.max(1, bw * 0.35), top, Math.max(2, bw * 0.7), bh);
-  });
-  if (ch.ema) { g.strokeStyle = css('--ema'); g.lineWidth = 1.5; g.beginPath();
-    let started = false;
-    ch.ema.forEach((v, i) => { if (v == null) return; const x = i * bw + bw / 2;
-      started ? g.lineTo(x, y(v)) : (g.moveTo(x, y(v)), started = true); });
-    g.stroke(); }
+    g.fillRect(x - Math.max(1, bw*.35), y(Math.max(o, cl)), Math.max(2, bw*.7), Math.max(1, Math.abs(y(o) - y(cl)))); });
+  if (ch.ema) { g.strokeStyle = css('--ema'); g.lineWidth = 1.5; g.beginPath(); let s = false;
+    ch.ema.forEach((v, i) => { if (v == null) return; const x = i*bw + bw/2; s ? g.lineTo(x, y(v)) : (g.moveTo(x, y(v)), s = true); }); g.stroke(); }
 }
 
-function render(s) {
-  last = s;
-  const st = s.status || {}, L = s.learning || {};
-  document.getElementById('nav').textContent = st.nav != null ? fmt(st.nav) + ' ' + (st.currency || '') : '-';
-  const pl = st.nav != null && st.day_start_nav ? st.nav - st.day_start_nav : null;
-  const plEl = document.getElementById('pl'); plEl.textContent = pl == null ? '-' : (pl >= 0 ? '+' : '') + fmt(pl);
-  plEl.className = pl == null ? '' : pl >= 0 ? 'good' : 'bad';
-  document.getElementById('ot').textContent = (st.open_trades || []).length;
-  document.getElementById('sess').textContent = st.in_session ? 'US session: open for entries' : 'Outside US session: watching only';
-  const halt = document.getElementById('halt');
-  halt.hidden = !st.no_new_trades || st.no_new_trades === 'outside US session';
-  halt.textContent = 'No new trades: ' + (st.no_new_trades || ''); halt.className = 'pill bad';
-
-  const grid = document.getElementById('grid');
-  const charts = (s.charts || []).filter(c => filter === 'all' || c.state === filter);
-  grid.innerHTML = charts.length ? '' : '<p class="empty">No charts in this group right now.</p>';
-  charts.forEach(ch => {
-    const d = document.createElement('div'); d.className = 'card ' + ch.state;
-    const arrow = ch.bias > 0 ? '▲' : ch.bias < 0 ? '▼' : '•';
-    const label = {signal:'SIGNAL', forming:'FORMING', watch:'WATCH', none:'NO SETUP'}[ch.state] || ch.state;
-    const dec = ch.decision ? `<div class="meta">Bot: ${esc(ch.decision === 'open' ? 'took it' : 'skipped - ' + (ch.decision_reason || ''))}</div>` : '';
-    d.innerHTML = `<div class="row"><span class="name">${esc(ch.instrument.replace('_','/'))} <span class="${ch.bias>0?'good':ch.bias<0?'bad':''}">${arrow}</span></span>
-      <span class="badge">${label}</span></div><canvas></canvas>
-      <div class="note">${esc(ch.note)}</div>
-      <div class="meta">Price ${px(ch.price)} · RSI ${esc(ch.rsi ?? '-')} · score ${esc(ch.score)}</div>${dec}`;
-    grid.appendChild(d); draw(d.querySelector('canvas'), ch);
-  });
-
-  const list = (id, items, f) => { const el = document.getElementById(id);
-    el.innerHTML = items && items.length ? items.map(f).join('') : '<li class="empty">nothing yet</li>'; };
-  list('lessons', L.lessons, l => `<li><b>${esc(l.day)}</b> ${esc(l.text)}</li>`);
-  list('rules', L.filters, f => `<li>Avoid ${esc(f.text)}</li>`);
-  list('mistakes', L.mistakes_30d, m => `<li>${esc(m.count)} × ${esc(m.text)}</li>`);
-  list('journal', s.journal, j => `<li>${esc(j.time_utc.slice(11,16))} ${esc(j.event)} ${esc(j.instrument)} ${esc(j.side)} ${esc((j.reason || j.note || '').replace(/^(BUY|SELL): /, ''))}</li>`);
-  const S = L.stats_30d || {};
-  document.getElementById('stats').textContent =
-    `${S.bot_trades ?? 0} bot trades (${fmt(S.bot_total_r)}R) · ${S.setups_followed ?? 0} setups followed (${fmt(S.all_setups_total_r)}R)`;
-  const tr = st.open_trades || [];
-  document.getElementById('trades').innerHTML = tr.length ? tr.map(t =>
-    `<div>${esc(t.instrument)} ${t.units > 0 ? 'BUY' : 'SELL'} ${esc(Math.abs(t.units))} @ ${px(t.entry)} · SL ${px(t.stop)} · TP ${px(t.take_profit)}</div>`).join('') : 'none';
+function viewLearn(){
+  const L = S.learning || {}, st = L.stats_30d || {};
+  const params = Object.entries(L.params || {});
+  return `<div class="card"><h2>🧠 Bot kya seekh raha hai</h2>
+    <p class="small muted" style="margin:0">Time Machine har setup ko chart pe follow karta hai (liya ho ya roka ho). Roz 17:00 New York pe: jo cheez baar-baar loss deti hai uska "avoid" rule banata hai, aur ek setting ko thoda badal ke purane + naye data pe test karta hai. Risk ki limits kabhi khud nahi badalta.</p></div>
+  <div class="daybar">
+    <div><span class="lbl">Setups follow</span><b>${st.setups_followed ?? 0}</b></div>
+    <div><span class="lbl">Bot trades</span><b>${st.bot_trades ?? 0}</b></div>
+    <div><span class="lbl">Bot ka R</span><b class="${(st.bot_total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.bot_total_r ?? 0).toFixed ? (st.bot_total_r >= 0 ? '+' : '') + st.bot_total_r.toFixed(2) : st.bot_total_r}</b></div>
+    <div><span class="lbl">Sab setups ka R</span><b class="${(st.all_setups_total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.all_setups_total_r >= 0 ? '+' : '') + Number(st.all_setups_total_r || 0).toFixed(2)}</b></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>📜 Seekhe hue sabak</h2>${(L.lessons || []).length ? `<ul class="tl">${L.lessons.map(l => `<li><span class="t">${esc(l.day.slice(5))}</span><span>${esc(l.text)}</span></li>`).join('')}</ul>` : '<p class="empty">Abhi koi sabak nahi. Pehla review aaj 17:00 New York ke baad, aur pehle rules ~20 milte-julte setups ke baad aayenge.</p>'}</div>
+    <div class="wrap">
+      <div class="card"><h2>🚫 Khud banaye rules</h2>${(L.filters || []).length ? `<ul class="plain">${L.filters.map(f => `<li>Avoid: ${esc(f.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi.</p>'}</div>
+      <div class="card"><h2>⚠️ Sabse zyada galtiyan (30 din)</h2>${(L.mistakes_30d || []).length ? `<ul class="plain">${L.mistakes_30d.map(m => `<li><b class="num">${m.count}×</b> ${esc(m.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi.</p>'}</div>
+      <div class="card"><h2>⚙️ Badli hui settings</h2>${params.length ? `<div class="kv">${params.map(([k,v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join('')}</div>` : '<p class="empty">Sab default hain.</p>'}</div>
+    </div>
+  </div>`;
 }
 
-async function poll() {
-  try { const r = await fetch('/api/state'); if (r.ok) render(await r.json()); } catch (e) {}
+async function poll(){
+  try { const r = await fetch('/api/state', {cache:'no-store'}); if (r.ok) { S = await r.json(); render(); } } catch (e) {}
   setTimeout(poll, 15000);
 }
-window.addEventListener('resize', () => last && render(last));
-poll();
+window.addEventListener('resize', () => { if (route === 'charts' && S) drawCharts(); });
+render(); poll();
 </script>
 </body>
 </html>

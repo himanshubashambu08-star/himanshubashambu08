@@ -6,3 +6,4 @@ bot.log
 __pycache__/
 memory-*.db
 reports/
+agents-*.json
