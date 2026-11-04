@@ -71,3 +71,11 @@ class OandaPrices(unittest.TestCase):
         self.assertEqual(b.calls[0][2], {"instruments": "EUR_USD,USD_JPY"})
         self.assertAlmostEqual(out["EUR_USD"].mid, 1.1001)
         self.assertFalse(out["USD_JPY"].tradeable)
+
+
+class OandaSpread(unittest.TestCase):
+    def test_typical_spread_is_median_of_bid_ask_candles(self):
+        cs = [{"bid": {"c": "100"}, "ask": {"c": f"{100 + x}"}} for x in (0.2, 0.3, 5.0)]
+        b = FakeOanda({"/candles": {"candles": cs}})
+        self.assertAlmostEqual(b.typical_spread("XAU_USD"), 0.3)
+        self.assertEqual(b.calls[0][2]["price"], "BA")

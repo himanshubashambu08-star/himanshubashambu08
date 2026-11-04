@@ -527,6 +527,7 @@ class Learner:
     def snapshot(self):
         since = self.clock() - 30 * 86400
         rows = self._rows("status='done' AND time>=?", (since,))
+        shadow = [r for r in rows if not r["taken"] and r["time"] >= (self.get("setup_since") or 0)]
         inside = [r for r in rows if in_window(r)]
         outside = [r for r in rows if not in_window(r)]
         counts = {}
@@ -549,11 +550,12 @@ class Learner:
                 "off_session": _card(outside),
             },
             "report_card": self.get("report_card"),
-            "shadow_30d": _card([r for r in rows if not r["taken"]]),
-            "shadow_by_pair": sorted([{"pair": k, **_card([r for r in rows if not r["taken"] and r["instrument"] == k])}
-                                      for k in {r["instrument"] for r in rows if not r["taken"]}],
+            "setup_since": self.get("setup_since"),
+            "shadow_30d": _card(shadow),
+            "shadow_by_pair": sorted([c for c in ({"pair": k, **_card([r for r in shadow if r["instrument"] == k])}
+                                                  for k in {r["instrument"] for r in shadow}) if c["n"]],
                                      key=lambda x: -x["total_r"])[:15],
-            "real_30d": self.closed_summary(self.clock() - 30 * 86400),
+            "real_30d": self.closed_summary(max(self.clock() - 30 * 86400, self.get("setup_since") or 0)),
             "research": self.get("research"),
             "trade_list": self.get("trade_list", []),
             "experiments": self.get("experiments"),

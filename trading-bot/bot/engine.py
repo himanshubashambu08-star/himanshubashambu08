@@ -293,6 +293,7 @@ class Engine:
         account = self.broker.account()
         self.risk.update(account, now)
         self.agents.set_day(self.risk.state["day"])
+        self.check_setup_change()
         self.report_budget(account)
         self.report_news(now)
         trades = self.broker.open_trades()
@@ -770,6 +771,36 @@ class Engine:
         return out
 
     # ---- Exit Planner ------------------------------------------------------
+    def typical_spreads(self, names):
+        """Median recent spread per instrument (cached 6 h), so backtests do not depend on one live tick."""
+        cache = getattr(self, "_spread_cache", {})
+        out, now = {}, time.time()
+        for n in names:
+            hit = cache.get(n)
+            if hit and now - hit[1] < 6 * 3600:
+                out[n] = hit[0]
+                continue
+            try:
+                out[n] = self.broker.typical_spread(n)
+                cache[n] = (out[n], now)
+            except Exception as e:
+                log.error("typical spread %s: %s", n, e)
+        self._spread_cache = cache
+        return out
+
+    def setup_signature(self):
+        e = self.ema_params() if self.ema else {}
+        return [self.cfg["strategy"], self.cfg["entry_timeframe"], e.get("reward_risk"), self.cfg["base_instrument"],
+                self.cfg["trade_mode"], e.get("window_ny")]
+
+    def check_setup_change(self):
+        """New strategy settings -> shadow/real counters start from zero."""
+        sig = self.setup_signature()
+        if self.learner.get("setup_sig") != sig:
+            self.learner.put("setup_sig", sig)
+            # signal times are candle OPEN times: start 2 candles back so the first new signal is counted
+            self.learner.put("setup_since", self.clock() - 2 * GRANULARITY_SECONDS[self.cfg["entry_timeframe"]])
+
     def trading_day_start(self):
         """Unix time when the current trading day began (17:00 New York)."""
         ny = datetime.fromtimestamp(self.clock(), timezone.utc).astimezone(NY)
@@ -967,7 +998,7 @@ class Engine:
                          f"{tf} candles download ho rahe hain (spread ke saath)…")
         start = self.clock() - self.cfg["backtest_days"] * 86400
         try:
-            spreads = {k: p.spread for k, p in self.broker.prices(names).items()}
+            spreads = self.typical_spreads(names)
         except Exception as e:
             log.error("spreads for backtest: %s", e)
             spreads = {}
@@ -1111,7 +1142,7 @@ class Engine:
         A, n = self.agents, self.cfg["base_instrument"]
         start = self.clock() - self.cfg["backtest_days"] * 86400
         try:
-            spread = self.broker.prices([n])[n].spread
+            spread = self.typical_spreads([n]).get(n, 0.0)
         except Exception:
             spread = 0.0
         A.did("learner", f"Variations test shuru: {pair(n)} · targets {self.VARIATION_RRS} × timeframes "
@@ -1164,7 +1195,7 @@ class Engine:
         A.did("learner", f"Research shuru: {len(names)} charts, {tf} · 1:{self.cfg['research_rr']}, har ghanta, "
                          f"~{self.cfg['research_days']} din ka data (spread ke saath)…")
         try:
-            spreads = {k: p.spread for k, p in self.broker.prices(names).items()}
+            spreads = self.typical_spreads(names)
         except Exception as e:
             log.error("spreads for research: %s", e)
             spreads = {}
@@ -1262,7 +1293,7 @@ class Engine:
             A.did("learner", f"Experiment shuru: {len(names)} charts ke ~7 mahine ke asli data pe 6 versions test "
                              "kar raha hoon (spread ke kharche ke saath)…")
             try:
-                spreads = {k: p.spread for k, p in self.broker.prices(names).items()}
+                spreads = self.typical_spreads(names)
             except Exception as e:
                 log.error("spreads for experiment: %s", e)
                 spreads = {}

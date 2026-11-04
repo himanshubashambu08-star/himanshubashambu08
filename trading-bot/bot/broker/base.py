@@ -37,6 +37,10 @@ class Broker(ABC):
         """Candles from start_ts to now (or end_ts), any length (downloaded in pieces)."""
         return self.candles(instrument, granularity, 5000)
 
+    def typical_spread(self, instrument):
+        """Median spread over recent history (not one live tick). Default: the live spread."""
+        return self.price(instrument).spread
+
     def prices(self, instruments):
         """Latest prices for many instruments: {name: Price}. Adapters may do this in one call."""
         return {n: self.price(n) for n in instruments}

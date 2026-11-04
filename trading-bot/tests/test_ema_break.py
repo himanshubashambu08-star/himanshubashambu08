@@ -354,3 +354,26 @@ class BacktestStats(unittest.TestCase):
             self.assertEqual([y["year"] for y in r["years"]], [2025, 2026])
             self.assertEqual(r["years"][1]["total_r"], 6)
             self.assertEqual(r["window"], "24 ghante (Mon–Fri)")
+
+
+class SetupReset(unittest.TestCase):
+    def test_counters_restart_when_setup_changes(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make(d, gate=False)
+            e.tick()
+            first = e.learner.get("setup_since")
+            self.assertIsNotNone(first)
+            e.tick()
+            self.assertEqual(e.learner.get("setup_since"), first)          # same setup: unchanged
+            e.base_params["reward_risk"] = 2.0
+            e.check_setup_change()
+            self.assertNotEqual(e.learner.get("setup_sig")[2], 3.0)
+
+    def test_typical_spread_used_and_cached(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make(d)
+            calls = []
+            b.typical_spread = lambda n: calls.append(n) or 0.4
+            self.assertEqual(e.typical_spreads(["XAU_USD"]), {"XAU_USD": 0.4})
+            e.typical_spreads(["XAU_USD"])
+            self.assertEqual(calls, ["XAU_USD"])

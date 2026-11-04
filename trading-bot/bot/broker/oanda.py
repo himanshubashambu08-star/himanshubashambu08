@@ -105,6 +105,15 @@ class OandaBroker(Broker):
         return {p["instrument"]: Price(bid=float(p["bids"][0]["price"]), ask=float(p["asks"][0]["price"]),
                                        tradeable=bool(p.get("tradeable", True))) for p in out}
 
+    def typical_spread(self, instrument, count=2000):
+        """Median close spread of the last `count` M5 candles (bid/ask), i.e. about one week of quotes."""
+        got = self._req("GET", f"/v3/instruments/{instrument}/candles",
+                        {"granularity": "M5", "count": count, "price": "BA"})["candles"]
+        sp = sorted(float(c["ask"]["c"]) - float(c["bid"]["c"]) for c in got if "ask" in c and "bid" in c)
+        if not sp:
+            return self.price(instrument).spread
+        return sp[len(sp) // 2]
+
     def quote_to_home(self, instrument):
         """How many home-currency units 1 unit of the instrument's quote currency is worth."""
         if self._home is None:

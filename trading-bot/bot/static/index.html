@@ -783,12 +783,13 @@ function emaCard(compact){
         <div class="kpi"><span class="lbl">Timeframe · target</span><b style="font-size:15px">${esc(B.timeframe)} · 1:${B.reward_risk ?? e.reward_risk}</b></div>
       </div>
       ${(B.years || []).length ? `<div class="lbl" style="margin-top:10px">Saal ke hisaab se</div>${B.years.map(y => row('📅 ' + y.year, y)).join('')}` : ''}
-      <p class="small muted" style="margin:8px 0 0">${nyD(B.from)} se ${nyD(B.to)} tak (~${Math.round((B.to - B.from) / 86400 / 30.4)} mahine) ka asli OANDA ${esc(B.timeframe)} data, spread kaat ke. 1:3 pe ~25% jeet = barabar; spread ke baad thoda zyada chahiye. Har din 5 PM NY pe naye data ke saath dobara test hota hai. Bana: ${nyDT(B.made)} NY.</p>` : ''}</div>`;
+      <p class="small muted" style="margin:8px 0 0">${nyD(B.from)} se ${nyD(B.to)} tak (~${Math.round((B.to - B.from) / 86400 / 30.4)} mahine) ka asli OANDA ${esc(B.timeframe)} data, spread kaat ke${B.spread && B.spread[(B.pairs || [])[0]] != null ? ` (median spread ${px(B.spread[B.pairs[0]])}, pichhle ~1 hafte ke bid/ask se)` : ''}. 1:3 pe ~25% jeet = barabar; spread ke baad thoda zyada chahiye. Har din 5 PM NY pe naye data ke saath dobara test hota hai. Bana: ${nyDT(B.made)} NY.</p>` : ''}</div>`;
 }
 function shadowCard(){
   const L = S.learning || {}, sh = L.shadow_30d || {}, re = L.real_30d || {}, ccy = (S.status || {}).currency || '';
   const line = (c, money_) => c && c.n ? `<b class="num ${c.total_r >= 0 ? 'good' : 'bad'}">${c.total_r >= 0 ? '+' : ''}${Number(c.total_r).toFixed(1)}R</b><br><span class="small muted">${c.n} · win ${c.win_pct}% · PF ${c.pf ?? '∞'}${money_ != null ? ' · ' + (money_ >= 0 ? '+' : '') + money(money_) + ' ' + ccy : ''}</span>` : '<span class="muted">abhi kuch nahi</span>';
-  return `<div class="card" id="c-shadow"><h2>🌙 Shadow vs 💰 Asli (30 din)</h2>
+  const since = L.setup_since;
+  return `<div class="card" id="c-shadow"><h2>🌙 Shadow vs 💰 Asli</h2><p class="small muted" style="margin:0 0 6px">Naye setup ke shuru se gina gaya${since ? ': ' + nyDT(since) + ' NY' : ''} (max 30 din). Strategy badalte hi yeh zero se shuru hota hai.</p>
     <div class="xt sh"><div class="xr"><div class="xn">🌙 Shadow setups<br><span class="small muted">Saare charts, 24/7. Sirf record + chart pe follow, paisa nahi.</span></div><div class="xc" style="grid-column:span 2">${line(sh)}</div></div>
     <div class="xr win"><div class="xn">💰 Asli demo trades<br><span class="small muted">Sirf trading list pe.</span></div><div class="xc" style="grid-column:span 2">${line(re, re.pl)}</div></div></div>
     ${(L.shadow_by_pair || []).length ? `<details style="margin-top:8px"><summary>Shadow: pair ke hisaab se</summary><div style="margin-top:6px">${L.shadow_by_pair.map(p => `<div class="rc"><span>${esc(pair(p.pair))}</span><b class="${p.total_r >= 0 ? 'good' : 'bad'}">${p.total_r >= 0 ? '+' : ''}${p.total_r}R · ${p.n} setups · win ${p.win_pct}%</b></div>`).join('')}</div></details>` : ''}</div>`;
