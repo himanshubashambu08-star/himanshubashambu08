@@ -108,6 +108,8 @@ h3{font:600 15px var(--f-body);margin:0}
 .ccard.signal{border-top-color:var(--good)}.ccard.forming{border-top-color:var(--gold-hi)}.ccard.watch{border-top-color:#4c7bd9}
 canvas{width:100%;height:150px;display:block;margin:6px 0}
 canvas.mini{height:110px}
+canvas.big{height:min(60vh,420px)}
+.ccard a,.jcard a{color:var(--gold);text-decoration:none;font-weight:600}
 .live{font-size:12px;color:var(--muted)}.live.on{color:var(--good);animation:glow2 1.2s ease-in-out infinite}
 @keyframes glow2{50%{opacity:.25}}
 .cbadge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;color:#fff;background:var(--muted)}
@@ -217,7 +219,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const pair = n => String(n || '').replace('_','/');
 const money = (x, c) => x == null ? '-' : Number(x).toLocaleString(undefined,{maximumFractionDigits:0}) + (c ? ' ' + c : '');
-const px = v => v == null ? '-' : Number(v).toFixed(Math.abs(v) < 20 ? 5 : Math.abs(v) < 1000 ? 3 : 2);
+const px = v => v == null ? '-' : Math.abs(v) >= 1000 ? Number(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : Number(v).toFixed(Math.abs(v) < 20 ? 5 : 3);
 const tfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false});
 const dfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',day:'numeric',month:'short'});
 const nyT = ts => ts ? tfmt.format(new Date(ts*1000)) : '-';
@@ -239,13 +241,14 @@ function render(){
   const askTab = document.querySelector('.tabs [data-view=ask]'); if (askTab) askTab.hidden = !brainOn;
   if (route === 'ask' && S && !brainOn) { route = 'home'; history.replaceState(null, '', '#home'); }
   const base = route.split('/')[0];
-  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === (base === 'agent' ? 'agents' : base))));
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === (base === 'agent' ? 'agents' : base === 'chart' ? 'charts' : base))));
   if (!S) return;
   const v = $('#view');
   if (base === 'agent') v.innerHTML = viewAgent(route.split('/')[1]);
   else if (base === 'agents') v.innerHTML = viewAgents();
   else if (base === 'journeys') v.innerHTML = viewJourneys();
   else if (base === 'charts') v.innerHTML = viewCharts();
+  else if (base === 'chart') v.innerHTML = viewChart(decodeURIComponent(route.split('/')[1] || ''));
   else if (base === 'learn') v.innerHTML = viewLearn();
   else if (base === 'news') v.innerHTML = viewNews();
   else if (base === 'ask') { const q = document.getElementById('q')?.value || ''; v.innerHTML = viewAsk(); const t = document.getElementById('q'); if (t) t.value = q; }
@@ -359,6 +362,7 @@ function journeyCard(j){
   return `<div class="card jcard" id="j-${esc(j.ref)}">
     <div class="jhead" data-toggle="${esc(j.ref)}"><div><b>${esc(pair(j.instrument))} ${j.side > 0 ? '▲ BUY' : '▼ SELL'}</b>
       <div class="small muted">${nyDT(j.time + 3600)} NY · ${j.taken ? 'Bot ne trade liya' : blockedBy ? 'Roka: ' + esc(aname(blockedBy.agent)) : ''}</div></div>${badgeFor(j)}</div>
+    ${(S.charts || []).some(c => c.instrument === j.instrument) ? `<canvas class="mini" data-inst="${esc(j.instrument)}"></canvas><div class="small"><a href="#chart/${esc(j.instrument)}" data-go="chart/${esc(j.instrument)}">🔍 ${esc(pair(j.instrument))} ka bada live chart ›</a></div>` : ''}
     ${open ? `<ul class="steps">${(j.steps || []).map(s => `<li class="${s.verdict}"><span class="who">${esc(aname(s.agent))}</span> <span class="small muted">${nyT(s.t)}</span><br>${esc(s.text)}</li>`).join('')}</ul>`
            : `<div class="small muted">${(j.steps || []).map(s => agent(s.agent).emoji + (s.verdict === 'block' ? '✗' : s.verdict === 'pass' ? '✓' : '')).join(' → ')} <span style="color:var(--gold)">· tap karke poora safar</span></div>`}
   </div>`;
@@ -385,6 +389,7 @@ function chartCard(c, mode){
       <span class="row" style="gap:6px"><span class="live" data-live="${id}">●</span><span class="cbadge">${CLABEL[c.state] || c.state}</span></span></div>
     <canvas data-inst="${id}" ${mode === 'scanner' ? 'class="mini"' : ''}></canvas>${extra}
     <div class="small muted" style="margin-top:4px">Price <b class="num" data-px="${id}">${px(c.price)}</b> · RSI ${esc(c.rsi ?? '-')}${c.zone ? ` · zone ${c.zone[0]}–${c.zone[1]}` : ''}</div>
+    <div class="small" style="margin-top:4px"><a href="#chart/${id}" data-go="chart/${id}">🔍 Bada live chart kholo ›</a></div>
     ${c.ref && mode !== 'scanner' ? `<div class="small" data-ref="${esc(c.ref)}" style="cursor:pointer;color:var(--gold)">Bot: ${c.decision === 'open' ? 'trade liya' : 'roka - ' + esc(c.decision_reason || '')} ›</div>` : ''}
   </div>`;
 }
@@ -392,6 +397,29 @@ function liveNote(){
   const L = LIVE.data; if (!L) return '<span class="small muted">Live price aa raha hai…</span>';
   const open = Object.values(L.prices || {}).some(p => p.open);
   return `<span class="small ${open ? 'good' : 'muted'}">${open ? '● LIVE' : '● Market band (weekend/closed)'} · price ${new Date(L.t * 1000).toLocaleTimeString('en-GB', {timeZone:'America/New_York'})} NY${L.error ? ' · ⚠ ' + esc(L.error) : ''}</span>`;
+}
+
+function viewChart(inst){
+  const c = (S.charts || []).find(x => x.instrument === inst);
+  if (!c) return `<button class="back" data-go="charts">‹ Saare charts</button><p class="empty">${esc(pair(inst))} ka chart abhi nahi mila.</p>`;
+  const tr = ((S.status || {}).open_trades || []).filter(t => t.instrument === inst);
+  const js = (S.journeys || []).filter(j => j.instrument === inst).slice(0, 5);
+  const tv = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent('OANDA:' + inst.replace('_', ''));
+  return `<button class="back" data-go="charts">‹ Saare charts</button>
+  <div class="card ccard ${c.state}">
+    <div class="row"><h2 style="margin:0">${esc(pair(inst))} <span class="${c.bias > 0 ? 'good' : c.bias < 0 ? 'bad' : ''}">${c.bias > 0 ? '▲' : c.bias < 0 ? '▼' : '•'}</span></h2>
+      <span class="row" style="gap:6px"><span class="live" data-live="${esc(inst)}">●</span><span class="cbadge">${CLABEL[c.state] || c.state}</span></span></div>
+    <div class="small muted">H1 candles (har candle = 1 ghanta) · <span id="livenote">${liveNote()}</span></div>
+    <canvas class="big" data-inst="${esc(inst)}"></canvas>
+    <div class="legend"><span><b style="color:var(--ema)">━</b> EMA20</span><span><b style="color:var(--gold-hi)">▬</b> entry zone</span>${tr.length ? '<span><b style="color:var(--gold-hi)">┅</b> Entry</span><span><b class="bad">┅</b> SL</span><span><b class="good">┅</b> TP</span>' : ''}</div>
+    <div style="margin-top:8px">${esc(c.note)}</div>
+    <div class="kv" style="margin-top:8px"><span>Price</span><b data-px="${esc(inst)}">${px(c.price)}</b><span>RSI</span><b>${esc(c.rsi ?? '-')}</b>
+      ${c.zone ? `<span>Entry zone</span><b>${c.zone[0]} – ${c.zone[1]}</b>` : ''}${c.stop_hint ? `<span>SL andaaza</span><b>${c.stop_hint}</b>` : ''}
+      <span>Pichhle 20 candles high / low</span><b>${px(c.swing_high)} / ${px(c.swing_low)}</b></div>
+    <div class="btns"><a class="btn" href="${tv}" target="_blank" rel="noopener">📊 TradingView pe kholo</a></div>
+  </div>
+  ${tr.length ? `<div class="card"><h2>🎯 Is pair ka open trade</h2>${openTrades({open_trades: tr})}</div>` : ''}
+  ${js.length ? `<div class="card"><h2>🧭 Is pair ke signals</h2></div>${js.map(journeyCard).join('')}` : ''}`;
 }
 function viewCharts(){
   const charts = (S.charts || []).filter(c => cfilter === 'all' || c.state === cfilter);
@@ -417,11 +445,18 @@ function drawCharts(){
   const byInst = Object.fromEntries((S.charts || []).map(c => [c.instrument, c]));
   document.querySelectorAll('canvas[data-inst]').forEach(cv => { const c = byInst[cv.dataset.inst]; if (c) draw(cv, c); });
 }
+function tradeLines(inst){
+  return ((S.status || {}).open_trades || []).filter(t => t.instrument === inst).flatMap(t => [
+    t.entry != null && {v:t.entry, c:css('--gold-hi'), l:'Entry'}, t.stop != null && {v:t.stop, c:css('--down'), l:'SL'},
+    t.take_profit != null && {v:t.take_profit, c:css('--up'), l:'TP'}].filter(Boolean));
+}
 function draw(cv, ch){
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   cv.width = w*dpr; cv.height = h*dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
   const c = ch.candles || []; if (!c.length) return;
+  const lines = tradeLines(ch.instrument);
   let lo = Math.min(...c.map(x => x[3])), hi = Math.max(...c.map(x => x[2]));
+  lines.forEach(L => { lo = Math.min(lo, L.v); hi = Math.max(hi, L.v); });
   (ch.ema || []).forEach(v => { if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
   if (ch.zone) { lo = Math.min(lo, ch.zone[0]); hi = Math.max(hi, ch.zone[1]); }
   const pad = (hi - lo) * .06 || 1; lo -= pad; hi += pad;
@@ -432,6 +467,14 @@ function draw(cv, ch){
     g.fillRect(x - Math.max(1, bw*.35), y(Math.max(o, cl)), Math.max(2, bw*.7), Math.max(1, Math.abs(y(o) - y(cl)))); });
   if (ch.ema) { g.strokeStyle = css('--ema'); g.lineWidth = 1.5; g.beginPath(); let s = false;
     ch.ema.forEach((v, i) => { if (v == null) return; const x = i*bw + bw/2; s ? g.lineTo(x, y(v)) : (g.moveTo(x, y(v)), s = true); }); g.stroke(); }
+  g.lineWidth = 1.2; g.font = '600 11px system-ui, sans-serif';
+  const used = [];
+  lines.forEach(L => { g.strokeStyle = L.c; g.fillStyle = L.c; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(0, y(L.v)); g.lineTo(w, y(L.v)); g.stroke();
+    g.setLineDash([]); const ly = Math.max(11, y(L.v) - 3); let lx = 4;
+    while (used.some(u => Math.abs(u[1] - ly) < 12 && Math.abs(u[0] - lx) < 110)) lx += 115;   // labels side by side, not on top
+    used.push([lx, ly]); g.fillText(L.l + ' ' + px(L.v), lx, ly); });
+  const last = c[c.length - 1]; g.fillStyle = css('--ink'); g.font = '600 11px ui-monospace, monospace';
+  const txt = px(last[4]); g.fillText(txt, w - g.measureText(txt).width - 2, Math.max(11, Math.min(h - 2, y(last[4]) - 4)));
 }
 
 
@@ -508,7 +551,7 @@ function viewLearn(){
 }
 
 async function poll(){
-  try { const r = await fetch('/api/state', {cache:'no-store'}); if (r.ok) { S = await r.json(); if (!(route === 'ask' && document.activeElement && document.activeElement.id === 'q')) render(); botAfterPoll(); } } catch (e) {}
+  try { const r = await fetch('/api/state', {cache:'no-store'}); if (r.ok) { S = await r.json(); if (S.ui_version) { if (window.UIV && window.UIV !== S.ui_version) { location.reload(); return; } window.UIV = S.ui_version; } if (!(route === 'ask' && document.activeElement && document.activeElement.id === 'q')) render(); botAfterPoll(); } } catch (e) {}
   setTimeout(poll, 15000);
 }
 window.addEventListener('resize', () => { if (S) drawCharts(); });

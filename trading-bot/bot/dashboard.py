@@ -27,7 +27,9 @@ def make_handler(engine):
             elif self.path == "/api/prices":
                 self._send(200, json.dumps(engine.live_prices()).encode(), "application/json")
             elif self.path == "/api/state":
-                self._send(200, json.dumps(engine.snapshot(), default=str).encode(), "application/json")
+                snap = engine.snapshot()
+                snap["ui_version"] = int(os.path.getmtime(STATIC))   # page reloads itself after an update
+                self._send(200, json.dumps(snap, default=str).encode(), "application/json")
             else:
                 self._send(404, b"not found", "text/plain")
 

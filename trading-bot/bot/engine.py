@@ -58,6 +58,12 @@ def ny_time(ts):
     return datetime.fromtimestamp(ts, timezone.utc).astimezone(NY).strftime("%H:%M")
 
 
+def pf(v):
+    """Readable price: 1.08423 / 151.234 / 2,415.20 / 621,310.50 (never 6.2e+05)."""
+    a = abs(v)
+    return f"{v:.5f}" if a < 20 else f"{v:.3f}" if a < 1000 else f"{v:,.2f}"
+
+
 def hinglish_reason(reason):
     r = str(reason)
     fixed = {
@@ -325,7 +331,7 @@ class Engine:
             A.step(ref, "scanner", "pass", f"{pair(inst.name)} ka {tf_name} candle {ny_time(sig.time + tf_s)} pe close hua")
             A.step(ref, "reader", "pass", f"Chart pe signal dikha")
             A.step(ref, "rules", "pass", f"✓ H4 trend {'up' if sig.side > 0 else 'down'} · ✓ EMA pullback + rejection · "
-                   f"✓ RSI {f.get('rsi')} · SL distance {sig.stop_distance:.5g}")
+                   f"✓ RSI {f.get('rsi')} · SL distance {pf(sig.stop_distance)}")
             A.count("rules", "passed")
             A.did("rules", f"{pair(inst.name)} {side_word(sig.side)}: saare rules poore (RSI {f.get('rsi')})", ref, "good")
             A.handoff("rules", "timer", f"{pair(inst.name)} {side_word(sig.side)} timing check ke liye", ref)
@@ -379,7 +385,7 @@ class Engine:
                 or (self.learner.blocked(sig) if self.cfg["learn"] else None)
             if reason:
                 return self._skip(inst, sig, "timer", reason)
-            A.step(ref, "timer", "pass", "GO: US session khula, news blackout nahi, koi seekha hua rule nahi roka")
+            A.step(ref, "timer", "pass", "GO: " + ("entry ka time khula" if self.cfg["entry_sessions_ny"] else "24 ghante mode") + ", news blackout nahi, koi seekha hua rule nahi roka")
             A.count("timer", "go")
             A.did("timer", f"{name} {side_word(sig.side)}: GO", ref, "good")
             A.handoff("timer", "risk", f"{name} size aur limits ke liye", ref)
@@ -409,11 +415,11 @@ class Engine:
             A.trade_refs[str(trade.id)] = ref
             if self.cfg["learn"]:
                 self.learner.record_signal(sig, taken=True, trade_id=trade.id, entry=trade.entry)
-            A.step(ref, "executor", "pass", f"Order laga: {side_word(sig.side)} {units:g} @ {trade.entry:.5g} · "
-                   f"SL {stop:.5g} · TP {tp:.5g} ({rr}R)")
+            A.step(ref, "executor", "pass", f"Order laga: {side_word(sig.side)} {units:g} @ {pf(trade.entry)} · "
+                   f"SL {pf(stop)} · TP {pf(tp)} ({rr}R)")
             A.mark(ref, taken=True, state="trade open", trade_id=str(trade.id))
             A.count("executor", "orders")
-            A.did("executor", f"{name} {side_word(sig.side)} {units:g} @ {trade.entry:.5g} · SL {stop:.5g} · TP {tp:.5g}",
+            A.did("executor", f"{name} {side_word(sig.side)} {units:g} @ {pf(trade.entry)} · SL {pf(stop)} · TP {pf(tp)}",
                   ref, "good")
             A.handoff("executor", "manager", f"{name} trade #{trade.id} sambhalne ko", ref)
             self.journal.write("open", inst.name, sig.side, units=units, entry=trade.entry,
@@ -515,11 +521,11 @@ class Engine:
                 r = (px - info["entry"]) * side / risk if risk else 0.0
                 self.learner.set_real_result(tid, r)
                 word = "TARGET 🎯" if r > 0.5 else ("breakeven" if abs(r) < 0.05 else ("STOP LOSS" if r < 0 else "profit"))
-                A.did("manager", f"{pair(inst)} close @ {px:.5g}: {r:+.2f}R ({word})", ref,
+                A.did("manager", f"{pair(inst)} close @ {pf(px)}: {r:+.2f}R ({word})", ref,
                       "good" if r > 0 else ("bad" if r < 0 else "info"))
                 A.count("manager", "closed")
                 A.count("manager", "r_x100", int(round(r * 100)))
-                A.step(ref, "manager", "pass", f"Trade close @ {px:.5g}: {r:+.2f}R ({word})")
+                A.step(ref, "manager", "pass", f"Trade close @ {pf(px)}: {r:+.2f}R ({word})")
                 A.mark(ref, state="khatam", result=f"{r:+.2f}R", r=round(r, 2))
                 A.handoff("manager", "learner", f"{pair(inst)} ka result {r:+.2f}R seekhne ko", ref)
                 self.journal.write("close", inst, side, entry=info["entry"], note=f"{r:+.2f}R exit {px}")
@@ -558,8 +564,8 @@ class Engine:
                 try:
                     self.broker.modify_stop(t.id, new_stop, instrument=t.instrument)
                     what = "breakeven pe" if abs(new_stop - info["entry"]) < 1e-12 else "trail kiya"
-                    A.did("manager", f"{pair(t.instrument)} SL {what}: {new_stop:.5g} (+{progress:.2f}R)", ref, "good")
-                    A.step(ref, "manager", "info", f"SL {what} → {new_stop:.5g} jab trade +{progress:.2f}R tha")
+                    A.did("manager", f"{pair(t.instrument)} SL {what}: {pf(new_stop)} (+{progress:.2f}R)", ref, "good")
+                    A.step(ref, "manager", "info", f"SL {what} → {pf(new_stop)} jab trade +{progress:.2f}R tha")
                     A.count("manager", "sl_moves")
                     self.journal.write("move_sl", t.instrument, t.side, stop=new_stop, note=f"+{progress:.2f}R")
                     log.info("SL %s %s -> %s (+%.2fR)", t.instrument, t.id, new_stop, progress)
