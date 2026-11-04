@@ -330,3 +330,27 @@ class Variations(unittest.TestCase):
             self.assertEqual(len(r["rows"]), 10)                     # M5, M15 x 5 targets (H1/H4 have no data)
             self.assertEqual({x["rr"] for x in r["rows"]}, {1.5, 2.0, 3.0, 4.0, 5.0})
             self.assertEqual(e.snapshot()["mode"]["variations"]["instrument"], "XAU_USD")
+
+
+class BacktestStats(unittest.TestCase):
+    def test_streak_years_window(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make(d, gate=False)
+            e.cfg["base_window_ny"] = [["00:00", "24:00"]]
+            import bot.ema_break as eb
+            real = eb.backtest
+            y25 = datetime(2025, 3, 3, 15, tzinfo=timezone.utc).timestamp()
+            y26 = datetime(2026, 3, 3, 15, tzinfo=timezone.utc).timestamp()
+            fake = [{"time": y25 + k * 3600, "r": r, "hour": 10, "day": "x", "side": 1}
+                    for k, r in enumerate([-1, -1, -1, 3, -1])] + \
+                   [{"time": y26 + k * 3600, "r": 3, "hour": 10, "day": "y", "side": 1} for k in range(2)]
+            eb.backtest = lambda *a, **kw: fake
+            try:
+                b.data[("XAU_USD", "M5")] = uptrend(600, t0=y25 - 3600)
+                r = e.ema_backtest("t")
+            finally:
+                eb.backtest = real
+            self.assertEqual(r["longest_losing_streak"], 3)
+            self.assertEqual([y["year"] for y in r["years"]], [2025, 2026])
+            self.assertEqual(r["years"][1]["total_r"], 6)
+            self.assertEqual(r["window"], "24 ghante (Mon–Fri)")

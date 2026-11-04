@@ -772,10 +772,17 @@ function emaCard(compact){
       <li>Alert candle: BUY ke liye green candle jiska low dono EMA ke upar (touch nahi). SELL ulta.</li>
       <li>Entry: agli candle alert ka high tode (SELL: low). Na tode to setup cancel.</li>
       <li>SL: alert candle ka low (SELL: high) · TP: ${e.reward_risk}R · SL ${e.min_stop_atr}–${e.max_stop_atr}×ATR ke beech na ho to skip</li>
-      <li>${M.trade_mode === 'all' ? '24 ghante, saare charts pe' : 'Sirf ' + (e.window_ny || []).map(w => w.join('–')).join(', ') + ' NY'} · ${e.max_trades_per_day ? 'din mein max ' + e.max_trades_per_day + ' trades' : 'din ki koi limit nahi'} · 0.5% risk · open trades ka risk bhi daily limit mein gina jaata hai</li>
+      <li>${M.trade_mode === 'all' ? '24 ghante, saare charts pe' : ((e.window_ny || [])[0] || []).join('–') === '00:00–24:00' ? '24 ghante (Mon–Fri)' : 'Sirf ' + (e.window_ny || []).map(w => w.join('–')).join(', ') + ' NY'} · ${e.max_trades_per_day ? 'din mein max ' + e.max_trades_per_day + ' trades' : 'din ki koi limit nahi'} · 0.5% risk · open trades ka risk bhi daily limit mein gina jaata hai</li>
     </ul>
     ${gate}
     ${B ? `<div style="margin-top:8px">${row('🔧 Tuning (purana 70%)', B.tuning)}${row('🧪 Unseen (naya 30%)', B.unseen)}${row('📊 Sab', B.all)}</div>
+      <div class="kpis" style="margin-top:8px">
+        <div class="kpi"><span class="lbl">Max drawdown</span><b class="bad">${B.all.max_dd_r}R</b><span class="small muted">~${(B.all.max_dd_r * ((S.status || {}).risk || {}).risk_per_trade_pct || B.all.max_dd_r * 0.5).toFixed(1)}% account</span></div>
+        <div class="kpi"><span class="lbl">Sabse lambi haar</span><b class="bad">${B.longest_losing_streak ?? '-'}</b><span class="small muted">trade lagataar SL</span></div>
+        <div class="kpi"><span class="lbl">Time window</span><b style="font-size:15px">${esc(B.window || '-')}</b></div>
+        <div class="kpi"><span class="lbl">Timeframe · target</span><b style="font-size:15px">${esc(B.timeframe)} · 1:${B.reward_risk ?? e.reward_risk}</b></div>
+      </div>
+      ${(B.years || []).length ? `<div class="lbl" style="margin-top:10px">Saal ke hisaab se</div>${B.years.map(y => row('📅 ' + y.year, y)).join('')}` : ''}
       <p class="small muted" style="margin:8px 0 0">${nyD(B.from)} se ${nyD(B.to)} tak (~${Math.round((B.to - B.from) / 86400 / 30.4)} mahine) ka asli OANDA ${esc(B.timeframe)} data, spread kaat ke. 1:3 pe ~25% jeet = barabar; spread ke baad thoda zyada chahiye. Har din 5 PM NY pe naye data ke saath dobara test hota hai. Bana: ${nyDT(B.made)} NY.</p>` : ''}</div>`;
 }
 function shadowCard(){
@@ -788,7 +795,7 @@ function shadowCard(){
 }
 function researchCard(){
   const L = S.learning || {}, R_ = L.research, list = L.trade_list || [], M = S.mode || {};
-  const base = `<div class="rc"><span>🥇 ${esc(pair('XAU_USD'))} 08:00–12:00 NY (shuru wali)</span><b class="${(M.gate || {}).passed ? 'good' : 'bad'}">${(M.gate || {}).passed ? '✅ chalu' : '🔒 gate band'}</b></div>`;
+  const bw = ((M.ema || {}).window_ny || [[]])[0].join('–'); const base = `<div class="rc"><span>🥇 ${esc(pair('XAU_USD'))} ${esc(M.timeframe)} · 1:${(M.ema || {}).reward_risk} · ${bw === '00:00–24:00' ? '24 ghante' : bw + ' NY'}</span><b class="${(M.gate || {}).passed ? 'good' : 'bad'}">${(M.gate || {}).passed ? '✅ chalu' : '🔒 gate band'}</b></div>`;
   const listHtml = base + list.map(c => `<div class="rc"><span>${esc(pair(c.instrument))} · ${c.hour}:00–${c.hour + 1}:00 NY</span><b class="good">✅ unseen PF ${c.unseen_pf ?? '∞'} · ${c.unseen_n} trades</b></div>`).join('');
   const P = M.research_progress;
   const prog = P && P.current ? `<div class="status open"><span class="dot"></span><span>⏳ Research chal raha hai: ${P.done}/${P.total} charts ho gaye<small>Abhi: ${esc(pair(P.current))} · shuru ${nyDT(P.started)} NY. Har chart ka 1 saal ka M5 data aata hai.</small></span></div><div class="bar"><span style="width:${Math.round(100 * P.done / Math.max(1, P.total))}%"></span></div>` : '';

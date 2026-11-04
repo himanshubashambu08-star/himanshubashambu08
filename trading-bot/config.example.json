@@ -8,7 +8,7 @@
     "instrument_types": [
       "CURRENCY"
     ],
-    "entry_timeframe": "M5",
+    "entry_timeframe": "H1",
     "trend_timeframe": "H4",
     "entry_sessions_ny": [],
     "board_refresh_seconds": 60,
@@ -25,15 +25,15 @@
     "base_instrument": "XAU_USD",
     "base_window_ny": [
       [
-        "08:00",
-        "12:00"
+        "00:00",
+        "24:00"
       ]
     ],
     "research_days": 730,
     "cell_min_unseen_trades": 30,
     "cell_min_unseen_pf": 1.2,
     "cell_min_tuning_pf": 1.1,
-    "trade_mode": "all",
+    "trade_mode": "list",
     "research_timeframe": "H1",
     "research_rr": 3.0,
     "forward_tests": [
@@ -42,7 +42,8 @@
         "timeframe": "H1",
         "reward_risk": 3.0
       }
-    ]
+    ],
+    "auto_add_cells": false
   },
   "strategy": {
     "ema_fast": 9,

@@ -986,9 +986,23 @@ class Engine:
             A.did("learner", "Backtest: purana data nahi mila", tone="bad")
             return None
         split = span[0] + 0.7 * (span[1] - span[0])
+        trades.sort(key=lambda t: t["time"])
         old = [t["r"] for t in trades if t["time"] < split]
         new = [t["r"] for t in trades if t["time"] >= split]
+        streak = cur = 0
+        for t in trades:                                  # longest run of losing trades in a row
+            cur = cur + 1 if t["r"] < 0 else 0
+            streak = max(streak, cur)
+        years = {}
+        for t in trades:
+            years.setdefault(datetime.fromtimestamp(t["time"], timezone.utc).astimezone(NY).year, []).append(t["r"])
+        win = ep["window_ny"]
         res = {"made": self.clock(), "day": day, "from": span[0], "to": span[1], "split": split,
+               "longest_losing_streak": streak,
+               "years": [{"year": y, **_card_r(rs)} for y, rs in sorted(years.items())],
+               "window": "24 ghante (Mon–Fri)" if win == ema_break.ALL_DAY or win == [["00:00", "24:00"]]
+                         else ", ".join(f"{a}–{b}" for a, b in win) + " NY",
+               "reward_risk": ep["reward_risk"],
                "pairs": names, "timeframe": tf, "spread": spreads, "rules": {k: ep[k] for k in ep},
                "all": _card_r([t["r"] for t in trades]), "tuning": _card_r(old), "unseen": _card_r(new),
                "need_trades": self.cfg["gate_min_unseen_trades"], "need_pf": self.cfg["gate_min_pf"]}
