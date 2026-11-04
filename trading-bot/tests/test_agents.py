@@ -89,3 +89,15 @@ class LivePrices(unittest.TestCase):
                 self.assertIn("XAU_USD", got["prices"])
             finally:
                 srv.shutdown()
+
+
+class SlTpAmounts(unittest.TestCase):
+    def test_open_trade_shows_money_at_sl_and_tp(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make_engine(d)
+            e.tick()
+            t = e.status["open_trades"][0]
+            risk = abs(t["entry"] - t["stop"]) * abs(t["units"])
+            self.assertAlmostEqual(t["sl_amt"], -risk, places=1)
+            self.assertAlmostEqual(t["tp_amt"], 2 * risk, places=1)
+            self.assertLessEqual(-t["sl_amt"], 100.0 + 1e-6)     # <= 1% of 10k as configured

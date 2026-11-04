@@ -376,8 +376,7 @@ class Engine:
             self.status = {
                 "time": now, "nav": account.nav, "balance": account.balance, "currency": account.currency,
                 "day_start_nav": self.risk.state.get("day_start_nav"),
-                "open_trades": [{**t.__dict__, "init_stop": (self.risk.state["trades"].get(str(t.id)) or {}).get("stop"),
-                                 "ref": A.trade_refs.get(str(t.id))} for t in self.broker.open_trades()],
+                "open_trades": self.open_trades_view(),
                 "no_new_trades": self.why_no_new_trades(now),
                 "in_session": self.in_session(now), "session_text": self.session_text(now),
                 "params": params, "reward_risk": self.reward_risk(),
@@ -684,6 +683,26 @@ class Engine:
             "learning": {k: snap["learning"][k] for k in ("filters", "lessons", "mistakes_30d", "stats_30d", "params")},
             "settings": {"risk": st.get("risk"), "strategy": st.get("params"), "reward_risk": st.get("reward_risk")},
         }
+
+    def open_trades_view(self):
+        """Open trades with what hitting SL / TP would mean in account currency."""
+        out, conv = [], {}
+        for t in self.broker.open_trades():
+            d = {**t.__dict__, "init_stop": (self.risk.state["trades"].get(str(t.id)) or {}).get("stop"),
+                 "ref": self.agents.trade_refs.get(str(t.id)), "sl_amt": None, "tp_amt": None}
+            try:
+                if t.instrument not in conv:
+                    conv[t.instrument] = self.broker.quote_to_home(t.instrument)
+                k = conv[t.instrument]
+                if k:
+                    if t.stop is not None:
+                        d["sl_amt"] = round((t.stop - t.entry) * t.units * k, 2)
+                    if t.take_profit is not None:
+                        d["tp_amt"] = round((t.take_profit - t.entry) * t.units * k, 2)
+            except Exception as e:
+                log.error("sl/tp amount %s: %s", t.instrument, e)
+            out.append(d)
+        return out
 
     def live_prices(self, max_age=2.0):
         """Fresh bid/ask/mid for every watched chart, cached for `max_age` seconds (one broker call)."""

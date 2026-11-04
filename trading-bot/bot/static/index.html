@@ -308,7 +308,7 @@ function openTrades(st){
   if (!tr.length) return '<p class="empty">Koi trade open nahi hai.</p>';
   return tr.map(t => `<div class="kv" style="padding:6px 0;border-top:1px solid var(--line)"><span><b>${esc(pair(t.instrument))}</b> ${t.units > 0 ? 'BUY' : 'SELL'} ${Math.abs(t.units)}</span>
     <b class="${t.unrealized_pl >= 0 ? 'good' : 'bad'}">${t.unrealized_pl >= 0 ? '+' : ''}${money(t.unrealized_pl)}</b>
-    <span class="small muted">Entry ${px(t.entry)} · SL ${px(t.stop)} · TP ${px(t.take_profit)}</span><span></span></div>`).join('');
+    <span class="small muted">Entry ${px(t.entry)} · SL ${px(t.stop)} · TP ${px(t.take_profit)}</span><span></span>${slTpLine(t)}</div>`).join('');
 }
 
 function agentChips(a){
@@ -423,6 +423,13 @@ function viewChart(inst){
   ${tr.length ? `<div class="card"><h2>🎯 Is pair ka open trade</h2>${openTrades({open_trades: tr})}</div>` : ''}
   ${js.length ? `<div class="card"><h2>🧭 Is pair ke signals</h2></div>${js.map(journeyCard).join('')}` : ''}`;
 }
+function amt(v){ if (v == null) return ''; const c = (S.status || {}).currency || '';
+  return ` <b class="${v >= 0 ? 'good' : 'bad'}">(${v >= 0 ? '+' : ''}${money(v)} ${c})</b>`; }
+function slTpLine(t){
+  const slTxt = t.sl_amt == null ? '' : t.sl_amt >= 0 ? `SL lage to bhi <b class="good">+${money(t.sl_amt)} ${S.status.currency}</b> pakka (SL profit mein)` : `SL lage to <b class="bad">−${money(-t.sl_amt)} ${S.status.currency}</b> jayega`;
+  const tpTxt = t.tp_amt == null ? '' : `TP lage to <b class="good">+${money(t.tp_amt)} ${S.status.currency}</b> milega`;
+  return slTxt || tpTxt ? `<div class="small" style="grid-column:1/-1">🛑 ${slTxt}${slTxt && tpTxt ? '<br>' : ''}${tpTxt ? '🎯 ' + tpTxt : ''}</div>` : '';
+}
 function liveR(t, price){
   const risk = t.init_stop != null ? Math.abs(t.entry - t.init_stop) : null;
   return risk ? (price - t.entry) * Math.sign(t.units) / risk : null;
@@ -436,7 +443,8 @@ function openList(){
     return `<div class="otr"><div class="row"><b>${esc(pair(t.instrument))} ${t.units > 0 ? '<span class="good">▲ BUY</span>' : '<span class="bad">▼ SELL</span>'} <span class="small muted">${Math.abs(t.units)}</span></b>
         <b class="num ${r == null ? '' : r >= 0 ? 'good' : 'bad'}" data-trr="${esc(t.id)}">${r == null ? '' : (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'}</b></div>
       <div class="small muted">Entry ${px(t.entry)} · Abhi <b class="num" data-px="${id}">${px(price)}</b> · SL ${px(t.stop)}${t.init_stop != null && Math.abs(t.stop - t.init_stop) > 1e-12 ? ' (move hua)' : ''} · TP ${px(t.take_profit)}</div>
-      <div class="small">P&amp;L <b class="${t.unrealized_pl >= 0 ? 'good' : 'bad'}">${t.unrealized_pl >= 0 ? '+' : ''}${money(t.unrealized_pl, S.status.currency)}</b> ·
+      ${slTpLine(t)}
+      <div class="small">Abhi P&amp;L <b class="${t.unrealized_pl >= 0 ? 'good' : 'bad'}">${t.unrealized_pl >= 0 ? '+' : ''}${money(t.unrealized_pl, S.status.currency)}</b> ·
         <a href="#chart/${id}" data-go="chart/${id}">🔍 Chart</a>${t.ref ? ` · <a href="#journeys" data-ref="${esc(t.ref)}">🧭 Safar</a>` : ''}</div></div>`; }).join('')}</div>`;
 }
 function viewCharts(){
@@ -467,8 +475,9 @@ function drawCharts(){
 }
 function tradeLines(inst){
   return ((S.status || {}).open_trades || []).filter(t => t.instrument === inst).flatMap(t => [
-    t.entry != null && {v:t.entry, c:css('--gold-hi'), l:'Entry'}, t.stop != null && {v:t.stop, c:css('--down'), l:'SL'},
-    t.take_profit != null && {v:t.take_profit, c:css('--up'), l:'TP'}].filter(Boolean));
+    t.entry != null && {v:t.entry, c:css('--gold-hi'), l:'Entry'},
+    t.stop != null && {v:t.stop, c:css('--down'), l:'SL' + (t.sl_amt != null ? ` (${t.sl_amt >= 0 ? '+' : '−'}${money(Math.abs(t.sl_amt))})` : '')},
+    t.take_profit != null && {v:t.take_profit, c:css('--up'), l:'TP' + (t.tp_amt != null ? ` (+${money(t.tp_amt)})` : '')}].filter(Boolean));
 }
 function draw(cv, ch){
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
@@ -490,8 +499,8 @@ function draw(cv, ch){
   g.lineWidth = 1.2; g.font = '600 11px system-ui, sans-serif';
   const used = [];
   lines.forEach(L => { g.strokeStyle = L.c; g.fillStyle = L.c; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(0, y(L.v)); g.lineTo(w, y(L.v)); g.stroke();
-    g.setLineDash([]); const ly = Math.max(11, y(L.v) - 3); let lx = 4;
-    while (used.some(u => Math.abs(u[1] - ly) < 12 && Math.abs(u[0] - lx) < 110)) lx += 115;   // labels side by side, not on top
+    g.setLineDash([]); const ly = y(L.v) < 14 ? y(L.v) + 13 : y(L.v) - 3; let lx = 4;
+    while (used.some(u => Math.abs(u[1] - ly) < 12 && Math.abs(u[0] - lx) < 150)) lx += 155;   // labels side by side, not on top
     used.push([lx, ly]); g.fillText(L.l + ' ' + px(L.v), lx, ly); });
   const last = c[c.length - 1]; g.fillStyle = css('--ink'); g.font = '600 11px ui-monospace, monospace';
   const txt = px(last[4]); g.fillText(txt, w - g.measureText(txt).width - 2, Math.max(11, Math.min(h - 2, y(last[4]) - 4)));
