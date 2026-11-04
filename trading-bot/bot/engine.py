@@ -310,7 +310,11 @@ class Engine:
             self.last_bucket = self.risk.state.get("last_bucket")   # after a restart, never rescan the same candle
         new_candle = bucket != self.last_bucket
         if new_candle or now - self.last_board >= self.cfg["board_refresh_seconds"]:
-            self.refresh(account, trades, now, look_for_trades=new_candle)
+            try:
+                self.refresh(account, trades, now, look_for_trades=new_candle)
+            except Exception as e:           # never let one bad chart or label stop trading and the backtests
+                log.exception("refresh failed: %s", e)
+                self.agents.did("scanner", f"Scan mein error: {e}", tone="bad")
             self.last_board = now
             if new_candle:
                 self.risk.state["last_bucket"] = bucket
@@ -409,7 +413,8 @@ class Engine:
                  f"{states.get('watch', 0)} watch · {states.get('none', 0)} kuch nahi", "ok")
         forming = sorted([r for r in board.values() if r["state"] == "forming"], key=lambda r: -r["score"])
         A.plan("reader", "Nazar: " + "; ".join(
-            f"{pair(r['instrument'])} {'buy' if r['bias'] > 0 else 'sell'} zone {r['zone'][0]}–{r['zone'][1]}"
+            f"{pair(r['instrument'])} {'buy' if r['bias'] > 0 else 'sell'}"
+            + (f" zone {r['zone'][0]}–{r['zone'][1]}" if r.get("zone") else "")
             for r in forming[:4]) if forming else "Abhi koi setup banta nahi dikh raha. Har minute dobara padhega.")
         p = {**strategy.DEFAULTS, **params}
         ep = self.ema_params()

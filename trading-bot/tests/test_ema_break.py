@@ -262,3 +262,23 @@ class TradeEverywhere(unittest.TestCase):
             e.tick()
             self.assertEqual(len(b.pending), 1)
             self.assertTrue(e.trade_allowed("EUR_USD", e.clock() + 10 * 3600))   # any chart, any hour
+
+
+class BoardRobustness(unittest.TestCase):
+    def test_forming_chart_does_not_crash_scan_and_backtest_starts(self):
+        with tempfile.TemporaryDirectory() as d:
+            c = uptrend()                                # last candle touches the EMAs -> "forming"
+            b, e, _ = make(d, candles=c)
+            e._validated_once = False
+            started = []
+            e.validate_setup = lambda day: started.append(day)
+            import threading
+            real = threading.Thread
+            threading.Thread = lambda target, args=(), daemon=None: type("T", (), {"start": lambda s: target(*args)})()
+            try:
+                e.tick()
+            finally:
+                threading.Thread = real
+            self.assertEqual(e.board["XAU_USD"]["state"], "forming")
+            self.assertIn("risk", e.status)                     # status filled = scan finished
+            self.assertEqual(len(started), 1)                   # backtest/research was started
