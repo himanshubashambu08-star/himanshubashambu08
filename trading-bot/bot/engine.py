@@ -56,6 +56,8 @@ DEFAULTS = {
     "cell_min_unseen_pf": 1.2,
     "cell_min_tuning_pf": 1.1,               # ...and it must also be good on the older data (no luck picks)
     "auto_add_cells": True,
+    # forward tests: rule variants followed live on the chart (shadow only, never traded)
+    "forward_tests": [{"instrument": "XAU_USD", "timeframe": "H1", "reward_risk": 3.0}],
     "trade_mode": "all",                     # "all" = real demo order on every setup, every chart, every hour
                                              # "list" = only the tested trading list, everything else shadow
 }
@@ -303,6 +305,11 @@ class Engine:
                 log.error("open trades view: %s", e)
         self.manage(trades)
         self.check_pending()
+        if self.ema:
+            try:
+                self.forward_tick(now)
+            except Exception as e:
+                log.exception("forward test: %s", e)
 
         tf = GRANULARITY_SECONDS[self.cfg["entry_timeframe"]]
         bucket = int((now - self.cfg["scan_delay_seconds"]) // tf)
@@ -337,7 +344,8 @@ class Engine:
                 run()
         self.brain.maybe_brief(now, self._brief_done)
         need = ((self.learner.get("ema_backtest") or {}).get("rules") != self.ema_params()
-                or not self.learner.get("research") or not self.learner.get("variations")) if self.ema \
+                or not self.learner.get("research")
+                or {r["rr"] for r in (self.learner.get("variations") or {}).get("rows", [])} != set(self.VARIATION_RRS)) if self.ema \
             else not self.learner.get("experiments")
         if self.cfg["learn"] and not getattr(self, "_validated_once", False) and need:
             self._validated_once = True
@@ -998,8 +1006,60 @@ class Engine:
               tone="good" if res["passed"] else "bad")
         return res
 
-    VARIATION_TFS = ["M5", "M15", "H1"]
-    VARIATION_RRS = [1.5, 2.0, 3.0]
+    # ---- forward tests: live shadow of a backtest winner -------------------------
+    def forward_tick(self, now):
+        state = self.learner.get("forward", {})
+        changed = False
+        for ft in self.cfg["forward_tests"]:
+            key = f"{ft['instrument']}|{ft['timeframe']}|{ft['reward_risk']}"
+            tf_s = GRANULARITY_SECONDS[ft["timeframe"]]
+            bucket = int((now - self.cfg["scan_delay_seconds"]) // tf_s)
+            st = state.setdefault(key, {**ft, "started": now, "setups": [], "last_bucket": None})
+            if st["last_bucket"] == bucket:
+                continue
+            st["last_bucket"] = bucket
+            changed = True
+            candles = self.broker.candles(ft["instrument"], ft["timeframe"], 300)
+            closed = [c for c in candles if c.complete]
+            p = {**self.ema_params(), "reward_risk": ft["reward_risk"], "max_trades_per_day": 0}
+            sig = ema_break.evaluate(ft["instrument"], candles, p)
+            if sig and not any(x["time"] == sig.time for x in st["setups"]):
+                st["setups"].append({"time": sig.time, "side": sig.side, "trig": sig.entry_price,
+                                     "stop": sig.stop_price, "state": "open"})
+                self.agents.did("learner", f"Forward test {pair(ft['instrument'])} {ft['timeframe']} 1:{ft['reward_risk']}: "
+                                           f"naya {side_word(sig.side)} setup @ {pf(sig.entry_price)} (sirf follow, trade nahi)")
+            for x in st["setups"]:
+                if x["state"] != "open":
+                    continue
+                after = [c for c in closed if c.time >= x["time"] + tf_s]
+                res = ema_break.follow(x["side"], x["trig"], x["stop"], ft["reward_risk"], after)
+                if res is None:
+                    continue
+                r, _ = res
+                if r == "cancel":
+                    x["state"] = "cancel"
+                else:
+                    x.update(state="done", r=round(r, 3), closed=after[min(len(after) - 1, _ - 1)].time)
+                    self.agents.did("learner", f"Forward test {pair(ft['instrument'])} {ft['timeframe']}: setup "
+                                               f"{r:+.2f}R pe band", tone="good" if r > 0 else "bad")
+            st["setups"] = st["setups"][-500:]
+        if changed:
+            self.learner.put("forward", state)
+
+    def forward_view(self):
+        from .learner import _card_r
+        out = []
+        for key, st in (self.learner.get("forward", {}) or {}).items():
+            done = [x for x in st["setups"] if x["state"] == "done"]
+            out.append({"key": key, "instrument": st["instrument"], "timeframe": st["timeframe"],
+                        "reward_risk": st["reward_risk"], "started": st["started"], "card": _card_r([x["r"] for x in done]),
+                        "open": sum(1 for x in st["setups"] if x["state"] == "open"),
+                        "cancelled": sum(1 for x in st["setups"] if x["state"] == "cancel"),
+                        "recent": sorted(st["setups"], key=lambda x: -x["time"])[:12]})
+        return out
+
+    VARIATION_TFS = ["M5", "M15", "H1", "H4"]
+    VARIATION_RRS = [1.5, 2.0, 3.0, 4.0, 5.0]
 
     def ema_variations(self, day):
         """Same EMA 9/15 rules on the base instrument with different targets and timeframes, every hour
@@ -1324,6 +1384,7 @@ class Engine:
                          "gate_progress": self.learner.get("gate_progress"),
                          "research_progress": self.learner.get("research_progress"),
                 "variations": self.learner.get("variations"),
+                "forward": self.forward_view() if self.ema else [],
                          "charts_watched": len(self._universe or []),
                          "pending": list((self.risk.state.get("pending") or {}).values()),
                          "trades_today": self.trades_today() if self.ema else None},

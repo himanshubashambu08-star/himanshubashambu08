@@ -248,6 +248,28 @@ class Shadow(unittest.TestCase):
             self.assertFalse(e.trade_allowed("XAU_USD", three))
 
 
+class Forward(unittest.TestCase):
+    def test_forward_records_and_follows_setup(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, clock = make(d, gate=False)
+            c = alert_after(uptrend(), size=2.0)
+            b.data[("XAU_USD", "H1")] = c
+            e.cfg["forward_tests"] = [{"instrument": "XAU_USD", "timeframe": "H1", "reward_risk": 3.0}]
+            e.forward_tick(clock[0])
+            v = e.forward_view()[0]
+            self.assertEqual(v["open"], 1)
+            a = c[-1]
+            brk = Candle(a.time + 3600, a.c, a.h + 0.5, a.c - 0.1, a.h + 0.3)          # H1: one hour later
+            up = [Candle(brk.time + 3600 * (k + 1), a.h + k, a.h + k + 20, a.h + k, a.h + k + 1) for k in range(3)]
+            b.data[("XAU_USD", "H1")] = c + [brk] + up
+            clock[0] += 5 * 3600
+            e.forward_tick(clock[0])
+            v = e.forward_view()[0]
+            self.assertEqual(v["card"]["n"], 1)
+            self.assertAlmostEqual(v["card"]["total_r"], 3.0)
+            self.assertEqual(len(b.orders), 0)                  # never traded
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -292,6 +314,6 @@ class Variations(unittest.TestCase):
             b.data[("XAU_USD", "M5")] = long
             b.data[("XAU_USD", "M15")] = long
             r = e.ema_variations("t")
-            self.assertEqual(len(r["rows"]), 6)                      # M5, M15 x 3 targets (H1 has no data)
-            self.assertEqual({x["rr"] for x in r["rows"]}, {1.5, 2.0, 3.0})
+            self.assertEqual(len(r["rows"]), 10)                     # M5, M15 x 5 targets (H1/H4 have no data)
+            self.assertEqual({x["rr"] for x in r["rows"]}, {1.5, 2.0, 3.0, 4.0, 5.0})
             self.assertEqual(e.snapshot()["mode"]["variations"]["instrument"], "XAU_USD")

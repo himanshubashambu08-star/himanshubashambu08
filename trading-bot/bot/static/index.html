@@ -402,7 +402,7 @@ function viewTrades(){
 }
 function variationsCard(){
   const V = (S.mode || {}).variations;
-  if (!V) return `<div class="card" id="c-var"><h2>🧪 Variations test</h2><p class="empty">Chal raha hai: targets 1:1.5 / 1:2 / 1:3 × M5 / M15 / H1 × har ghanta, 2 saal ka data (10–20 min).</p></div>`;
+  if (!V) return `<div class="card" id="c-var"><h2>🧪 Variations test</h2><p class="empty">Chal raha hai: targets 1:1.5 se 1:5 × M5 / M15 / H1 / H4 × har ghanta, 2 saal ka data (10–25 min).</p></div>`;
   const cell = c => c && c.n ? `<b class="num ${c.total_r >= 0 ? 'good' : 'bad'}">PF ${c.pf ?? '∞'}</b><br><span class="small muted">${c.total_r >= 0 ? '+' : ''}${c.total_r}R · ${c.n} · ${c.win_pct}%</span>` : '<span class="muted">-</span>';
   const nPass = V.rows.filter(r => r.passed).length;
   return `<div class="card" id="c-var"><div class="row"><h2>🧪 Variations test (${esc(pair(V.instrument))})</h2><span class="small muted">${nyDT(V.made)} NY</span></div>
@@ -411,9 +411,22 @@ function variationsCard(){
       <div class="xc"><span class="lbl">Purana 70%</span>${cell(r.tuning)}</div><div class="xc"><span class="lbl">Unseen 30%</span>${cell(r.unseen)}</div></div>`).join('')}</div>
     ${V.hours_ok.length ? `<div class="lbl" style="margin-top:10px">Pass hue ghante (NY time)</div>${V.hours_ok.map(h => `<div class="rc"><span>${esc(h.tf)} · 1:${h.rr} · ${h.hour}:00–${h.hour + 1}:00</span><b class="good">unseen PF ${h.unseen.pf ?? '∞'} · ${h.unseen.n} trades · purana PF ${h.tuning.pf ?? '∞'}</b></div>`).join('')}` : ''}</div>`;
 }
+function forwardCard(){
+  const F = (S.mode || {}).forward || [];
+  if (!F.length) return '';
+  return F.map(f => { const c = f.card || {};
+    return `<div class="card" id="c-fwd"><div class="row"><h2>🔭 Forward test: ${esc(pair(f.instrument))} ${esc(f.timeframe)} · 1:${f.reward_risk}</h2></div>
+    <p class="small muted" style="margin:0 0 8px">Backtest mein pass hua tha. Ab bot ise <b>live chart pe naye data</b> pe follow kar raha hai (sirf shadow, koi order nahi). Shuru: ${nyDT(f.started)} NY. Kam se kam 30–50 setups ke baad hi bharosa karna.</p>
+    <div class="kpis"><div class="kpi"><span class="lbl">Band setups</span><b>${c.n || 0}</b></div>
+      <div class="kpi"><span class="lbl">Win</span><b>${c.n ? c.win_pct + '%' : '-'}</b></div>
+      <div class="kpi"><span class="lbl">Kul R</span><b class="${(c.total_r || 0) >= 0 ? 'good' : 'bad'}">${c.n ? (c.total_r >= 0 ? '+' : '') + c.total_r + 'R' : '-'}</b></div>
+      <div class="kpi"><span class="lbl">PF</span><b>${c.n ? (c.pf ?? '∞') : '-'}</b></div></div>
+    <div class="small muted" style="margin-top:6px">Abhi chal rahe: ${f.open} · cancel (level nahi tuta): ${f.cancelled}</div>
+    ${f.recent.length ? `<details style="margin-top:6px"><summary>Aakhri setups</summary>${f.recent.map(x => `<div class="rc"><span>${nyDT(x.time)} NY · ${x.side > 0 ? 'BUY' : 'SELL'} @ ${px(x.trig)}</span><b class="${x.state === 'done' ? (x.r > 0 ? 'good' : 'bad') : 'muted'}">${x.state === 'done' ? (x.r >= 0 ? '+' : '') + x.r + 'R' : x.state === 'open' ? 'chal raha' : 'cancel'}</b></div>`).join('')}</details>` : '<p class="empty">Abhi koi setup nahi aaya. H1 pe setup kam bante hain, din mein 0–3.</p>'}</div>`; }).join('');
+}
 function viewStrategy(){
   const L = S.learning || {}, st = L.stats_30d || {};
-  return pageHead('🥇 Strategy & backtest', '', 'menu') + ((S.mode || {}).strategy === 'ema_break' ? emaCard(false) + variationsCard() : reportCard(L.report_card, st) + experimentsCard(L.experiments));
+  return pageHead('🥇 Strategy & backtest', '', 'menu') + ((S.mode || {}).strategy === 'ema_break' ? emaCard(false) + forwardCard() + variationsCard() : reportCard(L.report_card, st) + experimentsCard(L.experiments));
 }
 function viewShadow(){ return pageHead('🌙 Shadow vs asli', 'Aur research: kahan kaam karti hai strategy', 'menu') + shadowCard() + researchCard(); }
 function viewSettings(){
