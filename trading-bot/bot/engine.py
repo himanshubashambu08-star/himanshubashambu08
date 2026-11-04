@@ -934,6 +934,7 @@ class Engine:
         A, ep = self.agents, self.ema_params()
         tf = self.cfg["entry_timeframe"]
         names = [self.cfg["base_instrument"]]
+        self.learner.put("gate_progress", {"running": True, "started": self.clock()})
         A.did("learner", f"Backtest shuru: {', '.join(map(pair, names))} ke ~{self.cfg['backtest_days']} din ke asli "
                          f"{tf} candles download ho rahe hain (spread ke saath)…")
         start = self.clock() - self.cfg["backtest_days"] * 86400
@@ -970,6 +971,7 @@ class Engine:
                          if u["n"] < self.cfg["gate_min_unseen_trades"] else
                          f"unseen PF {u['pf']} (chahiye {self.cfg['gate_min_pf']}+)")
         self.learner.put("ema_backtest", res)
+        self.learner.put("gate_progress", {"running": False, "finished": self.clock()})
         self.learner.put("gate", {"passed": res["passed"], "made": res["made"], "reason": res["reason"]})
         self.learner.lesson(day, "validate", f"EMA 9/15 backtest: tuning {res['tuning']['n']} trades PF {res['tuning']['pf']} "
                             f"({res['tuning']['total_r']:+.1f}R) · unseen {u['n']} trades PF {u['pf']} ({u['total_r']:+.1f}R) · "
@@ -995,7 +997,9 @@ class Engine:
             spreads = {}
         start = self.clock() - self.cfg["research_days"] * 86400
         rows, cells = [], []
-        for n in names:
+        t0 = self.clock()
+        for k, n in enumerate(names):
+            self.learner.put("research_progress", {"done": k, "total": len(names), "current": n, "started": t0})
             try:
                 candles = self.broker.candles_range(n, tf, start)
             except Exception as e:
@@ -1029,6 +1033,8 @@ class Engine:
                "rules": {"min_unseen_trades": self.cfg["cell_min_unseen_trades"],
                          "min_unseen_pf": self.cfg["cell_min_unseen_pf"], "min_tuning_pf": self.cfg["cell_min_tuning_pf"]}}
         self.learner.put("research", res)
+        self.learner.put("research_progress", {"done": len(names), "total": len(names), "current": None,
+                                               "finished": self.clock()})
         old_list = {(c["instrument"], c["hour"]) for c in self.learner.get("trade_list", [])}
         new_list = [{"instrument": c["instrument"], "hour": c["hour"], "unseen_pf": c["unseen"]["pf"],
                      "unseen_n": c["unseen"]["n"]} for c in cells]
@@ -1239,6 +1245,9 @@ class Engine:
                          "trade_mode": self.cfg["trade_mode"],
                          "ema": self.ema_params() if self.ema else None, "gate": self.learner.get("gate"),
                          "backtest": self.learner.get("ema_backtest"),
+                         "gate_progress": self.learner.get("gate_progress"),
+                         "research_progress": self.learner.get("research_progress"),
+                         "charts_watched": len(self._universe or []),
                          "pending": list((self.risk.state.get("pending") or {}).values()),
                          "trades_today": self.trades_today() if self.ema else None},
                 **({} if light else {"brain": self.brain.snapshot(), "seen": list(self.seen),
