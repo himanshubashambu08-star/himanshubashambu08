@@ -32,6 +32,7 @@ DEFAULTS = {
     "tune_bars": 3000,
     "tune_instruments": 8,
     "test_fraction": 0.3,       # most recent 30% of history = unseen test data
+    "validate_bars": 5000,      # report card: ~7 months of H1 per pair (OANDA max per request)
     "reports_dir": "reports",
 }
 
@@ -67,10 +68,22 @@ TUNABLE = {
 OFF_SESSION = "outside US session"
 
 
-def learnable(row):
-    """Only setups that happened while the bot was allowed to enter teach it anything.
-    Setups outside the entry window are still followed and shown, but never become rules."""
+# Time-of-day rules may only be learned from setups inside the entry window (a night setup says
+# nothing about 3 PM). Every other rule (weak trend, chasing, RSI, spread, pair) learns from ALL
+# setups, in or out of session, because the setup itself is the same.
+TIME_CONDITIONS = {"late_session", "early_session", "friday"}
+
+
+def in_window(row):
     return (row.get("skip_reason") or "") != OFF_SESSION
+
+
+def learnable(row, name=None):
+    if name is None:
+        return True
+    if name in TIME_CONDITIONS or str(name).startswith("hour:"):
+        return in_window(row)
+    return True
 
 
 def _dyn_conditions(row):
@@ -101,9 +114,26 @@ def tag_mistakes(row, r, bars_held, max_r):
         tags.append("stopped_fast")
     if max_r >= 1.0 and r <= 0:
         tags.append("gave_back")
-    if r < 0 and learnable(row):
-        tags += [c for c in CONDITIONS if matches(c, row)]
+    if r < 0:
+        tags += [c for c in CONDITIONS if learnable(row, c) and matches(c, row)]
     return tags
+
+
+def _card_r(rs):
+    wins = [x for x in rs if x > 0]
+    losses = [x for x in rs if x < 0]
+    eq = peak = dd = 0.0
+    for x in rs:
+        eq += x
+        peak = max(peak, eq)
+        dd = max(dd, peak - eq)
+    return {"n": len(rs), "win_pct": round(100 * len(wins) / len(rs), 1) if rs else 0,
+            "total_r": round(sum(rs), 2), "avg_r": round(sum(rs) / len(rs), 3) if rs else 0,
+            "pf": round(sum(wins) / -sum(losses), 2) if losses else None, "max_dd_r": round(dd, 2)}
+
+
+def _card(rows):
+    return _card_r([r["r"] for r in rows])
 
 
 def _mean_se(xs):
@@ -224,15 +254,16 @@ class Learner:
     # ---- learning: filters --------------------------------------------
     def learn_filters(self, day):
         since = self.clock() - self.p["window_days"] * 86400
-        rows = [r for r in self._rows("status='done' AND time>=?", (since,)) if learnable(r)]
+        rows = self._rows("status='done' AND time>=?", (since,))
         names = set(CONDITIONS)
         for r in rows:
-            names.update(_dyn_conditions(r))
+            names.update(c for c in _dyn_conditions(r) if learnable(r, c))
         active = set(self.filters())
         changes = []
         for name in sorted(names):
-            w = [r["r"] for r in rows if matches(name, r)]
-            wo = [r["r"] for r in rows if not matches(name, r)]
+            pool = [r for r in rows if learnable(r, name)]
+            w = [r["r"] for r in pool if matches(name, r)]
+            wo = [r["r"] for r in pool if not matches(name, r)]
             if len(w) < self.p["min_samples"]:
                 continue
             m, se = _mean_se(w)
@@ -323,7 +354,7 @@ class Learner:
     def daily_review(self, day, history=None, base_params=None, base_rr=2.0, instruments=(),
                      breakeven_at_r=1.0):
         since = self.clock() - 86400 * 1.5
-        recent = [r for r in self._rows("status='done' AND time>=?", (since,)) if learnable(r)]
+        recent = self._rows("status='done' AND time>=?", (since,))
         counts = {}
         for r in recent:
             for m in r["mistakes"]:
@@ -364,8 +395,9 @@ class Learner:
     # ---- dashboard ------------------------------------------------------
     def snapshot(self):
         since = self.clock() - 30 * 86400
-        every = self._rows("status='done' AND time>=?", (since,))
-        rows = [r for r in every if learnable(r)]
+        rows = self._rows("status='done' AND time>=?", (since,))
+        inside = [r for r in rows if in_window(r)]
+        outside = [r for r in rows if not in_window(r)]
         counts = {}
         for r in rows:
             for m in r["mistakes"]:
@@ -382,6 +414,48 @@ class Learner:
                 "bot_trades": len(taken),
                 "bot_total_r": round(sum((r["real_r"] if r["real_r"] is not None else r["r"]) for r in taken), 2),
                 "all_setups_total_r": round(sum(r["r"] for r in rows), 2),
-                "outside_session_followed": len(every) - len(rows),
+                "in_session": _card(inside),
+                "off_session": _card(outside),
             },
+            "report_card": self.get("report_card"),
         }
+
+    # ---- setup report card on real broker history ----------------------------
+    def validate(self, day, history, instruments, params, rr, breakeven_at_r=1.0, in_session=None, bars=None):
+        """Backtest the CURRENT setup on real history for every pair, split in/out of the entry window."""
+        per, every = [], []
+        span = [None, None]
+        had_data = False
+        for n in instruments:
+            try:
+                htf, ltf = history(n)
+            except Exception as e:
+                per.append({"pair": n, "error": str(e)})
+                continue
+            if len(ltf) < 400:
+                continue
+            had_data = True
+            ts = backtest.run(n, htf, ltf, params=params, reward_risk=rr, breakeven_at_r=breakeven_at_r)
+            for t in ts:
+                t["in"] = bool(in_session(t["time"], n)) if in_session else True
+            every += ts
+            span[0] = min(span[0] or ltf[0].time, ltf[0].time)
+            span[1] = max(span[1] or ltf[-1].time, ltf[-1].time)
+            per.append({"pair": n, **_card_r([t["r"] for t in ts])})
+        if not had_data:
+            self.put("report_card", {"day": day, "made": self.clock(), "verdict": "nodata", "pairs": per})
+            return None
+        card = {"day": day, "from": span[0], "to": span[1], "made": self.clock(),
+                "all": _card_r([t["r"] for t in every]),
+                "in_session": _card_r([t["r"] for t in every if t["in"]]),
+                "off_session": _card_r([t["r"] for t in every if not t["in"]]),
+                "pairs": sorted(per, key=lambda x: -(x.get("total_r") or -1e9))}
+        a = card["all"]
+        card["verdict"] = ("pass" if a["n"] >= 30 and a["total_r"] > 0 and (a["pf"] or 0) >= 1.1 else
+                           "weak" if a["n"] >= 30 else "few")
+        self.put("report_card", card)
+        words = {"pass": "setup asli data pe plus mein hai", "weak": "setup asli data pe kamzor hai, abhi live mat lo",
+                 "few": "trades kam hain, abhi pakka nahi keh sakte"}[card["verdict"]]
+        self.lesson(day, "validate", f"Report card: {a['n']} trades, win {a['win_pct']}%, total {a['total_r']:+.1f}R, "
+                    f"profit factor {a['pf']} — {words}.", {"all": a})
+        return card

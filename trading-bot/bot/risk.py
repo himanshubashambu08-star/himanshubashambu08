@@ -24,7 +24,8 @@ DEFAULTS = {
     "max_trades_per_instrument": 1,
     "max_trades_per_currency": 2,
     # pairs that move almost together count as one trade (only 1 open per group)
-    "correlated_groups": [["AUD_USD", "NZD_USD"], ["AUD_JPY", "NZD_JPY"]],
+    "correlated_groups": [["AUD_USD", "NZD_USD"], ["AUD_JPY", "NZD_JPY"],
+                          ["NAS100_USD", "SPX500_USD", "US30_USD"]],
     "max_spread_to_stop": 0.15,
     "reward_risk": 2.0,
 }

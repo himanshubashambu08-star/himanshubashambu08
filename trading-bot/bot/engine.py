@@ -36,6 +36,7 @@ DEFAULTS = {
     "poll_seconds": 20,
     "board_refresh_seconds": 60,
     "entry_sessions_ny": [["08:00", "16:00"]],   # only open trades in the New York (US) session; [] = any time
+    "entry_sessions_by_type": {"CFD": [["09:30", "16:00"]]},   # US stock indices: only while Wall Street is open
     "breakeven_at_r": 1.0,
     "trail_start_r": 1.5,
     "trail_atr_mult": 1.0,
@@ -141,8 +142,15 @@ class Engine:
         return self._universe
 
     # ---- sessions -------------------------------------------------------
-    def in_session(self, now):
-        sessions = self.cfg["entry_sessions_ny"]
+    def _inst(self, inst):
+        if inst is None or hasattr(inst, "type"):
+            return inst
+        return next((i for i in self.universe() if i.name == inst), None)
+
+    def in_session(self, now, inst=None):
+        inst = self._inst(inst)
+        sessions = self.cfg["entry_sessions_by_type"].get(inst.type, self.cfg["entry_sessions_ny"]) \
+            if inst is not None else self.cfg["entry_sessions_ny"]
         if not sessions:
             return True
         ny = datetime.fromtimestamp(now, timezone.utc).astimezone(NY)
@@ -168,14 +176,14 @@ class Engine:
                 return True
         return False
 
-    def why_no_new_trades(self, now):
+    def why_no_new_trades(self, now, inst=None):
         if self.risk.halted:
             return self.risk.halted
         if os.path.exists(self.cfg["kill_file"]):
             return "STOP switch ON (kill file)"
         if self._in_blackout(now):
             return "news blackout"
-        if not self.in_session(now):
+        if not self.in_session(now, inst):
             return "outside US session"
         return None
 
@@ -205,6 +213,9 @@ class Engine:
                 and self.learner.get("last_review_day") != prev_day:
             self.review(prev_day)
         self.brain.maybe_brief(now, self._brief_done)
+        if self.cfg["learn"] and not getattr(self, "_validated_once", False) and not self.learner.get("report_card"):
+            self._validated_once = True
+            threading.Thread(target=self.validate_setup, args=(self.risk.state["day"],), daemon=True).start()
         self.agents.save()
 
     # ---- Budget Manager ----------------------------------------------------
@@ -309,7 +320,7 @@ class Engine:
             A.count("rules", "passed")
             A.did("rules", f"{pair(inst.name)} {side_word(sig.side)}: saare rules poore (RSI {f.get('rsi')})", ref, "good")
             A.handoff("rules", "timer", f"{pair(inst.name)} {side_word(sig.side)} timing check ke liye", ref)
-            self.try_open(inst, sig, account, blocked_now)
+            self.try_open(inst, sig, account, self.why_no_new_trades(now, inst))
             reading = board.get(inst.name)
             j = A.journeys.get(ref)
             if reading and j:
@@ -558,7 +569,7 @@ class Engine:
             ref = ref_for(row["instrument"], row["time"])
             r = row["r"]
             mist = ", ".join(MISTAKE_WORDS.get(m, m) for m in row["mistakes"][:2])
-            who = "bot ka trade" if row["taken"] else ("session ke bahar, isse seekhega nahi"
+            who = "bot ka trade" if row["taken"] else ("session ke bahar, setup ki jaanch mein gina"
                                                    if row.get("skip_reason") == "outside US session" else "chhoda hua setup")
             A.did("learner", f"{pair(row['instrument'])} ({who}) chart pe {r:+.2f}R hota"
                   + (f" · galti: {mist}" if mist else ""), ref, "good" if r > 0 else ("bad" if r < 0 else "info"))
@@ -572,6 +583,27 @@ class Engine:
         A.status("learner", f"30 din: {snap['stats_30d']['setups_followed']} setups follow · "
                  f"{len(snap['filters'])} seekhe rules", "ok")
         A.plan("learner", "Agla daily review 17:00 New York (galtiyan → naye rules, ek setting ka walk-forward test)")
+
+    def validate_setup(self, day):
+        """Report card: backtest today's setup on real broker history for every pair."""
+        A = self.agents
+        n = self.learner.p["validate_bars"]
+
+        def history(name):
+            return (self.broker.candles(name, self.cfg["trend_timeframe"], n),
+                    self.broker.candles(name, self.cfg["entry_timeframe"], n))
+        try:
+            A.did("learner", "Report card bana raha hoon: setup ko har pair ke asli purane data pe test kar raha hoon…")
+            card = self.learner.validate(day, history, [i.name for i in self.universe()], self.params(),
+                                         self.reward_risk(), self.cfg["breakeven_at_r"], self.in_session)
+            if card:
+                a = card["all"]
+                A.did("learner", f"Report card: {a['n']} trades, win {a['win_pct']}%, {a['total_r']:+.1f}R, "
+                      f"PF {a['pf']} (session ke andar {card['in_session']['total_r']:+.1f}R, bahar "
+                      f"{card['off_session']['total_r']:+.1f}R)", tone="good" if card["verdict"] == "pass" else "bad")
+        except Exception as e:
+            log.exception("validate failed: %s", e)
+            A.did("learner", f"Report card fail: {e}", tone="bad")
 
     def review(self, day):
         log.info("daily review for %s", day)
@@ -595,6 +627,7 @@ class Engine:
                 elif l["kind"] == "tune" and "->" in l["text"]:
                     A.handoff("learner", "rules", f"Setting badli: {l['text']}")
             log.info("review done: %s", out)
+            self.validate_setup(day)
         except Exception as e:
             log.exception("review failed: %s", e)
             A.did("learner", f"Review fail: {e}", tone="bad")

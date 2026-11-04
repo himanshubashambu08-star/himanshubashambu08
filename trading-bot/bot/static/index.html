@@ -159,6 +159,8 @@ details summary{cursor:pointer;font-weight:600}
 .cur{font:600 12px var(--f-num);padding:1px 6px;border-radius:5px;background:var(--bg);border:1px solid var(--line)}
 .imp{font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;text-transform:uppercase}
 .imp.High{background:var(--bad-soft);color:var(--bad)}.imp.Medium{background:var(--warn-soft);color:var(--warn)}
+.rc{display:flex;flex-direction:column;gap:1px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+.rc:first-child{border-top:none}.rc b{font:500 14px var(--f-num)}
 .chat{display:flex;flex-direction:column;gap:8px}
 .msg{padding:10px 12px;border-radius:12px;font-size:14.5px;max-width:92%;overflow-wrap:anywhere}
 .msg.user{align-self:flex-end;background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:var(--on-gold)}
@@ -466,12 +468,29 @@ function viewNews(){
     || '<p class="empty">Calendar abhi khali hai. Bot har ghante update karta hai.</p>'}`;
 }
 
+
+function rcRow(label, c){ if (!c || !c.n) return `<div class="rc"><span>${label}</span><b class="muted">abhi koi trade nahi</b></div>`;
+  return `<div class="rc"><span>${label}</span><b class="${c.total_r >= 0 ? 'good' : 'bad'}">${c.total_r >= 0 ? '+' : ''}${c.total_r}R · ${c.n} trades · win ${c.win_pct}% · PF ${c.pf ?? '-'}</b></div>`; }
+function reportCard(card, st){
+  const live = `<div style="margin-top:8px">${rcRow('🌞 Session ke andar (30 din, live)', st.in_session)}${rcRow('🌙 Session ke bahar (30 din, live)', st.off_session)}</div>`;
+  if (!card) return `<div class="card" id="c-report"><h2>📋 Setup ka report card</h2><p class="empty">Ban raha hai: setup ko har pair ke ~7 mahine ke asli OANDA data pe test kiya ja raha hai. Kuch minute mein yahan dikhega.</p>${live}</div>`;
+  if (card.verdict === 'nodata') return `<div class="card" id="c-report"><h2>📋 Setup ka report card</h2><p class="empty">Purana data nahi mila (ya kaafi candles nahi thi). Agla try 5 PM NY ke review pe.</p>${live}</div>`;
+  const V = {pass:['ok','✅ Setup asli data pe plus mein hai'], weak:['lock','⚠️ Setup asli data pe kamzor hai. Live paisa mat lagao, rules badalne padenge.'], few:['open','⏳ Abhi trades kam hain, pakka nahi keh sakte']}[card.verdict] || ['open', ''];
+  const months = Math.round((card.to - card.from) / (30 * 86400));
+  return `<div class="card" id="c-report"><div class="row"><h2>📋 Setup ka report card</h2><span class="small muted">${nyDT(card.made)} NY</span></div>
+    <div class="status ${V[0]}"><span class="dot"></span><span>${V[1]}<small>Aaj ke rules ko pichhle ~${months} mahine ke asli OANDA candles pe chala ke dekha (har din 5 PM NY pe dobara).</small></span></div>
+    <div style="margin-top:8px">${rcRow('📊 Sab (asli purana data)', card.all)}${rcRow('🌞 Entry window ke andar', card.in_session)}${rcRow('🌙 Window ke bahar', card.off_session)}
+      <div class="rc"><span>📉 Sabse bada girawat</span><b>${card.all.max_dd_r}R</b></div></div>
+    ${live}
+    <details style="margin-top:10px"><summary>Har pair ka result</summary><div style="margin-top:6px">${card.pairs.map(p => p.error ? `<div class="rc"><span>${esc(pair(p.pair))}</span><b class="muted">data nahi mila</b></div>` : rcRow(esc(pair(p.pair)), {n:p.n, win_pct:p.win_pct, total_r:p.total_r, pf:p.pf})).join('')}</div></details>
+    <p class="small muted" style="margin:8px 0 0">1R = ek trade pe jitna risk. PF (profit factor) 1 se upar = jitna haara usse zyada kamaya. Purana result aage ki guarantee nahi.</p></div>`;
+}
 function viewLearn(){
   const L = S.learning || {}, st = L.stats_30d || {};
   const params = Object.entries(L.params || {});
   return `<div class="card"><h2>🧠 Bot kya seekh raha hai</h2>
-    <p class="small muted" style="margin:0">Time Machine har setup ko chart pe follow karta hai (liya ho ya roka ho). Roz 17:00 New York pe: jo cheez baar-baar loss deti hai uska "avoid" rule banata hai, aur ek setting ko thoda badal ke purane + naye data pe test karta hai. Risk ki limits kabhi khud nahi badalta. Sirf entry window (US session) ke andar wale setups se seekhta hai.</p>
-    ${st.outside_session_followed ? `<p class="small" style="margin:6px 0 0">🌙 Session ke bahar ke <b>${st.outside_session_followed}</b> setups bhi chart pe follow kiye (Trades ka safar mein dikhte hain), lekin unse koi rule nahi banta.</p>` : ''}</div>
+    <p class="small muted" style="margin:0">Time Machine har setup ko chart pe follow karta hai (liya ho ya roka ho). Roz 17:00 New York pe: jo cheez baar-baar loss deti hai uska "avoid" rule banata hai, aur ek setting ko thoda badal ke purane + naye data pe test karta hai. Risk ki limits kabhi khud nahi badalta. Session ke bahar ke setups se bhi setup ke rules seekhta hai; sirf time wale rules (jaise "3 baje ke baad mat lo") session ke andar ke data se bante hain.</p></div>
+  ${reportCard(L.report_card, st)}
   <div class="daybar">
     <div><span class="lbl">Setups follow</span><b>${st.setups_followed ?? 0}</b></div>
     <div><span class="lbl">Bot trades</span><b>${st.bot_trades ?? 0}</b></div>

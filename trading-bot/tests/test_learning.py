@@ -242,20 +242,76 @@ if __name__ == "__main__":
 
 
 class SessionLearning(unittest.TestCase):
-    def test_off_session_setups_never_become_rules(self):
+    def test_night_setups_teach_setup_rules_but_never_time_rules(self):
         with tempfile.TemporaryDirectory() as d:
             L = Learner({"min_samples": 20, "reports_dir": d}, clock=lambda: NOW)
-            for _ in range(40):                       # night setups that all lose
-                s = sig(hour_ny=22)
+            for _ in range(40):                       # night setups with a WEAK trend that all lose
+                s = sig(hour_ny=22, trend_strength=0.05)
                 rid = L.record_signal(s, taken=False, skip_reason="outside US session")
-                L._update(rid, status="done", r=-1.0, bars_held=1, max_r=0.1, mistakes="[]")
-            for i in range(30):
+                L._update(rid, status="done", r=-1.0, bars_held=5, max_r=0.1, mistakes="[]")
+            for i in range(30):                       # normal in-session setups
                 add_done(L, sig(hour_ny=10), 2.0 if i % 2 else -1.0)
             L.learn_filters("d")
-            self.assertEqual(L.filters(), [])
+            self.assertIn("weak_trend", L.filters())          # the setup lesson counts
+            self.assertNotIn("hour:22", L.filters())          # but no time-of-day rule from the night
+            self.assertNotIn("late_session", L.filters())
             snap = L.snapshot()
-            self.assertEqual(snap["stats_30d"]["outside_session_followed"], 40)
-            self.assertEqual(snap["stats_30d"]["setups_followed"], 30)
+            self.assertEqual(snap["stats_30d"]["off_session"]["n"], 40)
+            self.assertEqual(snap["stats_30d"]["in_session"]["n"], 30)
             row = {"instrument": "EUR_USD", "side": 1, "skip_reason": "outside US session",
                    "features": {"hour_ny": 22, "rsi": 80}}
-            self.assertEqual(tag_mistakes(row, -1.0, 1, 0.1), ["stopped_fast"])
+            tags = tag_mistakes(row, -1.0, 1, 0.1)
+            self.assertIn("overextended_rsi", tags)
+            self.assertNotIn("late_session", tags)
+
+    def test_report_card_on_history(self):
+        import math
+        import random
+        rnd = random.Random(7)
+        htf = trend_candles(1500, step=2.0, period_s=14400, wiggle=6)
+        ltf, prev = [], 2000.0
+        for i in range(3000):
+            c = 2000 + 0.5 * i + 10 * math.sin(i / 5) + rnd.gauss(0, 3)
+            ltf.append(Candle(1_700_000_000 + 210 * 14400 + i * 3600, prev,
+                              max(prev, c) + abs(rnd.gauss(0, 1)), min(prev, c) - abs(rnd.gauss(0, 1)), c))
+            prev = c
+        with tempfile.TemporaryDirectory() as d:
+            L = Learner({"reports_dir": d}, clock=lambda: NOW)
+            card = L.validate("d", lambda n: (htf, ltf), ["XAU_USD", "BAD"], {"rsi_buy_min": 0, "rsi_buy_max": 100},
+                              2.0, in_session=lambda t, n: (t // 3600) % 24 >= 13)
+            self.assertGreater(card["all"]["n"], 10)
+            self.assertEqual(card["in_session"]["n"] + card["off_session"]["n"], card["all"]["n"])
+            self.assertIn(card["verdict"], ("pass", "weak", "few"))
+            self.assertEqual(L.snapshot()["report_card"]["all"], card["all"])
+            self.assertIn("Report card", L.lessons(1)[0]["text"])
+
+
+class IndexSessions(unittest.TestCase):
+    def test_stock_index_only_while_wall_street_open(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make_engine(d, sessions=[["08:00", "16:00"]])
+            nas = Instrument("NAS100_USD", "CFD", 1, 1, 1)
+            e._universe = [nas]
+            t0900 = datetime(2026, 11, 3, 14, 0, tzinfo=timezone.utc).timestamp()   # 09:00 NY
+            t1000 = datetime(2026, 11, 3, 15, 0, tzinfo=timezone.utc).timestamp()   # 10:00 NY
+            self.assertTrue(e.in_session(t0900))            # forex window open
+            self.assertFalse(e.in_session(t0900, nas))      # Wall Street not open yet
+            self.assertTrue(e.in_session(t1000, "NAS100_USD"))
+            self.assertEqual(e.why_no_new_trades(t0900, nas), "outside US session")
+
+
+class EngineReportCard(unittest.TestCase):
+    def test_engine_validate_uses_real_session_function(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make_engine(d, sessions=[["08:00", "16:00"]])
+            import math
+            ltf, prev = [], 2400.0
+            for i in range(600):
+                c = 2400 + 0.3 * i + 8 * math.sin(i / 5)
+                ltf.append(Candle(1_700_000_000 + i * 3600, prev, max(prev, c) + 0.5, min(prev, c) - 0.5, c))
+                prev = c
+            b.data[("XAU_USD", "H1")] = ltf
+            e.validate_setup("2026-11-04")
+            card = e.learner.get("report_card")
+            self.assertIn(card["verdict"], ("pass", "weak", "few"))
+            self.assertEqual(card["in_session"]["n"] + card["off_session"]["n"], card["all"]["n"])
