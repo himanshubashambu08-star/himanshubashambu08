@@ -337,7 +337,7 @@ class Engine:
                 run()
         self.brain.maybe_brief(now, self._brief_done)
         need = ((self.learner.get("ema_backtest") or {}).get("rules") != self.ema_params()
-                or not self.learner.get("research")) if self.ema \
+                or not self.learner.get("research") or not self.learner.get("variations")) if self.ema \
             else not self.learner.get("experiments")
         if self.cfg["learn"] and not getattr(self, "_validated_once", False) and need:
             self._validated_once = True
@@ -998,6 +998,59 @@ class Engine:
               tone="good" if res["passed"] else "bad")
         return res
 
+    VARIATION_TFS = ["M5", "M15", "H1"]
+    VARIATION_RRS = [1.5, 2.0, 3.0]
+
+    def ema_variations(self, day):
+        """Same EMA 9/15 rules on the base instrument with different targets and timeframes, every hour
+        separately. ~2 years, spread charged, 70/30 split. Only results good on BOTH halves count."""
+        from .learner import _card_r
+        A, n = self.agents, self.cfg["base_instrument"]
+        start = self.clock() - self.cfg["backtest_days"] * 86400
+        try:
+            spread = self.broker.prices([n])[n].spread
+        except Exception:
+            spread = 0.0
+        A.did("learner", f"Variations test shuru: {pair(n)} · targets {self.VARIATION_RRS} × timeframes "
+                         f"{self.VARIATION_TFS} × har ghanta…")
+        rows, hours_ok = [], []
+        for tf in self.VARIATION_TFS:
+            candles = self.broker.candles_range(n, tf, start)
+            if len(candles) < 500:
+                continue
+            split = candles[0].time + 0.7 * (candles[-1].time - candles[0].time)
+            for rr in self.VARIATION_RRS:
+                p = {**self.ema_params(), "reward_risk": rr, "max_trades_per_day": 0}
+                ts = ema_break.backtest(candles, p, spread, windows=ema_break.ALL_DAY)
+                old = [t for t in ts if t["time"] < split]
+                new = [t for t in ts if t["time"] >= split]
+                row = {"tf": tf, "rr": rr, "all": _card_r([t["r"] for t in ts]),
+                       "tuning": _card_r([t["r"] for t in old]), "unseen": _card_r([t["r"] for t in new]),
+                       "from": candles[0].time, "to": candles[-1].time}
+                row["passed"] = (row["unseen"]["n"] >= self.cfg["cell_min_unseen_trades"]
+                                 and pf_of(row["unseen"]) >= self.cfg["cell_min_unseen_pf"]
+                                 and pf_of(row["tuning"]) >= self.cfg["cell_min_tuning_pf"])
+                for h in range(24):
+                    ho = [t["r"] for t in old if t["hour"] == h]
+                    hn = [t["r"] for t in new if t["hour"] == h]
+                    cell = {"tf": tf, "rr": rr, "hour": h, "tuning": _card_r(ho), "unseen": _card_r(hn)}
+                    if (len(hn) >= self.cfg["cell_min_unseen_trades"] and pf_of(cell["unseen"]) >= self.cfg["cell_min_unseen_pf"]
+                            and pf_of(cell["tuning"]) >= self.cfg["cell_min_tuning_pf"]):
+                        hours_ok.append(cell)
+                rows.append(row)
+            del candles
+        res = {"made": self.clock(), "instrument": n, "rows": rows, "hours_ok": hours_ok,
+               "tested": len(rows) * 25, "spread": spread}
+        self.learner.put("variations", res)
+        best = max(rows, key=lambda r: r["unseen"]["total_r"]) if rows else None
+        self.learner.lesson(day, "variations", f"Variations ({pair(n)}): {len(rows)} combination + har ghanta test. "
+                            + (f"{sum(r['passed'] for r in rows)} combination aur {len(hours_ok)} ghante pass. " if rows else "")
+                            + (f"Sabse achha unseen: {best['tf']} 1:{best['rr']} → PF {best['unseen']['pf']}, "
+                               f"{best['unseen']['total_r']:+.0f}R." if best else ""))
+        A.did("learner", f"Variations poore: {sum(r['passed'] for r in rows)} combination pass, {len(hours_ok)} ghante pass",
+              tone="good" if hours_ok or any(r["passed"] for r in rows) else "info")
+        return res
+
     def ema_research(self, day):
         """Backtest the breakout rules on every instrument, all hours, spread included, split 70/30 per
         instrument. Instrument+hour cells good on BOTH halves join the trading list."""
@@ -1080,6 +1133,11 @@ class Engine:
             except Exception as e:
                 log.exception("ema backtest failed: %s", e)
                 A.did("learner", f"Backtest fail: {e}", tone="bad")
+            try:
+                self.ema_variations(day)
+            except Exception as e:
+                log.exception("variations failed: %s", e)
+                A.did("learner", f"Variations fail: {e}", tone="bad")
             try:
                 self.ema_research(day)
             except Exception as e:
@@ -1265,6 +1323,7 @@ class Engine:
                          "backtest": self.learner.get("ema_backtest"),
                          "gate_progress": self.learner.get("gate_progress"),
                          "research_progress": self.learner.get("research_progress"),
+                "variations": self.learner.get("variations"),
                          "charts_watched": len(self._universe or []),
                          "pending": list((self.risk.state.get("pending") or {}).values()),
                          "trades_today": self.trades_today() if self.ema else None},

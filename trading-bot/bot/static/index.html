@@ -265,7 +265,10 @@ const px = v => v == null ? '-' : Math.abs(v) >= 1000 ? Number(v).toLocaleString
 const tfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false});
 const dfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',day:'numeric',month:'short'});
 const nyT = ts => ts ? tfmt.format(new Date(ts*1000)) : '-';
-const nyDT = ts => ts ? dfmt.format(new Date(ts*1000)) + ' ' + tfmt.format(new Date(ts*1000)) : '-';
+const dfmtY = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',day:'numeric',month:'short',year:'numeric'});
+const nyDT = ts => { if (!ts) return '-'; const d = new Date(ts*1000);
+  return (d.getFullYear() === new Date().getFullYear() ? dfmt.format(d) : dfmtY.format(d)) + ' ' + tfmt.format(d); };
+const nyD = ts => ts ? dfmtY.format(new Date(ts*1000)) : '-';
 const agent = id => (S?.agents || []).find(a => a.id === id) || {id, emoji:'•', name:id, counts:{}, handoffs:{}, events:[]};
 const aname = id => { const a = agent(id); return `${a.emoji} ${a.name}`; };
 const countVal = (k, v) => k === 'r_x100' ? (v/100 >= 0 ? '+' : '') + (v/100).toFixed(2) + 'R' : v;
@@ -397,9 +400,20 @@ function viewTrades(){
   ${(S.mode || {}).pending && S.mode.pending.length ? `<div class="card"><h2>⏳ Pending stop orders</h2>${S.mode.pending.map(o => `<div class="small">${o.side > 0 ? 'BUY' : 'SELL'} ${esc(pair(o.instrument))} jab price ${px(o.entry)} tode · SL ${px(o.stop)} · TP ${px(o.tp)} · ${nyT(o.expire)} NY tak</div>`).join('')}</div>` : ''}
   <div class="menu"><button class="mi" data-go="closed"><span class="ic">📒</span><span><div class="tt">Saare band trades</div><div class="ss">Jeete / haare / breakeven filter</div></span><span></span><span class="ch">›</span></button></div>`;
 }
+function variationsCard(){
+  const V = (S.mode || {}).variations;
+  if (!V) return `<div class="card" id="c-var"><h2>🧪 Variations test</h2><p class="empty">Chal raha hai: targets 1:1.5 / 1:2 / 1:3 × M5 / M15 / H1 × har ghanta, 2 saal ka data (10–20 min).</p></div>`;
+  const cell = c => c && c.n ? `<b class="num ${c.total_r >= 0 ? 'good' : 'bad'}">PF ${c.pf ?? '∞'}</b><br><span class="small muted">${c.total_r >= 0 ? '+' : ''}${c.total_r}R · ${c.n} · ${c.win_pct}%</span>` : '<span class="muted">-</span>';
+  const nPass = V.rows.filter(r => r.passed).length;
+  return `<div class="card" id="c-var"><div class="row"><h2>🧪 Variations test (${esc(pair(V.instrument))})</h2><span class="small muted">${nyDT(V.made)} NY</span></div>
+    <div class="status ${nPass || V.hours_ok.length ? 'ok' : 'lock'}"><span class="dot"></span><span>${nPass ? `✅ ${nPass} combination pass` : '❌ Koi combination pass nahi'}${V.hours_ok.length ? ` · ${V.hours_ok.length} ghante pass` : ' · koi ghanta pass nahi'}<small>Pass = unseen (naya 30%) pe PF 1.2+ aur 30+ trades, aur purane 70% pe bhi PF 1.1+. ${V.tested} cheezein test hui hain, isliye 1-2 ka luck se pass hona mumkin hai.</small></span></div>
+    <div class="xt">${V.rows.map(r => `<div class="xr ${r.passed ? 'win' : ''}"><div class="xn">${esc(r.tf)} · 1:${r.rr}${r.passed ? ' <span class="pill good">PASS</span>' : ''}</div>
+      <div class="xc"><span class="lbl">Purana 70%</span>${cell(r.tuning)}</div><div class="xc"><span class="lbl">Unseen 30%</span>${cell(r.unseen)}</div></div>`).join('')}</div>
+    ${V.hours_ok.length ? `<div class="lbl" style="margin-top:10px">Pass hue ghante (NY time)</div>${V.hours_ok.map(h => `<div class="rc"><span>${esc(h.tf)} · 1:${h.rr} · ${h.hour}:00–${h.hour + 1}:00</span><b class="good">unseen PF ${h.unseen.pf ?? '∞'} · ${h.unseen.n} trades · purana PF ${h.tuning.pf ?? '∞'}</b></div>`).join('')}` : ''}</div>`;
+}
 function viewStrategy(){
   const L = S.learning || {}, st = L.stats_30d || {};
-  return pageHead('🥇 Strategy & backtest', '', 'menu') + ((S.mode || {}).strategy === 'ema_break' ? emaCard(false) : reportCard(L.report_card, st) + experimentsCard(L.experiments));
+  return pageHead('🥇 Strategy & backtest', '', 'menu') + ((S.mode || {}).strategy === 'ema_break' ? emaCard(false) + variationsCard() : reportCard(L.report_card, st) + experimentsCard(L.experiments));
 }
 function viewShadow(){ return pageHead('🌙 Shadow vs asli', 'Aur research: kahan kaam karti hai strategy', 'menu') + shadowCard() + researchCard(); }
 function viewSettings(){
@@ -748,7 +762,7 @@ function emaCard(compact){
     </ul>
     ${gate}
     ${B ? `<div style="margin-top:8px">${row('🔧 Tuning (purana 70%)', B.tuning)}${row('🧪 Unseen (naya 30%)', B.unseen)}${row('📊 Sab', B.all)}</div>
-      <p class="small muted" style="margin:8px 0 0">${nyDT(B.from)} se ${nyDT(B.to)} tak ka asli OANDA ${esc(B.timeframe)} data, spread kaat ke. 1:3 pe ~25% jeet = barabar; spread ke baad thoda zyada chahiye. Har din 5 PM NY pe naye data ke saath dobara test hota hai. Bana: ${nyDT(B.made)} NY.</p>` : ''}</div>`;
+      <p class="small muted" style="margin:8px 0 0">${nyD(B.from)} se ${nyD(B.to)} tak (~${Math.round((B.to - B.from) / 86400 / 30.4)} mahine) ka asli OANDA ${esc(B.timeframe)} data, spread kaat ke. 1:3 pe ~25% jeet = barabar; spread ke baad thoda zyada chahiye. Har din 5 PM NY pe naye data ke saath dobara test hota hai. Bana: ${nyDT(B.made)} NY.</p>` : ''}</div>`;
 }
 function shadowCard(){
   const L = S.learning || {}, sh = L.shadow_30d || {}, re = L.real_30d || {}, ccy = (S.status || {}).currency || '';

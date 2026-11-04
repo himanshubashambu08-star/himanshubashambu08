@@ -282,3 +282,16 @@ class BoardRobustness(unittest.TestCase):
             self.assertEqual(e.board["XAU_USD"]["state"], "forming")
             self.assertIn("risk", e.status)                     # status filled = scan finished
             self.assertEqual(len(started), 1)                   # backtest/research was started
+
+
+class Variations(unittest.TestCase):
+    def test_variations_table(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make(d, gate=False)
+            long = alert_after(uptrend(800, t0=T0 - 800 * 300))
+            b.data[("XAU_USD", "M5")] = long
+            b.data[("XAU_USD", "M15")] = long
+            r = e.ema_variations("t")
+            self.assertEqual(len(r["rows"]), 6)                      # M5, M15 x 3 targets (H1 has no data)
+            self.assertEqual({x["rr"] for x in r["rows"]}, {1.5, 2.0, 3.0})
+            self.assertEqual(e.snapshot()["mode"]["variations"]["instrument"], "XAU_USD")
