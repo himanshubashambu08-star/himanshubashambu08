@@ -51,13 +51,15 @@ DEFAULTS = {
     # shadow mode: scan everything, place demo orders only on the trading list
     "base_instrument": "XAU_USD",            # first trading-list entry (needs the main backtest gate)
     "base_window_ny": [["08:00", "12:00"]],
-    "research_days": 365,                    # per instrument x hour backtest, all instruments
+    "research_days": 730,                    # per instrument x hour backtest, all instruments
+    "research_timeframe": "H1",              # rules version the all-charts research tests
+    "research_rr": 3.0,
     "cell_min_unseen_trades": 30,            # an instrument+hour joins the list only with this many unseen trades
     "cell_min_unseen_pf": 1.2,
     "cell_min_tuning_pf": 1.1,               # ...and it must also be good on the older data (no luck picks)
     "auto_add_cells": True,
     # forward tests: rule variants followed live on the chart (shadow only, never traded)
-    "forward_tests": [{"instrument": "XAU_USD", "timeframe": "H1", "reward_risk": 3.0}],
+    "forward_tests": [{"instrument": "ALL", "timeframe": "H1", "reward_risk": 3.0}],   # "ALL" = every chart
     "trade_mode": "all",                     # "all" = real demo order on every setup, every chart, every hour
                                              # "list" = only the tested trading list, everything else shadow
 }
@@ -344,7 +346,8 @@ class Engine:
                 run()
         self.brain.maybe_brief(now, self._brief_done)
         need = ((self.learner.get("ema_backtest") or {}).get("rules") != self.ema_params()
-                or not self.learner.get("research")
+                or (self.learner.get("research") or {}).get("timeframe") != self.cfg["research_timeframe"]
+                or (self.learner.get("research") or {}).get("rr") != self.cfg["research_rr"]
                 or {r["rr"] for r in (self.learner.get("variations") or {}).get("rows", [])} != set(self.VARIATION_RRS)) if self.ema \
             else not self.learner.get("experiments")
         if self.cfg["learn"] and not getattr(self, "_validated_once", False) and need:
@@ -1010,7 +1013,13 @@ class Engine:
     def forward_tick(self, now):
         state = self.learner.get("forward", {})
         changed = False
+        tests = []
         for ft in self.cfg["forward_tests"]:
+            if ft["instrument"] == "ALL":
+                tests += [{**ft, "instrument": i.name, "group": "ALL"} for i in self.universe()]
+            else:
+                tests.append(ft)
+        for ft in tests:
             key = f"{ft['instrument']}|{ft['timeframe']}|{ft['reward_risk']}"
             tf_s = GRANULARITY_SECONDS[ft["timeframe"]]
             bucket = int((now - self.cfg["scan_delay_seconds"]) // tf_s)
@@ -1019,15 +1028,20 @@ class Engine:
                 continue
             st["last_bucket"] = bucket
             changed = True
-            candles = self.broker.candles(ft["instrument"], ft["timeframe"], 300)
+            try:
+                candles = self.broker.candles(ft["instrument"], ft["timeframe"], 300)
+            except Exception as e:
+                log.error("forward %s: %s", ft["instrument"], e)
+                continue
             closed = [c for c in candles if c.complete]
             p = {**self.ema_params(), "reward_risk": ft["reward_risk"], "max_trades_per_day": 0}
             sig = ema_break.evaluate(ft["instrument"], candles, p)
             if sig and not any(x["time"] == sig.time for x in st["setups"]):
                 st["setups"].append({"time": sig.time, "side": sig.side, "trig": sig.entry_price,
                                      "stop": sig.stop_price, "state": "open"})
-                self.agents.did("learner", f"Forward test {pair(ft['instrument'])} {ft['timeframe']} 1:{ft['reward_risk']}: "
-                                           f"naya {side_word(sig.side)} setup @ {pf(sig.entry_price)} (sirf follow, trade nahi)")
+                if not ft.get("group"):
+                    self.agents.did("learner", f"Forward test {pair(ft['instrument'])} {ft['timeframe']} 1:{ft['reward_risk']}: "
+                                               f"naya {side_word(sig.side)} setup @ {pf(sig.entry_price)} (sirf follow, trade nahi)")
             for x in st["setups"]:
                 if x["state"] != "open":
                     continue
@@ -1040,22 +1054,37 @@ class Engine:
                     x["state"] = "cancel"
                 else:
                     x.update(state="done", r=round(r, 3), closed=after[min(len(after) - 1, _ - 1)].time)
-                    self.agents.did("learner", f"Forward test {pair(ft['instrument'])} {ft['timeframe']}: setup "
-                                               f"{r:+.2f}R pe band", tone="good" if r > 0 else "bad")
+                    if not ft.get("group"):
+                        self.agents.did("learner", f"Forward test {pair(ft['instrument'])} {ft['timeframe']}: setup "
+                                                   f"{r:+.2f}R pe band", tone="good" if r > 0 else "bad")
             st["setups"] = st["setups"][-500:]
         if changed:
             self.learner.put("forward", state)
 
     def forward_view(self):
+        """One summary per (timeframe, target) across all charts, with a per-chart breakdown."""
         from .learner import _card_r
-        out = []
+        groups = {}
         for key, st in (self.learner.get("forward", {}) or {}).items():
+            g = groups.setdefault((st["timeframe"], st["reward_risk"]), {"timeframe": st["timeframe"],
+                                  "reward_risk": st["reward_risk"], "started": st["started"], "rs": [], "open": 0,
+                                  "cancelled": 0, "recent": [], "by": {}})
+            g["started"] = min(g["started"], st["started"])
             done = [x for x in st["setups"] if x["state"] == "done"]
-            out.append({"key": key, "instrument": st["instrument"], "timeframe": st["timeframe"],
-                        "reward_risk": st["reward_risk"], "started": st["started"], "card": _card_r([x["r"] for x in done]),
-                        "open": sum(1 for x in st["setups"] if x["state"] == "open"),
-                        "cancelled": sum(1 for x in st["setups"] if x["state"] == "cancel"),
-                        "recent": sorted(st["setups"], key=lambda x: -x["time"])[:12]})
+            g["rs"] += [x["r"] for x in done]
+            g["open"] += sum(1 for x in st["setups"] if x["state"] == "open")
+            g["cancelled"] += sum(1 for x in st["setups"] if x["state"] == "cancel")
+            g["recent"] += [{**x, "instrument": st["instrument"]} for x in st["setups"]]
+            if done:
+                g["by"][st["instrument"]] = _card_r([x["r"] for x in done])
+        out = []
+        for g in groups.values():
+            out.append({"timeframe": g["timeframe"], "reward_risk": g["reward_risk"], "started": g["started"],
+                        "card": _card_r(g.pop("rs")), "open": g["open"], "cancelled": g["cancelled"],
+                        "charts": len([1 for k in (self.learner.get("forward", {}) or {})
+                                       if k.split("|")[1] == g["timeframe"]]),
+                        "recent": sorted(g["recent"], key=lambda x: -x["time"])[:15],
+                        "by": sorted([{"pair": k, **v} for k, v in g["by"].items()], key=lambda x: -x["total_r"])})
         return out
 
     VARIATION_TFS = ["M5", "M15", "H1", "H4"]
@@ -1115,18 +1144,18 @@ class Engine:
         """Backtest the breakout rules on every instrument, all hours, spread included, split 70/30 per
         instrument. Instrument+hour cells good on BOTH halves join the trading list."""
         from .learner import _card_r
-        A, ep = self.agents, {**self.ema_params(), "max_trades_per_day": 99}
-        tf = self.cfg["entry_timeframe"]
+        A, ep = self.agents, {**self.ema_params(), "max_trades_per_day": 0, "reward_risk": self.cfg["research_rr"]}
+        tf = self.cfg["research_timeframe"]
         names = [i.name for i in self.universe()]
-        A.did("learner", f"Research shuru: {len(names)} instruments, har ghanta, ~{self.cfg['research_days']} din ka "
-                         f"{tf} data (spread ke saath). Ismein 10-30 minute lagte hain…")
+        A.did("learner", f"Research shuru: {len(names)} charts, {tf} · 1:{self.cfg['research_rr']}, har ghanta, "
+                         f"~{self.cfg['research_days']} din ka data (spread ke saath)…")
         try:
             spreads = {k: p.spread for k, p in self.broker.prices(names).items()}
         except Exception as e:
             log.error("spreads for research: %s", e)
             spreads = {}
         start = self.clock() - self.cfg["research_days"] * 86400
-        rows, cells = [], []
+        rows, cells, all_old, all_new = [], [], [], []
         t0 = self.clock()
         for k, n in enumerate(names):
             self.learner.put("research_progress", {"done": k, "total": len(names), "current": n, "started": t0})
@@ -1142,6 +1171,8 @@ class Engine:
             del candles
             old = [t for t in ts if t["time"] < split]
             new = [t for t in ts if t["time"] >= split]
+            all_old += [t["r"] for t in old]
+            all_new += [t["r"] for t in new]
             row = {"pair": n, "spread": spreads.get(n), "all": _card_r([t["r"] for t in ts]),
                    "tuning": _card_r([t["r"] for t in old]), "unseen": _card_r([t["r"] for t in new]), "hours": []}
             for h in range(24):
@@ -1159,6 +1190,8 @@ class Engine:
         rows.sort(key=lambda r: -r["unseen"]["total_r"])
         tested = sum(len(r["hours"]) for r in rows)
         res = {"made": self.clock(), "day": day, "days": self.cfg["research_days"], "timeframe": tf,
+               "rr": self.cfg["research_rr"],
+               "total": {"tuning": _card_r(all_old), "unseen": _card_r(all_new), "all": _card_r(all_old + all_new)},
                "instruments": rows, "cells_tested": tested, "passed": cells,
                "rules": {"min_unseen_trades": self.cfg["cell_min_unseen_trades"],
                          "min_unseen_pf": self.cfg["cell_min_unseen_pf"], "min_tuning_pf": self.cfg["cell_min_tuning_pf"]}}
@@ -1168,6 +1201,8 @@ class Engine:
         old_list = {(c["instrument"], c["hour"]) for c in self.learner.get("trade_list", [])}
         new_list = [{"instrument": c["instrument"], "hour": c["hour"], "unseen_pf": c["unseen"]["pf"],
                      "unseen_n": c["unseen"]["n"]} for c in cells]
+        if tf != self.cfg["entry_timeframe"] or self.cfg["research_rr"] != self.ema_params()["reward_risk"]:
+            new_list = []          # research tested other rules than the live ones: inform only, never trade from it
         self.learner.put("trade_list", new_list)
         added = [c for c in new_list if (c["instrument"], c["hour"]) not in old_list]
         removed = old_list - {(c["instrument"], c["hour"]) for c in new_list}

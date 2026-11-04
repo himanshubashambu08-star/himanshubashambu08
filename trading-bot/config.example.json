@@ -3,9 +3,7 @@
     "instruments": [
       "ALL:CURRENCY",
       "ALL:METAL",
-      "NAS100_USD",
-      "SPX500_USD",
-      "US30_USD"
+      "ALL:CFD"
     ],
     "instrument_types": [
       "CURRENCY"
@@ -31,11 +29,20 @@
         "12:00"
       ]
     ],
-    "research_days": 365,
+    "research_days": 730,
     "cell_min_unseen_trades": 30,
     "cell_min_unseen_pf": 1.2,
     "cell_min_tuning_pf": 1.1,
-    "trade_mode": "all"
+    "trade_mode": "all",
+    "research_timeframe": "H1",
+    "research_rr": 3.0,
+    "forward_tests": [
+      {
+        "instrument": "ALL",
+        "timeframe": "H1",
+        "reward_risk": 3.0
+      }
+    ]
   },
   "strategy": {
     "ema_fast": 9,

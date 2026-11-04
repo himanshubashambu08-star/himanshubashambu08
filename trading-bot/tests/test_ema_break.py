@@ -224,7 +224,8 @@ class Shadow(unittest.TestCase):
     def test_research_adds_only_cells_good_on_both_halves(self):
         with tempfile.TemporaryDirectory() as d:
             b, e, _ = make(d, gate=False)
-            e.cfg.update(cell_min_unseen_trades=1, cell_min_unseen_pf=1.2, cell_min_tuning_pf=1.1)
+            e.cfg.update(cell_min_unseen_trades=1, cell_min_unseen_pf=1.2, cell_min_tuning_pf=1.1,
+                         research_timeframe="M5", research_rr=3.0)
             import bot.ema_break as eb
             real = eb.backtest
             t0 = T0 - 100 * 86400
@@ -268,6 +269,18 @@ class Forward(unittest.TestCase):
             self.assertEqual(v["card"]["n"], 1)
             self.assertAlmostEqual(v["card"]["total_r"], 3.0)
             self.assertEqual(len(b.orders), 0)                  # never traded
+
+
+class ResearchMismatch(unittest.TestCase):
+    def test_research_on_other_rules_never_feeds_the_trading_list(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make(d, gate=False)
+            e.learner.put("trade_list", [{"instrument": "XAU_USD", "hour": 9}])
+            b.data[("XAU_USD", "H1")] = alert_after(uptrend(800, t0=T0 - 800 * 3600))
+            r = e.ema_research("t")                          # H1 1:3 research, live trading is M5
+            self.assertEqual(r["timeframe"], "H1")
+            self.assertEqual(e.learner.get("trade_list"), [])
+            self.assertIn("total", r)
 
 
 if __name__ == "__main__":
