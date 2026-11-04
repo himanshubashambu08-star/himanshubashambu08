@@ -309,7 +309,9 @@ function statusBanner(st){
   let cls = 'ok', text = (S.mode || {}).trade_mode === 'all' && (S.mode || {}).strategy === 'ema_break' ? 'Bot chal raha hai · har chart, 24 ghante' : 'Bot chal raha hai · entry window khuli hai', sub = st.session_text || '';
   if (blocked && blocked !== 'outside US session') { cls = 'lock'; text = 'Naye trades band'; sub = blocked; }
   else if (blocked) { cls = 'open'; text = 'Sirf dekh raha hai (US session band)'; sub = st.session_text; }
-  return `<div class="status ${cls}"><span class="dot"></span><span>${esc(text)}<small>${esc(sub)} · update ${nyT(st.time)} NY · agla scan ${nyT(st.next_scan)}</small></span></div>`;
+  const sc = S.scan || {};
+  const scanTxt = sc.running ? `🔄 Scan chal raha hai: ${sc.done}/${sc.total} charts` : sc.finished ? `✅ Aakhri scan ${nyT(sc.finished)} NY: ${sc.total} charts, ${sc.signals} signal${sc.failed ? `, ${sc.failed} fail` : ''}` : '';
+  return `<div class="status ${cls}"><span class="dot"></span><span>${esc(text)}<small>${scanTxt ? esc(scanTxt) + ' · ' : ''}${st.next_scan ? 'agla scan ' + nyT(st.next_scan) + ' NY' : ''}</small></span></div>${sc.running ? `<div class="bar"><span style="width:${Math.round(100 * sc.done / Math.max(1, sc.total))}%"></span></div>` : ''}`;
 }
 
 function todayCard(){
@@ -357,7 +359,7 @@ function menuItems(){
       it('trades', '🎯', 'Chal rahe trades', tr.length ? tr.slice(0, 3).map(t => pair(t.instrument) + (t.units > 0 ? ' BUY' : ' SELL')).join(', ') : 'Abhi koi trade open nahi', tr.length ? `${tr.length} · ${upl >= 0 ? '+' : ''}${money(upl)}` : '0', tr.length ? (upl >= 0 ? 'good' : 'bad') : ''),
       it('closed', '📒', 'Band trades', `Aaj ${T.closed || 0} band · ${T.wins || 0} jeete · ${T.losses || 0} haare`, `${(T.pl || 0) >= 0 ? '+' : ''}${money(T.pl || 0)}`, (T.pl || 0) > 0 ? 'good' : (T.pl || 0) < 0 ? 'bad' : ''),
       it('journeys', '🧭', 'Signals ka safar', 'Har signal kahan pass hua, kahan ruka', String((S.journeys || []).length)),
-      it('charts', '📈', 'Charts', `${n('signal')} signal · ${n('forming')} ban rahe · ${n('watch')} watch`, String(ch.length)),
+      it('charts', '📈', 'Charts', (S.scan || {}).running && !ch.length ? `Scan chal raha hai: ${S.scan.done}/${S.scan.total}` : `${n('signal')} signal · ${n('forming')} ban rahe · ${n('watch')} watch`, String(ch.length)),
     ]],
     ['Strategy aur seekhna', [
       it('strategy', '🥇', 'Strategy & backtest', ema ? (M.backtest ? `XAU/USD backtest: unseen ${M.backtest.unseen.n} trades · PF ${M.backtest.unseen.pf ?? '-'}` : (M.gate_progress || {}).running ? 'XAU/USD backtest chal raha hai…' : 'XAU/USD backtest abhi nahi bana') : 'Purani pullback strategy', ema ? (M.trade_mode === 'all' ? '⚡ ON' : G.passed ? '✅ PASS' : '🔒') : '', ema ? (M.trade_mode === 'all' || G.passed ? 'good' : 'warn') : ''),

@@ -376,7 +376,17 @@ class Engine:
         tf_name = self.cfg["entry_timeframe"]
         tf_s = GRANULARITY_SECONDS[tf_name]
         board, signals, failed = {}, [], []
-        for inst in self.universe():
+        uni = self.universe()
+        with self.lock:                      # account numbers right away, even while the scan is running
+            self.status.update({"time": now, "nav": account.nav, "balance": account.balance,
+                                "currency": account.currency, "day_start_nav": self.risk.state.get("day_start_nav"),
+                                "risk": dict(self.risk.p)})
+        self.scan_progress = {"done": 0, "total": len(uni), "started": now, "running": True}
+        for k, inst in enumerate(uni):
+            self.scan_progress["done"] = k
+            if k and k % 10 == 0:
+                with self.lock:
+                    self.board = {**self.board, **board}       # charts appear on the dashboard as they are read
             try:
                 ltf = self.broker.candles(inst.name, tf_name, n)
                 if self.ema:
@@ -492,6 +502,8 @@ class Engine:
         A.plan("executor", "Risk Manager se approve hote hi market order, SL aur TP ek saath broker pe. "
                "Fail hua to dobara nahi bhejta (double order se bachne ke liye).")
 
+        self.scan_progress = {"done": len(uni), "total": len(uni), "started": now, "running": False,
+                              "finished": time.time(), "signals": len(signals), "failed": len(failed)}
         with self.lock:
             self.board = board
             self.status = {
@@ -1246,6 +1258,7 @@ class Engine:
         return {"status": status, "charts": charts, "learning": self.learner.snapshot(),
                 "news": self.news_list(self.clock()), "news_error": self.news.error,
                 "journal": self.journal.rows[-30:][::-1], **self.agents.snapshot(),
+                "scan": getattr(self, "scan_progress", None),
                 "mode": {"strategy": self.cfg["strategy"], "timeframe": self.cfg["entry_timeframe"],
                          "trade_mode": self.cfg["trade_mode"],
                          "ema": self.ema_params() if self.ema else None, "gate": self.learner.get("gate"),
