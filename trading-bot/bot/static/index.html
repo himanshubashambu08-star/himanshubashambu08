@@ -106,7 +106,10 @@ h3{font:600 15px var(--f-body);margin:0}
 .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .ccard{border-top:4px solid var(--line)}
 .ccard.signal{border-top-color:var(--good)}.ccard.forming{border-top-color:var(--gold-hi)}.ccard.watch{border-top-color:#4c7bd9}
-canvas{width:100%;height:120px;display:block;margin:6px 0}
+canvas{width:100%;height:150px;display:block;margin:6px 0}
+canvas.mini{height:110px}
+.live{font-size:12px;color:var(--muted)}.live.on{color:var(--good);animation:glow2 1.2s ease-in-out infinite}
+@keyframes glow2{50%{opacity:.25}}
 .cbadge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;color:#fff;background:var(--muted)}
 .signal .cbadge{background:var(--good)}.forming .cbadge{background:var(--gold-hi)}.watch .cbadge{background:#4c7bd9}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -240,11 +243,12 @@ function render(){
   if (base === 'agent') v.innerHTML = viewAgent(route.split('/')[1]);
   else if (base === 'agents') v.innerHTML = viewAgents();
   else if (base === 'journeys') v.innerHTML = viewJourneys();
-  else if (base === 'charts') { v.innerHTML = viewCharts(); drawCharts(); }
+  else if (base === 'charts') v.innerHTML = viewCharts();
   else if (base === 'learn') v.innerHTML = viewLearn();
   else if (base === 'news') v.innerHTML = viewNews();
   else if (base === 'ask') { const q = document.getElementById('q')?.value || ''; v.innerHTML = viewAsk(); const t = document.getElementById('q'); if (t) t.value = q; }
   else v.innerHTML = viewHome();
+  if (v.querySelector('canvas[data-inst]')) { applyLive(false); drawCharts(); }
   applyHL();
 }
 
@@ -336,6 +340,7 @@ function viewAgent(id){
       <div class="lbl">Isko kaam kaun deta hai</div><div class="chips" style="margin:4px 0 10px">${from}</div>
       <div class="lbl">Aaj aage bheja</div><div class="chips" style="margin-top:4px">${ch.hand}</div></div>
   </div>
+  ${agentCharts(id)}
   <div class="card"><h2>📝 Kya kiya (naya upar)</h2><p class="small muted" style="margin:0 0 6px">Time New York ka hai. › wali line pe tap karo to us signal ka poora safar khulega.</p>
     ${ev ? `<ul class="tl">${ev}</ul>` : '<p class="empty">Abhi tak kuch record nahi hua.</p>'}</div>`;
 }
@@ -367,24 +372,48 @@ function viewJourneys(){
   ${list.map(journeyCard).join('') || '<p class="empty">Is group mein abhi kuch nahi.</p>'}`;
 }
 
+const CLABEL = {signal:'SIGNAL', forming:'BAN RAHA', watch:'WATCH', none:'KUCH NAHI'};
+function chartCard(c, mode){
+  const id = esc(c.instrument);
+  const extra = mode === 'scanner'
+    ? `<div class="small muted">H1 candles: ${(c.candles || []).length} · H4 trend: ${c.bias > 0 ? 'upar ▲' : c.bias < 0 ? 'neeche ▼' : 'saaf nahi'}</div>`
+    : `<div class="small">${esc(c.note)}</div>`;
+  return `<div class="card ccard ${c.state}">
+    <div class="row"><b>${esc(pair(c.instrument))} <span class="${c.bias > 0 ? 'good' : c.bias < 0 ? 'bad' : ''}">${c.bias > 0 ? '▲' : c.bias < 0 ? '▼' : '•'}</span></b>
+      <span class="row" style="gap:6px"><span class="live" data-live="${id}">●</span><span class="cbadge">${CLABEL[c.state] || c.state}</span></span></div>
+    <canvas data-inst="${id}" ${mode === 'scanner' ? 'class="mini"' : ''}></canvas>${extra}
+    <div class="small muted" style="margin-top:4px">Price <b class="num" data-px="${id}">${px(c.price)}</b> · RSI ${esc(c.rsi ?? '-')}${c.zone ? ` · zone ${c.zone[0]}–${c.zone[1]}` : ''}</div>
+    ${c.ref && mode !== 'scanner' ? `<div class="small" data-ref="${esc(c.ref)}" style="cursor:pointer;color:var(--gold)">Bot: ${c.decision === 'open' ? 'trade liya' : 'roka - ' + esc(c.decision_reason || '')} ›</div>` : ''}
+  </div>`;
+}
+function liveNote(){
+  const L = LIVE.data; if (!L) return '<span class="small muted">Live price aa raha hai…</span>';
+  const open = Object.values(L.prices || {}).some(p => p.open);
+  return `<span class="small ${open ? 'good' : 'muted'}">${open ? '● LIVE' : '● Market band (weekend/closed)'} · price ${new Date(L.t * 1000).toLocaleTimeString('en-GB', {timeZone:'America/New_York'})} NY${L.error ? ' · ⚠ ' + esc(L.error) : ''}</span>`;
+}
 function viewCharts(){
   const charts = (S.charts || []).filter(c => cfilter === 'all' || c.state === cfilter);
   const n = s => (S.charts || []).filter(c => c.state === s).length;
   const btn = (k, t) => `<button class="${cfilter === k ? 'on' : ''}" onclick="cfilter='${k}';render()">${t}</button>`;
-  const label = {signal:'SIGNAL', forming:'BAN RAHA', watch:'WATCH', none:'KUCH NAHI'};
-  return `<div class="card" id="c-charts"><h2>📈 Saare charts (${(S.charts || []).length})</h2>
-    <div class="legend" style="margin-bottom:8px"><span><b class="good">SIGNAL</b>: abhi rules poore</span><span><b style="color:var(--gold-hi)">BAN RAHA</b>: price zone ki taraf aa raha</span><span><b style="color:#4c7bd9">WATCH</b>: trend hai, price door</span><span><b>KUCH NAHI</b>: trend nahi</span><span>Peeli patti = entry zone · Purple line = EMA</span></div>
+  return `<div class="card" id="c-charts"><div class="row"><h2>📈 Saare charts (${(S.charts || []).length})</h2><span id="livenote">${liveNote()}</span></div>
+    <div class="legend" style="margin-bottom:8px"><span><b class="good">SIGNAL</b>: abhi rules poore</span><span><b style="color:var(--gold-hi)">BAN RAHA</b>: price zone ki taraf aa raha</span><span><b style="color:#4c7bd9">WATCH</b>: trend hai, price door</span><span><b>KUCH NAHI</b>: trend nahi</span><span>Peeli patti = entry zone · Purple line = EMA20 · Aakhri candle live chalti hai</span></div>
     <div class="seg">${btn('all','Sab')}${btn('signal','Signal '+n('signal'))}${btn('forming','Ban raha '+n('forming'))}${btn('watch','Watch '+n('watch'))}${btn('none','Kuch nahi '+n('none'))}</div></div>
-  <div class="cgrid">${charts.map((c, i) => `<div class="card ccard ${c.state}">
-    <div class="row"><b>${esc(pair(c.instrument))} <span class="${c.bias > 0 ? 'good' : c.bias < 0 ? 'bad' : ''}">${c.bias > 0 ? '▲' : c.bias < 0 ? '▼' : '•'}</span></b><span class="cbadge">${label[c.state] || c.state}</span></div>
-    <canvas data-i="${i}"></canvas><div class="small">${esc(c.note)}</div>
-    <div class="small muted" style="margin-top:4px">Price ${px(c.price)} · RSI ${esc(c.rsi ?? '-')}</div>
-    ${c.ref ? `<div class="small" data-ref="${esc(c.ref)}" style="cursor:pointer;color:var(--gold)">Bot: ${c.decision === 'open' ? 'trade liya' : 'roka - ' + esc(c.decision_reason || '')} ›</div>` : ''}
-  </div>`).join('') || '<p class="empty">Is group mein abhi koi chart nahi.</p>'}</div>`;
+  <div class="cgrid">${charts.map(c => chartCard(c)).join('') || '<p class="empty">Is group mein abhi koi chart nahi.</p>'}</div>`;
+}
+function agentCharts(id){
+  const all = S.charts || [];
+  if (id === 'scanner') return `<div class="card"><div class="row"><h2>📡 Live charts jo yeh scan kar raha hai (${all.length})</h2><span id="livenote">${liveNote()}</span></div>
+      <p class="small muted" style="margin:0">Har minute OANDA se H1 + H4 candles laata hai, aur har kuch second mein taaza price. Yahi data Chart Reader ko jaata hai.</p></div>
+    <div class="cgrid">${[...all].sort((a, b) => a.instrument.localeCompare(b.instrument)).map(c => chartCard(c, 'scanner')).join('')}</div>`;
+  if (id === 'reader') { const sorted = [...all].sort((a, b) => (b.score || 0) - (a.score || 0));
+    return `<div class="card"><div class="row"><h2>👁️ Isne har chart pe kya padha</h2><span id="livenote">${liveNote()}</span></div>
+      <p class="small muted" style="margin:0">Sabse kareeb wale mauke upar. Peeli patti = jahan entry ban sakti hai.</p></div>
+    <div class="cgrid">${sorted.map(c => chartCard(c)).join('')}</div>`; }
+  return '';
 }
 function drawCharts(){
-  const charts = (S.charts || []).filter(c => cfilter === 'all' || c.state === cfilter);
-  document.querySelectorAll('canvas[data-i]').forEach(cv => draw(cv, charts[+cv.dataset.i]));
+  const byInst = Object.fromEntries((S.charts || []).map(c => [c.instrument, c]));
+  document.querySelectorAll('canvas[data-inst]').forEach(cv => { const c = byInst[cv.dataset.inst]; if (c) draw(cv, c); });
 }
 function draw(cv, ch){
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
@@ -462,7 +491,7 @@ async function poll(){
   try { const r = await fetch('/api/state', {cache:'no-store'}); if (r.ok) { S = await r.json(); if (!(route === 'ask' && document.activeElement && document.activeElement.id === 'q')) render(); botAfterPoll(); } } catch (e) {}
   setTimeout(poll, 15000);
 }
-window.addEventListener('resize', () => { if (route === 'charts' && S) drawCharts(); });
+window.addEventListener('resize', () => { if (S) drawCharts(); });
 
 /* ================= Manager robot ================= */
 const BOT = {items:[], i:-1, auto:null, hl:null, started:false, guiding:false, mode:'brief', fresh:0};
@@ -651,7 +680,35 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-clear]')) { CHAT = []; lsSet('tb_chat', '[]'); render(); }
 });
 robotHome();
-render(); poll();
+/* ---- live prices: move the last candle with the real price every 3 s ---- */
+const LIVE = {data:null, busy:false};
+const TF_S = {M1:60, M5:300, M15:900, M30:1800, H1:3600, H4:14400, D:86400};
+function applyLive(redraw){
+  const L = LIVE.data; if (!L || !S) return;
+  const tf = TF_S[(S.status?.timeframes || ['H1'])[0]] || 3600;
+  (S.charts || []).forEach(c => {
+    const p = (L.prices || {})[c.instrument]; const k = c.candles; if (!p || !k || !k.length) return;
+    const mid = p.mid; let last = k[k.length - 1];
+    if (p.open && L.t >= last[0] + tf) {                     // a new candle started since the last board refresh
+      const t0 = Math.floor(L.t / tf) * tf; k.push([t0, last[4], Math.max(last[4], mid), Math.min(last[4], mid), mid]); k.shift();
+      if (c.ema) { c.ema.push(c.ema[c.ema.length - 1]); c.ema.shift(); }
+    } else { last[4] = mid; last[2] = Math.max(last[2], mid); last[3] = Math.min(last[3], mid); }
+    c.price = mid; c.live = p.open;
+  });
+  document.querySelectorAll('[data-px]').forEach(el => { const c = (S.charts || []).find(x => x.instrument === el.dataset.px); if (c) el.textContent = px(c.price); });
+  document.querySelectorAll('[data-live]').forEach(el => { const p = (L.prices || {})[el.dataset.live]; el.classList.toggle('on', !!(p && p.open)); el.title = p && p.open ? 'Live' : 'Market band'; });
+  const ln = document.getElementById('livenote'); if (ln) ln.innerHTML = liveNote();
+  if (redraw) drawCharts();
+}
+async function tickLive(){
+  if (!document.hidden && S && document.querySelector('canvas[data-inst]') && !LIVE.busy) {
+    LIVE.busy = true;
+    try { const r = await fetch('/api/prices', {cache:'no-store'}); if (r.ok) { LIVE.data = await r.json(); applyLive(true); } } catch (e) {}
+    LIVE.busy = false;
+  }
+  setTimeout(tickLive, 3000);
+}
+render(); poll(); tickLive();
 </script>
 </body>
 </html>

@@ -618,6 +618,21 @@ class Engine:
             "settings": {"risk": st.get("risk"), "strategy": st.get("params"), "reward_risk": st.get("reward_risk")},
         }
 
+    def live_prices(self, max_age=2.0):
+        """Fresh bid/ask/mid for every watched chart, cached for `max_age` seconds (one broker call)."""
+        now = time.time()
+        cache = getattr(self, "_live", None)
+        if cache and now - cache["t"] < max_age:
+            return cache
+        try:
+            got = self.broker.prices([i.name for i in self.universe()])
+            data = {n: {"bid": p.bid, "ask": p.ask, "mid": p.mid, "open": p.tradeable} for n, p in got.items()}
+            self._live = {"t": now, "prices": data, "error": None}
+        except Exception as e:
+            log.error("live prices failed: %s", e)
+            self._live = {"t": now, "prices": (cache or {}).get("prices", {}), "error": str(e)}
+        return self._live
+
     def mark_seen(self, keys):
         keys = [str(k)[:200] for k in keys or [] if k][:100]
         with self.lock:

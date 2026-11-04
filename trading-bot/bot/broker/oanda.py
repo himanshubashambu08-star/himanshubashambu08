@@ -98,6 +98,13 @@ class OandaBroker(Broker):
         return Price(bid=float(p["bids"][0]["price"]), ask=float(p["asks"][0]["price"]),
                      tradeable=bool(p.get("tradeable", True)))
 
+    def prices(self, instruments):
+        if not instruments:
+            return {}
+        out = self._req("GET", self._acct("/pricing"), {"instruments": ",".join(instruments)})["prices"]
+        return {p["instrument"]: Price(bid=float(p["bids"][0]["price"]), ask=float(p["asks"][0]["price"]),
+                                       tradeable=bool(p.get("tradeable", True))) for p in out}
+
     def quote_to_home(self, instrument):
         """How many home-currency units 1 unit of the instrument's quote currency is worth."""
         if self._home is None:

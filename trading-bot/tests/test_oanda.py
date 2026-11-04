@@ -59,3 +59,15 @@ class OandaAdapter(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OandaPrices(unittest.TestCase):
+    def test_prices_one_call(self):
+        b = FakeOanda({"/pricing": {"prices": [
+            {"instrument": "EUR_USD", "bids": [{"price": "1.1"}], "asks": [{"price": "1.1002"}], "tradeable": True},
+            {"instrument": "USD_JPY", "bids": [{"price": "150"}], "asks": [{"price": "150.02"}], "tradeable": False}]}})
+        out = b.prices(["EUR_USD", "USD_JPY"])
+        self.assertEqual(len(b.calls), 1)
+        self.assertEqual(b.calls[0][2], {"instruments": "EUR_USD,USD_JPY"})
+        self.assertAlmostEqual(out["EUR_USD"].mid, 1.1001)
+        self.assertFalse(out["USD_JPY"].tradeable)

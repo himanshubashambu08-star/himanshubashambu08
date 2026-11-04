@@ -24,6 +24,8 @@ def make_handler(engine):
             if self.path in ("/", "/index.html"):
                 with open(STATIC, "rb") as f:
                     self._send(200, f.read(), "text/html; charset=utf-8")
+            elif self.path == "/api/prices":
+                self._send(200, json.dumps(engine.live_prices()).encode(), "application/json")
             elif self.path == "/api/state":
                 self._send(200, json.dumps(engine.snapshot(), default=str).encode(), "application/json")
             else:

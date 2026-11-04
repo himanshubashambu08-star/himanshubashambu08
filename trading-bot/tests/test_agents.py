@@ -69,3 +69,23 @@ class EngineJourney(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LivePrices(unittest.TestCase):
+    def test_live_prices_cached_and_served(self):
+        import urllib.request
+        from bot import dashboard
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make_engine(d)
+            e.tick()
+            p = e.live_prices()
+            self.assertIn("XAU_USD", p["prices"])
+            self.assertAlmostEqual(p["prices"]["XAU_USD"]["mid"], b.mid["XAU_USD"])
+            b.mid["XAU_USD"] += 5
+            self.assertIs(e.live_prices(), p)                     # cached for 2 s
+            srv = dashboard.start(e, "127.0.0.1", 0)
+            try:
+                got = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{srv.server_address[1]}/api/prices").read())
+                self.assertIn("XAU_USD", got["prices"])
+            finally:
+                srv.shutdown()

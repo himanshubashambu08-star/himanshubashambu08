@@ -22,6 +22,10 @@ class Broker(ABC):
     @abstractmethod
     def close_trade(self, trade_id): ...
 
+    def prices(self, instruments):
+        """Latest prices for many instruments: {name: Price}. Adapters may do this in one call."""
+        return {n: self.price(n) for n in instruments}
+
     def closed_price(self, trade_id):
         """Average close price of a finished trade, or None if unknown / still open."""
         return None
