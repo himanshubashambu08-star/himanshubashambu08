@@ -90,10 +90,16 @@ class RiskManager:
         base, quote = instrument.split("_", 1)
         return {base: side, quote: -side}
 
-    def can_open(self, signal, open_trades, price, corr=None, kinds=None):
-        """corr(a, b) -> correlation of hourly returns or None; kinds: name -> instrument type."""
+    def can_open(self, signal, open_trades, price, corr=None, kinds=None, at_risk=None):
+        """corr(a, b) -> correlation of hourly returns or None; kinds: name -> instrument type.
+        at_risk: (lost_today, open_risk, new_risk) in account money -> daily limit counts open trades too."""
         if self.halted:
             return False, self.halted
+        if at_risk is not None and self.state.get("day_start_nav"):
+            lost, open_r, new_r = at_risk
+            limit = self.state["day_start_nav"] * self.p["daily_loss_limit_pct"] / 100
+            if lost + open_r + new_r > limit + 1e-9:
+                return False, f"daily limit incl open risk ({lost + open_r + new_r:,.0f} > {limit:,.0f})"
         if len(open_trades) >= self.p["max_open_trades"]:
             return False, "max open trades"
         same = [t for t in open_trades if t.instrument == signal.instrument]

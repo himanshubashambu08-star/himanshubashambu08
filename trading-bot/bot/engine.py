@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from . import strategy
+from . import ema_break, strategy
 from .agents import AgentLog
 from .journal import Journal
 from .learner import Learner, MISTAKE_WORDS
@@ -44,6 +44,10 @@ DEFAULTS = {
     "blackout_utc": [],
     "kill_file": "STOP",
     "learn": True,
+    "strategy": "pullback",          # "pullback" (old H1/H4 rules) or "ema_break" (EMA 9/15 breakout)
+    "gate_min_unseen_trades": 100,   # ema_break trades on demo only after the backtest passes on unseen data
+    "gate_min_pf": 1.2,
+    "backtest_days": 730,
 }
 
 
@@ -99,6 +103,13 @@ def hinglish_reason(reason):
         return f"{r[21:].replace('_', '/')} pehle se open hai, aur yeh pair uske saath hi chalta hai (double risk se bachne ke liye)"
     if r.startswith("too much ") and r.endswith(" exposure"):
         return f"{r[9:-9]} mein pehle se kaafi trades hain (ek currency pe zyada risk nahi)"
+    if r == "backtest gate":
+        return ("Backtest gate: nayi strategy ka backtest abhi unseen data pe pass nahi hua "
+                "(PF 1.2+ aur 100+ trades chahiye), isliye demo pe bhi trade nahi")
+    if r == "max trades today":
+        return "Aaj ke max trades ho gaye (din mein 2)"
+    if r.startswith("daily limit incl open risk"):
+        return "Daily loss limit: aaj ka nuksaan + open trades ka risk + yeh trade limit se zyada ho jata"
     if r == "liquid only":
         return "Sirf bade pairs mode: yeh chhota/exotic pair hai, trade nahi lega (sirf data ke liye follow hoga)"
     if r.startswith("news: "):
@@ -156,8 +167,22 @@ class Engine:
         learned.pop("reward_risk", None)
         return {**self.base_params, **learned}
 
+    @property
+    def ema(self):
+        return self.cfg["strategy"] == "ema_break"
+
+    def ema_params(self):
+        return {**ema_break.DEFAULTS, **self.base_params,
+                "window_ny": self.cfg["entry_sessions_ny"] or ema_break.DEFAULTS["window_ny"]}
+
     def reward_risk(self):
+        if self.ema:
+            return self.ema_params()["reward_risk"]
         return self.learner.params().get("reward_risk", self.risk.p["reward_risk"])
+
+    def gate(self):
+        g = self.learner.get("gate") or {}
+        return bool(g.get("passed"))
 
     def universe(self):
         if self._universe is None:
@@ -245,6 +270,7 @@ class Engine:
             except Exception as e:
                 log.error("open trades view: %s", e)
         self.manage(trades)
+        self.check_pending()
 
         tf = GRANULARITY_SECONDS[self.cfg["entry_timeframe"]]
         bucket = int((now - self.cfg["scan_delay_seconds"]) // tf)
@@ -274,7 +300,9 @@ class Engine:
             else:
                 run()
         self.brain.maybe_brief(now, self._brief_done)
-        if self.cfg["learn"] and not getattr(self, "_validated_once", False) and not self.learner.get("experiments"):
+        need = (self.learner.get("ema_backtest") or {}).get("rules") != self.ema_params() if self.ema \
+            else not self.learner.get("experiments")
+        if self.cfg["learn"] and not getattr(self, "_validated_once", False) and need:
             self._validated_once = True
             threading.Thread(target=self.validate_setup, args=(self.risk.state["day"],), daemon=True).start()
         self.agents.save()
@@ -314,14 +342,18 @@ class Engine:
         for inst in self.universe():
             try:
                 ltf = self.broker.candles(inst.name, tf_name, n)
-                htf = self.broker.candles(inst.name, self.cfg["trend_timeframe"], n)
-                board[inst.name] = strategy.read_chart(inst.name, htf, ltf, params)
+                if self.ema:
+                    board[inst.name] = ema_break.read_chart(inst.name, ltf, self.ema_params())
+                else:
+                    htf = self.broker.candles(inst.name, self.cfg["trend_timeframe"], n)
+                    board[inst.name] = strategy.read_chart(inst.name, htf, ltf, params)
                 self._closes[inst.name] = [c.c for c in ltf if c.complete][-201:]
                 if look_for_trades:
-                    if self.cfg["learn"]:
+                    if self.cfg["learn"] and not self.ema:
                         self.learner.resolve(inst.name, ltf, tf_s, self.reward_risk(), self.cfg["breakeven_at_r"])
                         self.report_resolved()
-                    sig = strategy.evaluate(inst.name, htf, ltf, params)
+                    sig = (ema_break.evaluate(inst.name, ltf, self.ema_params()) if self.ema
+                           else strategy.evaluate(inst.name, htf, ltf, params))
                     if sig:
                         signals.append((inst, sig))
             except Exception as e:
@@ -344,7 +376,14 @@ class Engine:
             f"{pair(r['instrument'])} {'buy' if r['bias'] > 0 else 'sell'} zone {r['zone'][0]}–{r['zone'][1]}"
             for r in forming[:4]) if forming else "Abhi koi setup banta nahi dikh raha. Har minute dobara padhega.")
         p = {**strategy.DEFAULTS, **params}
-        A.plan("rules", f"Rules: H4 pe EMA{p['htf_ema_fast']}/{p['htf_ema_slow']} trend · H1 pe EMA"
+        ep = self.ema_params()
+        if self.ema:
+            A.plan("rules", f"Rules ({tf_name}): EMA{ep['ema_fast']} > EMA{ep['ema_slow']} = sirf BUY, neeche = sirf SELL · "
+                   f"alert candle EMA ko touch na kare · agli candle high/low tode to entry · SL alert candle ka "
+                   f"low/high · TP {ep['reward_risk']}R · SL {ep['min_stop_atr']}–{ep['max_stop_atr']}×ATR · "
+                   f"max {ep['max_trades_per_day']} trade/din")
+        else:
+          A.plan("rules", f"Rules: H4 pe EMA{p['htf_ema_fast']}/{p['htf_ema_slow']} trend · H1 pe EMA"
                f"{p['ltf_ema_pullback']} tak pullback aur wapas close · RSI buy {p['rsi_buy_min']}–{p['rsi_buy_max']}, "
                f"sell {p['rsi_sell_min']}–{p['rsi_sell_max']} · SL {p['atr_stop_mult']}×ATR · TP {self.reward_risk()}R")
 
@@ -379,10 +418,14 @@ class Engine:
             f = sig.features
             A.step(ref, "scanner", "pass", f"{pair(inst.name)} ka {tf_name} candle {ny_time(sig.time + tf_s)} pe close hua")
             A.step(ref, "reader", "pass", "Chart pe signal dikha")
-            A.step(ref, "rules", "pass", f"✓ H4 trend {'up' if sig.side > 0 else 'down'} · ✓ EMA pullback + rejection · "
-                   f"✓ RSI {f.get('rsi')} · SL distance {pf(sig.stop_distance)}")
+            if self.ema:
+                A.step(ref, "rules", "pass", f"✓ EMA9 {'>' if sig.side > 0 else '<'} EMA15 · ✓ alert candle EMA se door · "
+                       f"entry {pf(sig.entry_price)} tootne pe · SL {pf(sig.stop_price)} ({f.get('stop_atr')}×ATR)")
+            else:
+                A.step(ref, "rules", "pass", f"✓ H4 trend {'up' if sig.side > 0 else 'down'} · ✓ EMA pullback + rejection · "
+                       f"✓ RSI {f.get('rsi')} · SL distance {pf(sig.stop_distance)}")
             A.count("rules", "passed")
-            A.did("rules", f"{pair(inst.name)} {side_word(sig.side)}: saare rules poore (RSI {f.get('rsi')})", ref, "good")
+            A.did("rules", f"{pair(inst.name)} {side_word(sig.side)}: saare rules poore", ref, "good")
             A.handoff("rules", "timer", f"{pair(inst.name)} {side_word(sig.side)} timing check ke liye", ref)
             self.try_open(inst, sig, account, self.why_no_new_trades(now, inst))
             reading = board.get(inst.name)
@@ -430,11 +473,17 @@ class Engine:
             sig.features["spread_ratio"] = round(price.spread / sig.stop_distance, 4)
 
             # Entry Timer
-            if not blocked_now and self.learner.get("universe", "all") == "liquid" and inst.name not in LIQUID:
+            if not blocked_now and self.learner.get("universe", "all") == "liquid" and inst.name not in LIQUID \
+                    and not self.ema:
                 blocked_now = "liquid only"
+            if not blocked_now and self.ema:
+                if not self.gate():
+                    blocked_now = "backtest gate"
+                elif self.trades_today() >= self.ema_params()["max_trades_per_day"]:
+                    blocked_now = "max trades today"
             ev = None if blocked_now else self.news.blocking(inst.name, self.clock())
             reason = blocked_now or (f"news: {ev['currency']} {ev['title']} {ny_time(ev['time'])} NY (High)" if ev else None) \
-                or (self.learner.blocked(sig) if self.cfg["learn"] else None)
+                or (self.learner.blocked(sig) if self.cfg["learn"] and not self.ema else None)
             if reason:
                 return self._skip(inst, sig, "timer", reason)
             A.step(ref, "timer", "pass", "GO: " + ("entry ka time khula" if self.cfg["entry_sessions_ny"] else "24 ghante mode") + ", news blackout nahi, koi seekha hua rule nahi roka")
@@ -443,11 +492,15 @@ class Engine:
             A.handoff("timer", "risk", f"{name} size aur limits ke liye", ref)
 
             # Risk Manager
+            conv = self.broker.quote_to_home(inst.name)
+            new_risk = account.balance * self.risk.p["risk_per_trade_pct"] / 100
+            lost = max(0.0, (self.risk.state.get("day_start_nav") or account.nav) - account.balance)
             ok, why = self.risk.can_open(sig, self.broker.open_trades(), price, corr=self.correlation,
-                                         kinds={i.name: i.type for i in self.universe()})
+                                         kinds={i.name: i.type for i in self.universe()},
+                                         at_risk=(lost, self.open_risk(), new_risk))
             if not ok:
                 return self._skip(inst, sig, "risk", why)
-            units = self.risk.size(account.balance, sig.stop_distance, self.broker.quote_to_home(inst.name), inst)
+            units = self.risk.size(account.balance, sig.stop_distance, conv, inst)
             if units <= 0:
                 return self._skip(inst, sig, "risk", "size 0 nikla (stop bahut door hai)")
             risk_cash = account.balance * self.risk.p["risk_per_trade_pct"] / 100
@@ -459,6 +512,8 @@ class Engine:
 
             # Order Executor
             rr = self.reward_risk()
+            if sig.entry_price is not None:
+                return self._place_stop(inst, sig, units, rr, account)
             entry = price.ask if sig.side > 0 else price.bid
             stop = entry - sig.side * sig.stop_distance
             tp = entry + sig.side * rr * sig.stop_distance
@@ -487,6 +542,98 @@ class Engine:
             A.step(ref, "executor", "block", f"Order fail: {e}")
             A.did("executor", f"{name}: order fail ({e})", ref, "bad")
             return None
+
+    # ---- breakout entries: stop order valid for the next candle only ---------------
+    def _place_stop(self, inst, sig, units, rr, account):
+        A, ref, name = self.agents, ref_for(inst.name, sig.time), pair(inst.name)
+        tf_s = GRANULARITY_SECONDS[self.cfg["entry_timeframe"]]
+        entry, stop = sig.entry_price, sig.stop_price
+        tp = entry + sig.side * rr * abs(entry - stop)
+        expire = sig.time + 2 * tf_s                     # end of the candle after the alert candle
+        oid = self.broker.stop_order(inst.name, sig.side * units, entry, stop, tp, expire)
+        self.risk.state.setdefault("pending", {})[oid] = {
+            "instrument": inst.name, "side": sig.side, "units": sig.side * units, "entry": entry, "stop": stop,
+            "tp": tp, "atr": sig.atr, "ref": ref, "expire": expire, "sig_time": sig.time,
+            "stop_dist": abs(entry - stop), "features": sig.features, "day": ema_break.ny_day(self.clock())}
+        self.risk.save()
+        A.step(ref, "executor", "pass", f"Stop order laga: {side_word(sig.side)} {units:g} jab price {pf(entry)} tode · "
+               f"SL {pf(stop)} · TP {pf(tp)} ({rr}R) · {ny_time(expire)} NY tak valid")
+        A.mark(ref, state="order laga (intezaar)")
+        A.count("executor", "orders")
+        A.did("executor", f"{name} {side_word(sig.side)} stop order @ {pf(entry)} · SL {pf(stop)} · TP {pf(tp)}", ref, "good")
+        self.journal.write("order", inst.name, sig.side, units=units, entry=entry, stop=stop, tp=tp, note=sig.reason)
+        log.info("STOP ORDER %s %s units=%s at=%s sl=%s tp=%s", inst.name, side_word(sig.side), units, entry, stop, tp)
+        return oid
+
+    def check_pending(self):
+        """Pending breakout orders: filled -> track the trade; not triggered in time -> cancelled."""
+        pend = self.risk.state.get("pending") or {}
+        A = self.agents
+        for oid, o in list(pend.items()):
+            try:
+                st = self.broker.order_status(oid)
+            except Exception as e:
+                log.error("order status %s: %s", oid, e)
+                continue
+            ref, name = o["ref"], pair(o["instrument"])
+            if st.get("state") == "FILLED" and st.get("trade_id"):
+                tid = str(st["trade_id"])
+                self.risk.remember(tid, o["entry"], o["stop"], o["atr"], instrument=o["instrument"], units=o["units"],
+                                   opened=self.clock(), tp=o["tp"])
+                self.known_trades[tid] = o["instrument"]
+                A.trade_refs[tid] = ref
+                from .models import Signal
+                self.learner.record_signal(Signal(o["instrument"], o["side"], o["stop_dist"], o["atr"], "ema_break",
+                                                  time=o["sig_time"], features=o.get("features") or {}),
+                                           taken=True, trade_id=tid, entry=o["entry"])
+                self.risk.state.setdefault("day_trades", {})
+                self.risk.state["day_trades"][o["day"]] = self.risk.state["day_trades"].get(o["day"], 0) + 1
+                A.step(ref, "executor", "pass", f"Price ne {pf(o['entry'])} toda: trade khula (#{tid})")
+                A.mark(ref, taken=True, state="trade open", trade_id=tid)
+                A.did("executor", f"{name} entry ho gayi @ {pf(o['entry'])}", ref, "good")
+                A.handoff("executor", "manager", f"{name} trade #{tid} sambhalne ko", ref)
+                del pend[oid]
+            elif st.get("state") in ("CANCELLED", "TRIGGERED") or self.clock() > o["expire"] + 90:
+                if st.get("state") == "PENDING":
+                    try:
+                        self.broker.cancel_order(oid)
+                    except Exception as e:
+                        log.error("cancel %s: %s", oid, e)
+                        continue
+                A.step(ref, "executor", "block", "Agli candle ne level nahi toda: setup cancel (koi trade nahi)")
+                A.mark(ref, state="cancel (break nahi hua)")
+                A.did("executor", f"{name} setup cancel: agli candle ne {pf(o['entry'])} nahi toda", ref, "info")
+                del pend[oid]
+        self.risk.save()
+
+    def trades_today(self):
+        day = ema_break.ny_day(self.clock())
+        filled = (self.risk.state.get("day_trades") or {}).get(day, 0)
+        waiting = sum(1 for o in (self.risk.state.get("pending") or {}).values() if o.get("day") == day)
+        return filled + waiting
+
+    def open_risk(self):
+        """Money lost if every open trade and pending order hit its stop now (only the part still at risk)."""
+        total = 0.0
+        live = {str(t.id): t for t in self.broker.open_trades()}
+        items = []
+        for tid, info in self.risk.state["trades"].items():
+            t = live.get(tid)
+            items.append({**info, "stop_now": t.stop} if t and t.stop is not None else info)
+        items += list((self.risk.state.get("pending") or {}).values())
+        for info in items:
+            inst, units = info.get("instrument"), info.get("units")
+            if not inst or not units:
+                continue
+            stop = info.get("stop_now", info.get("stop"))
+            loss = (info["entry"] - stop) * units
+            if loss <= 0:
+                continue                                   # stop already at/above entry: nothing at risk
+            try:
+                total += loss * self.broker.quote_to_home(inst)
+            except Exception:
+                pass
+        return total
 
     def _skip(self, inst, sig, agent, reason):
         A, ref = self.agents, ref_for(inst.name, sig.time)
@@ -691,6 +838,8 @@ class Engine:
                    f"+{self.cfg['breakeven_at_r']}R pe SL breakeven")
             plans.append(f"{pair(t.instrument)} {side_word(t.side)} abhi {progress:+.2f}R → {nxt}")
             new_stop = None
+            if self.ema:
+                continue                      # breakout mode: fixed SL and 3R target, no breakeven/trailing
             if progress >= self.cfg["trail_start_r"]:
                 new_stop = now_px - t.side * self.cfg["trail_atr_mult"] * info["atr"]
             if progress >= self.cfg["breakeven_at_r"]:
@@ -710,6 +859,10 @@ class Engine:
                     log.error("move SL %s failed: %s", t.id, e)
         mine = [t for t in trades if str(t.id) in self.risk.state["trades"]]
         A.status("manager", f"{len(mine)} open trade" + ("s" if len(mine) != 1 else ""), "ok" if mine else "idle")
+        if self.ema:
+            A.plan("manager", (" · ".join(plans) + " · " if plans else "") +
+                   "Is strategy mein SL aur TP (3R) fixed hain: na breakeven, na trailing.")
+            return
         A.plan("manager", " · ".join(plans) if plans else
                f"Koi open trade nahi. Naya trade aaya to +{self.cfg['breakeven_at_r']}R pe breakeven, "
                f"+{self.cfg['trail_start_r']}R se trailing.")
@@ -736,10 +889,69 @@ class Engine:
                  f"{len(snap['filters'])} seekhe rules", "ok")
         A.plan("learner", "Agla daily review 17:00 New York (galtiyan → naye rules, ek setting ka walk-forward test)")
 
+    def ema_backtest(self, day):
+        """EMA 9/15 breakout on ~2 years of real M5 candles, spread included, split 70% tuning / 30% unseen.
+        The bot trades on demo only if the unseen part has enough trades and a good profit factor."""
+        from .learner import _card_r
+        A, ep = self.agents, self.ema_params()
+        tf = self.cfg["entry_timeframe"]
+        names = [i.name for i in self.universe()]
+        A.did("learner", f"Backtest shuru: {', '.join(map(pair, names))} ke ~{self.cfg['backtest_days']} din ke asli "
+                         f"{tf} candles download ho rahe hain (spread ke saath)…")
+        start = self.clock() - self.cfg["backtest_days"] * 86400
+        try:
+            spreads = {k: p.spread for k, p in self.broker.prices(names).items()}
+        except Exception as e:
+            log.error("spreads for backtest: %s", e)
+            spreads = {}
+        trades, span = [], [None, None]
+        for n in names:
+            candles = self.broker.candles_range(n, tf, start)
+            if len(candles) < 500:
+                continue
+            for t in ema_break.backtest(candles, ep, spreads.get(n, 0.0)):
+                t["pair"] = n
+                trades.append(t)
+            span[0] = min(span[0] or candles[0].time, candles[0].time)
+            span[1] = max(span[1] or candles[-1].time, candles[-1].time)
+        if not span[0]:
+            self.learner.put("gate", {"passed": False, "made": self.clock(), "reason": "data nahi mila"})
+            A.did("learner", "Backtest: purana data nahi mila", tone="bad")
+            return None
+        split = span[0] + 0.7 * (span[1] - span[0])
+        old = [t["r"] for t in trades if t["time"] < split]
+        new = [t["r"] for t in trades if t["time"] >= split]
+        res = {"made": self.clock(), "day": day, "from": span[0], "to": span[1], "split": split,
+               "pairs": names, "timeframe": tf, "spread": spreads, "rules": {k: ep[k] for k in ep},
+               "all": _card_r([t["r"] for t in trades]), "tuning": _card_r(old), "unseen": _card_r(new),
+               "need_trades": self.cfg["gate_min_unseen_trades"], "need_pf": self.cfg["gate_min_pf"]}
+        u = res["unseen"]
+        res["passed"] = u["n"] >= self.cfg["gate_min_unseen_trades"] and (u["pf"] or 0) >= self.cfg["gate_min_pf"]
+        res["reason"] = ("pass" if res["passed"] else
+                         f"unseen mein sirf {u['n']} trades (chahiye {self.cfg['gate_min_unseen_trades']}+)"
+                         if u["n"] < self.cfg["gate_min_unseen_trades"] else
+                         f"unseen PF {u['pf']} (chahiye {self.cfg['gate_min_pf']}+)")
+        self.learner.put("ema_backtest", res)
+        self.learner.put("gate", {"passed": res["passed"], "made": res["made"], "reason": res["reason"]})
+        self.learner.lesson(day, "validate", f"EMA 9/15 backtest: tuning {res['tuning']['n']} trades PF {res['tuning']['pf']} "
+                            f"({res['tuning']['total_r']:+.1f}R) · unseen {u['n']} trades PF {u['pf']} ({u['total_r']:+.1f}R) · "
+                            + ("✅ PASS: demo pe trading chalu" if res["passed"] else f"❌ gate band: {res['reason']}"))
+        A.did("learner", f"Backtest: unseen {u['n']} trades, win {u['win_pct']}%, PF {u['pf']}, {u['total_r']:+.1f}R → "
+              + ("PASS, demo trading chalu" if res["passed"] else "gate band, sirf dekhega"),
+              tone="good" if res["passed"] else "bad")
+        return res
+
     def validate_setup(self, day):
         """Report card + experiments: today's rules and 5 alternatives on real broker history, spread included."""
         A = self.agents
         n = self.learner.p["validate_bars"]
+        if self.ema:
+            try:
+                return self.ema_backtest(day)
+            except Exception as e:
+                log.exception("ema backtest failed: %s", e)
+                A.did("learner", f"Backtest fail: {e}", tone="bad")
+                return None
 
         def history(name):
             return (self.broker.candles(name, self.cfg["trend_timeframe"], n),
@@ -772,6 +984,10 @@ class Engine:
 
     def review(self, day):
         log.info("daily review for %s", day)
+        if self.ema:                     # simple mode: no auto rules; just re-test on the newest data
+            self.learner.put("last_review_day", day)
+            self.validate_setup(day)
+            return
         A = self.agents
         n = self.learner.p["tune_bars"]
 
@@ -908,6 +1124,11 @@ class Engine:
         return {"status": status, "charts": charts, "learning": self.learner.snapshot(),
                 "news": self.news_list(self.clock()), "news_error": self.news.error,
                 "journal": self.journal.rows[-30:][::-1], **self.agents.snapshot(),
+                "mode": {"strategy": self.cfg["strategy"], "timeframe": self.cfg["entry_timeframe"],
+                         "ema": self.ema_params() if self.ema else None, "gate": self.learner.get("gate"),
+                         "backtest": self.learner.get("ema_backtest"),
+                         "pending": list((self.risk.state.get("pending") or {}).values()),
+                         "trades_today": self.trades_today() if self.ema else None},
                 **({} if light else {"brain": self.brain.snapshot(), "seen": list(self.seen),
                                      "closed": self.learner.closed_trades(200),
                                      "closed_days": self.learner.closed_by_day(trading_day),

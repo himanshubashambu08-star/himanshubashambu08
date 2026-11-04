@@ -73,6 +73,8 @@ class Signal:
     reason: str
     time: float = field(default_factory=lambda: datetime.now(timezone.utc).timestamp())
     features: dict = field(default_factory=dict)   # conditions at entry, used by the learner
+    entry_price: float | None = None               # set = enter with a STOP order at this price (breakout)
+    stop_price: float | None = None
 
 
 GRANULARITY_SECONDS = {

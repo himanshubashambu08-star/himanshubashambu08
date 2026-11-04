@@ -165,6 +165,54 @@ class OandaBroker(Broker):
         return Trade(id=t["tradeID"], instrument=instrument, units=float(t["units"]),
                      entry=float(t["price"]), stop=stop, take_profit=take_profit)
 
+    def stop_order(self, instrument, units, price, stop, take_profit, expire_ts):
+        inst = self.instrument(instrument)
+        body = {"order": {
+            "type": "STOP", "instrument": instrument, "price": self._fmt(instrument, price),
+            "units": f"{units:.{max(inst.units_precision, 0)}f}",
+            "timeInForce": "GTD", "gtdTime": datetime.fromtimestamp(expire_ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "positionFill": "DEFAULT", "triggerCondition": "DEFAULT",
+            "stopLossOnFill": {"price": self._fmt(instrument, stop), "timeInForce": "GTC"},
+            "takeProfitOnFill": {"price": self._fmt(instrument, take_profit), "timeInForce": "GTC"},
+        }}
+        r = self._req("POST", self._acct("/orders"), body=body)
+        t = r.get("orderCreateTransaction")
+        if not t or r.get("orderCancelTransaction"):
+            reason = (r.get("orderCancelTransaction") or {}).get("reason", "rejected")
+            raise OandaError(f"stop order for {instrument} not accepted: {reason}")
+        return str(t["id"])
+
+    def cancel_order(self, order_id):
+        try:
+            self._req("PUT", self._acct(f"/orders/{order_id}/cancel"))
+        except OandaError as e:
+            if "ORDER_DOESNT_EXIST" not in str(e) and "404" not in str(e):
+                raise
+
+    def order_status(self, order_id):
+        o = self._req("GET", self._acct(f"/orders/{order_id}"))["order"]
+        return {"state": o.get("state"), "trade_id": o.get("tradeOpenedID"),
+                "price": float(o["price"]) if o.get("price") else None}
+
+    def candles_range(self, instrument, granularity, start_ts, end_ts=None):
+        out, t = [], start_ts
+        end_ts = end_ts or time.time()
+        for _ in range(200):
+            got = self._req("GET", f"/v3/instruments/{instrument}/candles",
+                            {"granularity": granularity, "price": "M", "count": 5000,
+                             "from": datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})["candles"]
+            batch = [Candle(time=_ts(c["time"]), o=float(c["mid"]["o"]), h=float(c["mid"]["h"]),
+                            l=float(c["mid"]["l"]), c=float(c["mid"]["c"]), volume=int(c.get("volume", 0)),
+                            complete=bool(c["complete"])) for c in got]
+            batch = [c for c in batch if not out or c.time > out[-1].time]
+            if not batch:
+                break
+            out += batch
+            t = out[-1].time + 1
+            if t >= end_ts or len(got) < 5000:
+                break
+        return [c for c in out if c.time <= end_ts]
+
     def modify_stop(self, trade_id, price, instrument=None):
         p = self._fmt(instrument, price) if instrument else f"{price}"
         self._req("PUT", self._acct(f"/trades/{trade_id}/orders"),

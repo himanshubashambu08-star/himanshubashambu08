@@ -22,6 +22,21 @@ class Broker(ABC):
     @abstractmethod
     def close_trade(self, trade_id): ...
 
+    def stop_order(self, instrument, units, price, stop, take_profit, expire_ts):
+        """Pending entry that fills only if price reaches `price` before `expire_ts`. Returns order id."""
+        raise NotImplementedError
+
+    def cancel_order(self, order_id):
+        raise NotImplementedError
+
+    def order_status(self, order_id):
+        """{"state": "PENDING"|"FILLED"|"CANCELLED", "trade_id": str|None, "price": float|None}"""
+        raise NotImplementedError
+
+    def candles_range(self, instrument, granularity, start_ts, end_ts=None):
+        """Candles from start_ts to now (or end_ts), any length (downloaded in pieces)."""
+        return self.candles(instrument, granularity, 5000)
+
     def prices(self, instruments):
         """Latest prices for many instruments: {name: Price}. Adapters may do this in one call."""
         return {n: self.price(n) for n in instruments}

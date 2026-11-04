@@ -252,7 +252,7 @@ function render(){
   const base = route.split('/')[0];
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === (base === 'agent' ? 'agents' : base === 'chart' ? 'charts' : base))));
   if (!S) return;
-  const sym = $('#sym'); if (sym && S.version) sym.textContent = `OANDA · demo · v${S.version.app} · R${S.version.rules}`;
+  const sym = $('#sym'); if (sym && S.version) sym.textContent = `OANDA · demo · v${S.version.app} · ${(S.mode || {}).strategy === 'ema_break' ? 'EMA9/15' : 'R' + S.version.rules}`;
   const v = $('#view');
   if (base === 'agent') v.innerHTML = viewAgent(route.split('/')[1]);
   else if (base === 'agents') v.innerHTML = viewAgents();
@@ -312,6 +312,7 @@ function viewHome(){
   }).join('');
   const b = agent('budget');
   return `${statusBanner(st)}
+  ${emaCard(true)}
   ${todayCard()}
   <div class="daybar">
     <div><span class="lbl">Equity</span><b>${money(st.nav, ccy)}</b></div>
@@ -412,6 +413,7 @@ function viewJourneys(){
   ${list.map(journeyCard).join('') || '<p class="empty">Is group mein abhi kuch nahi.</p>'}`;
 }
 
+const emaName = () => (S && S.mode && S.mode.strategy === 'ema_break') ? 'EMA' + (S.mode.ema || {}).ema_fast : 'EMA20';
 const CLABEL = {signal:'SIGNAL', forming:'BAN RAHA', watch:'WATCH', none:'KUCH NAHI'};
 function chartCard(c, mode){
   const id = esc(c.instrument);
@@ -445,7 +447,7 @@ function viewChart(inst){
       <span class="row" style="gap:6px"><span class="live" data-live="${esc(inst)}">●</span><span class="cbadge">${CLABEL[c.state] || c.state}</span></span></div>
     <div class="small muted">H1 candles (har candle = 1 ghanta) · <span id="livenote">${liveNote()}</span></div>
     <canvas class="big" data-inst="${esc(inst)}"></canvas>
-    <div class="legend"><span><b style="color:var(--ema)">━</b> EMA20</span><span><b style="color:var(--gold-hi)">▬</b> entry zone</span>${tr.length ? '<span><b style="color:var(--gold-hi)">┅</b> Entry</span><span><b class="bad">┅</b> SL</span><span><b class="good">┅</b> TP</span>' : ''}</div>
+    <div class="legend"><span><b style="color:var(--ema)">━</b> ${emaName()}</span><span><b style="color:var(--gold-hi)">▬</b> entry zone</span>${tr.length ? '<span><b style="color:var(--gold-hi)">┅</b> Entry</span><span><b class="bad">┅</b> SL</span><span><b class="good">┅</b> TP</span>' : ''}</div>
     <div style="margin-top:8px">${esc(c.note)}</div>
     <div class="kv" style="margin-top:8px"><span>Price</span><b data-px="${esc(inst)}">${px(c.price)}</b><span>RSI</span><b>${esc(c.rsi ?? '-')}</b>
       ${c.zone ? `<span>Entry zone</span><b>${c.zone[0]} – ${c.zone[1]}</b>` : ''}${c.stop_hint ? `<span>SL andaaza</span><b>${c.stop_hint}</b>` : ''}
@@ -485,7 +487,7 @@ function viewCharts(){
   const n = s => (S.charts || []).filter(c => c.state === s).length;
   const btn = (k, t) => `<button class="${cfilter === k ? 'on' : ''}" onclick="cfilter='${k}';render()">${t}</button>`;
   return `<div class="card" id="c-charts"><div class="row"><h2>📈 Saare charts (${(S.charts || []).length})</h2><span id="livenote">${liveNote()}</span></div>
-    <div class="legend" style="margin-bottom:8px"><span><b class="good">SIGNAL</b>: abhi rules poore</span><span><b style="color:var(--gold-hi)">BAN RAHA</b>: price zone ki taraf aa raha</span><span><b style="color:#4c7bd9">WATCH</b>: trend hai, price door</span><span><b>KUCH NAHI</b>: trend nahi</span><span>Peeli patti = entry zone · Purple line = EMA20 · Aakhri candle live chalti hai</span></div>
+    <div class="legend" style="margin-bottom:8px"><span><b class="good">SIGNAL</b>: abhi rules poore</span><span><b style="color:var(--gold-hi)">BAN RAHA</b>: price zone ki taraf aa raha</span><span><b style="color:#4c7bd9">WATCH</b>: trend hai, price door</span><span><b>KUCH NAHI</b>: trend nahi</span><span>Peeli patti = entry zone · Purple line = ${emaName()} · Aakhri candle live chalti hai</span></div>
     <div class="seg">${btn('all','Sab')}${btn('open','🎯 Open trades '+openSet.size)}${btn('signal','Signal '+n('signal'))}${btn('forming','Ban raha '+n('forming'))}${btn('watch','Watch '+n('watch'))}${btn('none','Kuch nahi '+n('none'))}</div></div>
   ${openSet.size || cfilter === 'open' ? openList() : ''}
   <div class="cgrid">${charts.map(c => chartCard(c)).join('') || '<p class="empty">Is group mein abhi koi chart nahi.</p>'}</div>`;
@@ -627,6 +629,28 @@ function experimentsCard(X){
     <div class="xt">${X.table.map(v => `<div class="xr ${v.id === X.adopted ? 'win' : ''}"><div class="xn">${esc(v.name)}${v.id === X.active_id ? ' <span class="pill info">LAAGU THA</span>' : ''}${v.id === X.adopted ? ' <span class="pill good">APNAYA</span>' : ''}</div>
       <div class="xc"><span class="lbl">Sab data</span>${cell(v.all)}</div><div class="xc"><span class="lbl">Naya data</span>${cell(v.new)}</div></div>`).join('')}</div></div>`;
 }
+function emaCard(compact){
+  const M = S.mode || {}; if (M.strategy !== 'ema_break') return '';
+  const B = M.backtest, G = M.gate || {}, e = M.ema || {};
+  const row = (label, c) => c && c.n ? `<div class="rc"><span>${label}</span><b class="${c.total_r >= 0 ? 'good' : 'bad'}">${c.n} trades · win ${c.win_pct}% · PF ${c.pf ?? '-'} · ${c.total_r >= 0 ? '+' : ''}${c.total_r}R · max DD ${c.max_dd_r}R</b></div>` : `<div class="rc"><span>${label}</span><b class="muted">koi trade nahi</b></div>`;
+  const gate = !B ? `<div class="status open"><span class="dot"></span><span>⏳ Backtest chal raha hai (2 saal ka M5 data download ho raha hai, 5–15 min)<small>Tab tak bot sirf dekhega, trade nahi lega.</small></span></div>`
+    : G.passed ? `<div class="status ok"><span class="dot"></span><span>✅ Gate PASS: demo pe trading chalu<small>Unseen data pe PF ${B.unseen.pf} aur ${B.unseen.n} trades.</small></span></div>`
+    : `<div class="status lock"><span class="dot"></span><span>🔒 Gate band: bot sirf dekh raha hai, trade nahi lega<small>Wajah: ${esc(G.reason || '')}. Shart: unseen pe ${B.need_trades}+ trades aur PF ${B.need_pf}+.</small></span></div>`;
+  if (compact) return `<div class="card" id="c-ema"><div class="row"><h2>🥇 EMA 9/15 · ${esc(pair((B && B.pairs || ['XAU_USD'])[0]))} · ${esc(M.timeframe)}</h2><span class="small muted">Aaj ${M.trades_today ?? 0}/${e.max_trades_per_day} trades</span></div>${gate}
+    ${(M.pending || []).map(o => `<div class="small" style="margin-top:6px">⏳ Stop order: ${o.side > 0 ? 'BUY' : 'SELL'} ${esc(pair(o.instrument))} jab price ${px(o.entry)} tode · SL ${px(o.stop)} · TP ${px(o.tp)} · ${nyT(o.expire)} NY tak</div>`).join('')}</div>`;
+  return `<div class="card" id="c-ema"><h2>🥇 Strategy: EMA 9/15 breakout</h2>
+    <ul class="plain small" style="margin-bottom:8px">
+      <li><b>${esc(M.timeframe)}</b> chart · sirf ${esc(((B && B.pairs) || ['XAU_USD']).map(pair).join(', '))}</li>
+      <li>EMA${e.ema_fast} &gt; EMA${e.ema_slow} = sirf BUY, neeche = sirf SELL</li>
+      <li>Alert candle: BUY ke liye green candle jiska low dono EMA ke upar (touch nahi). SELL ulta.</li>
+      <li>Entry: agli candle alert ka high tode (SELL: low). Na tode to setup cancel.</li>
+      <li>SL: alert candle ka low (SELL: high) · TP: ${e.reward_risk}R · SL ${e.min_stop_atr}–${e.max_stop_atr}×ATR ke beech na ho to skip</li>
+      <li>Sirf ${(e.window_ny || []).map(w => w.join('–')).join(', ')} NY · din mein max ${e.max_trades_per_day} trades · 0.5% risk · open trades ka risk bhi daily limit mein gina jaata hai</li>
+    </ul>
+    ${gate}
+    ${B ? `<div style="margin-top:8px">${row('🔧 Tuning (purana 70%)', B.tuning)}${row('🧪 Unseen (naya 30%)', B.unseen)}${row('📊 Sab', B.all)}</div>
+      <p class="small muted" style="margin:8px 0 0">${nyDT(B.from)} se ${nyDT(B.to)} tak ka asli OANDA ${esc(B.timeframe)} data, spread kaat ke. 1:3 pe ~25% jeet = barabar; spread ke baad thoda zyada chahiye. Har din 5 PM NY pe naye data ke saath dobara test hota hai. Bana: ${nyDT(B.made)} NY.</p>` : ''}</div>`;
+}
 function viewLearn(){
   const L = S.learning || {}, st = L.stats_30d || {}, ccy = (S.status || {}).currency || '';
   const params = Object.entries(L.params || {}), nr = S.next_review;
@@ -660,8 +684,7 @@ function viewLearn(){
 
   <div class="card" id="c-rules"><h2>🚫 Laagu rules (bot ne khud banaye)</h2>${(L.filters || []).length ? `<ul class="plain">${L.filters.map(f => `<li>Bachna hai: ${esc(f.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi. Upar "Kaunse rule ban sakte hain" mein dekho kaun sa kitna kareeb hai.</p>'}</div>
 
-  ${reportCard(L.report_card, st)}
-  ${experimentsCard(L.experiments)}
+  ${(S.mode || {}).strategy === 'ema_break' ? emaCard(false) : reportCard(L.report_card, st) + experimentsCard(L.experiments)}
   <div class="daybar">
     <div><span class="lbl">Setups follow (30 din)</span><b>${st.setups_followed ?? 0}</b></div>
     <div><span class="lbl">Bot trades</span><b>${st.bot_trades ?? 0}</b></div>

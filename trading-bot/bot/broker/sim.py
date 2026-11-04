@@ -47,6 +47,25 @@ class SimBroker(Broker):
         self.orders.append(t)
         return t
 
+    def stop_order(self, instrument, units, price, stop, take_profit, expire_ts):
+        oid = "o" + str(next(self._ids))
+        self.pending = getattr(self, "pending", {})
+        self.pending[oid] = {"instrument": instrument, "units": units, "price": price, "stop": stop,
+                             "tp": take_profit, "expire": expire_ts, "state": "PENDING", "trade_id": None}
+        return oid
+
+    def cancel_order(self, order_id):
+        o = getattr(self, "pending", {}).get(order_id)
+        if o and o["state"] == "PENDING":
+            o["state"] = "CANCELLED"
+
+    def order_status(self, order_id):
+        o = getattr(self, "pending", {}).get(order_id)
+        return {"state": o["state"], "trade_id": o["trade_id"], "price": o["price"]} if o else {"state": "CANCELLED"}
+
+    def candles_range(self, instrument, granularity, start_ts, end_ts=None):
+        return [c for c in self.data.get((instrument, granularity), []) if c.time >= start_ts]
+
     def modify_stop(self, trade_id, price, instrument=None):
         self.trades[trade_id].stop = price
 
@@ -72,6 +91,13 @@ class SimBroker(Broker):
     def move(self, instrument, mid):
         """Move price; fill stops / targets that were crossed (stop checked first)."""
         self.mid[instrument] = mid
+        for oid, o in getattr(self, "pending", {}).items():          # pending stop entries
+            if o["state"] == "PENDING" and o["instrument"] == instrument and (mid - o["price"]) * o["units"] >= 0:
+                t = Trade(id=str(next(self._ids)), instrument=instrument, units=o["units"], entry=o["price"],
+                          stop=o["stop"], take_profit=o["tp"])
+                self.trades[t.id] = t
+                self.orders.append(t)
+                o.update(state="FILLED", trade_id=t.id)
         for t in [t for t in self.trades.values() if t.instrument == instrument]:
             if t.stop is not None and (mid - t.stop) * t.side <= 0:
                 self.close_trade(t.id, at=t.stop)

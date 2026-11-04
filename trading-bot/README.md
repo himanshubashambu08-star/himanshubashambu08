@@ -144,3 +144,19 @@ To use your own entry rules, edit `evaluate()` in `bot/strategy.py`. It must ret
 ```bash
 python -m unittest discover -s tests -t .
 ```
+
+## Strategy mode: EMA 9/15 breakout (`engine.strategy = "ema_break"`)
+
+Simple rules on one chart (default XAU_USD, M5):
+
+- EMA9 > EMA15 = only BUY, EMA9 < EMA15 = only SELL
+- Alert candle: BUY = green candle whose low is above both EMAs (SELL mirrored)
+- Entry: a STOP order at the alert high (SELL: low), valid only for the next candle; not broken = cancelled
+- Stop: alert low (SELL: high). Target: 3R. Skip if the stop is < 0.5 or > 2 ATR(14)
+- Only 08:00-12:00 New York, max 2 trades a day, 0.5% risk; the daily loss limit also counts the risk of open trades
+- No breakeven or trailing in this mode
+
+**Gate:** the bot downloads ~2 years of real M5 candles, backtests the exact live rules with the current spread,
+and splits the result 70% (tuning) / 30% (unseen). It places demo trades only when the unseen part has
+100+ trades and a profit factor of 1.2+. Retested every day at 17:00 New York. Run it by hand with
+`python run.py backtest --port 0`.

@@ -60,6 +60,19 @@ def main(argv=None):
         sys.exit("Live trading uses real money. Run on 'practice' for weeks first. "
                  "If you are sure, add --i-understand-real-money.")
 
+    if a.mode == "backtest" and eng_cfg.get("strategy") == "ema_break":
+        broker = make_broker(a.env)
+        eng = Engine(broker, cfg, news_fetcher=lambda: [])
+        r = eng.ema_backtest("cli")
+        if not r:
+            sys.exit("No history downloaded.")
+        for k, label in (("tuning", "Tuning (purana 70%)"), ("unseen", "Unseen (naya 30%)"), ("all", "Sab")):
+            c = r[k]
+            print(f"{label:22} trades {c['n']:4}  win {c['win_pct']:5}%  PF {c['pf']}  total {c['total_r']:+.1f}R  "
+                  f"max DD {c['max_dd_r']}R")
+        print("GATE:", "PASS - demo trading allowed" if r["passed"] else "FAIL - " + r["reason"])
+        return
+
     if a.mode == "backtest":
         broker = make_broker(a.env)
         names = a.instruments.split(",") if a.instruments else eng_cfg["instruments"]
