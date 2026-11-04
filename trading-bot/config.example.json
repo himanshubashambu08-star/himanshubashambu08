@@ -1,19 +1,18 @@
 {
   "engine": {
     "instruments": [
-      "XAU_USD"
+      "ALL:CURRENCY",
+      "ALL:METAL",
+      "NAS100_USD",
+      "SPX500_USD",
+      "US30_USD"
     ],
     "instrument_types": [
       "CURRENCY"
     ],
     "entry_timeframe": "M5",
     "trend_timeframe": "H4",
-    "entry_sessions_ny": [
-      [
-        "08:00",
-        "12:00"
-      ]
-    ],
+    "entry_sessions_ny": [],
     "board_refresh_seconds": 60,
     "breakeven_at_r": 1.0,
     "trail_start_r": 1.5,
@@ -24,7 +23,18 @@
     "strategy": "ema_break",
     "gate_min_unseen_trades": 100,
     "gate_min_pf": 1.2,
-    "backtest_days": 730
+    "backtest_days": 730,
+    "base_instrument": "XAU_USD",
+    "base_window_ny": [
+      [
+        "08:00",
+        "12:00"
+      ]
+    ],
+    "research_days": 365,
+    "cell_min_unseen_trades": 30,
+    "cell_min_unseen_pf": 1.2,
+    "cell_min_tuning_pf": 1.1
   },
   "strategy": {
     "ema_fast": 9,

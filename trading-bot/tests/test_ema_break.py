@@ -120,7 +120,7 @@ class EngineEma(unittest.TestCase):
             e.tick()
             self.assertEqual(getattr(b, "pending", {}), {})
             j = e.snapshot()["journeys"][0]
-            self.assertIn("Backtest gate", [s for s in j["steps"] if s["verdict"] == "block"][0]["text"])
+            self.assertIn("Shadow", [s for s in j["steps"] if s["verdict"] == "block"][0]["text"])
 
     def test_stop_order_fills_and_trade_is_tracked(self):
         with tempfile.TemporaryDirectory() as d:
@@ -189,6 +189,61 @@ class EngineEma(unittest.TestCase):
             self.assertIn("unseen mein sirf", r["reason"])
             self.assertFalse(e.gate())
             self.assertEqual(e.snapshot()["mode"]["strategy"], "ema_break")
+
+
+class Shadow(unittest.TestCase):
+    def test_shadow_setup_is_followed_with_breakout_rules(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, clock = make(d, gate=False)
+            e.tick()                                                      # shadow: recorded, no order
+            self.assertEqual(getattr(b, "pending", {}), {})
+            rows = e.learner._rows("1=1")
+            self.assertEqual((len(rows), rows[0]["taken"], rows[0]["skip_reason"]), (1, 0, "shadow"))
+            c = b.data[("XAU_USD", "M5")]
+            a = c[-1]
+            brk = Candle(a.time + 300, a.c, a.h + 0.5, a.c - 0.1, a.h + 0.3)
+            up = [Candle(brk.time + 300 * (k + 1), a.h + k, a.h + k + 20, a.h + k, a.h + k + 1) for k in range(3)]
+            b.data[("XAU_USD", "M5")] = c + [brk] + up
+            clock[0] = up[-1].time + 300 + 20
+            e.tick()
+            row = e.learner._rows("1=1")[0]
+            self.assertEqual(row["status"], "done")
+            self.assertAlmostEqual(row["r"], 3.0)
+            snap = e.learner.snapshot()
+            self.assertEqual(snap["shadow_30d"]["n"], 1)
+            self.assertEqual(snap["real_30d"]["n"], 0)
+
+    def test_unbroken_shadow_is_cancelled(self):
+        from bot.ema_break import follow
+        bar = Candle(0, 10, 10.5, 9.5, 10)
+        self.assertEqual(follow(1, 11, 9, 3, [bar]), ("cancel", 1))
+        self.assertIsNone(follow(1, 11, 9, 3, []))
+
+    def test_research_adds_only_cells_good_on_both_halves(self):
+        with tempfile.TemporaryDirectory() as d:
+            b, e, _ = make(d, gate=False)
+            e.cfg.update(cell_min_unseen_trades=1, cell_min_unseen_pf=1.2, cell_min_tuning_pf=1.1)
+            import bot.ema_break as eb
+            real = eb.backtest
+            t0 = T0 - 100 * 86400
+            fake = [{"time": t0 + k * 86400, "hour": 9 if k % 2 else 3, "r": (3.0 if k % 2 else -1.0), "day": "x", "side": 1}
+                    for k in range(100)]
+            eb.backtest = lambda *a, **kw: fake
+            try:
+                long = uptrend(600, t0=t0)
+                b.data[("XAU_USD", "M5")] = long + [Candle(T0 + 300 * k, 1, 1, 1, 1) for k in range(1)]
+                b.data[("XAU_USD", "M5")][-1] = Candle(t0 + 100 * 86400, 1, 1, 1, 1)
+                r = e.ema_research("t")
+            finally:
+                eb.backtest = real
+            hours = {(c["instrument"], c["hour"]) for c in e.learner.get("trade_list")}
+            self.assertIn(("XAU_USD", 9), hours)                       # always +3R
+            self.assertNotIn(("XAU_USD", 3), hours)                    # always -1R
+            self.assertGreater(r["cells_tested"], 0)
+            nine = datetime(2026, 11, 3, 14, 30, tzinfo=timezone.utc).timestamp()     # 09:30 NY
+            self.assertTrue(e.trade_allowed("XAU_USD", nine))
+            three = datetime(2026, 11, 3, 8, 30, tzinfo=timezone.utc).timestamp()     # 03:30 NY
+            self.assertFalse(e.trade_allowed("XAU_USD", three))
 
 
 if __name__ == "__main__":

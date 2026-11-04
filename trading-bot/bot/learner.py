@@ -282,6 +282,31 @@ class Learner:
         return {**_card_r(rs), "wins": sum(1 for x in rs if x > 0.05), "losses": sum(1 for x in rs if x < -0.05),
                 "be": sum(1 for x in rs if abs(x) <= 0.05), "pl": round(sum(pls), 2)}
 
+    def resolve_ema(self, instrument, candles, gran_seconds, reward_risk=3.0):
+        """Shadow follow with the breakout rules: next candle must break the level, then SL / TP."""
+        from .ema_break import follow
+        done = 0
+        self.last_resolved = []
+        closed = [c for c in candles if c.complete]
+        for row in self._rows("instrument=? AND status='open' AND taken=0", (instrument,)):
+            after = [c for c in closed if c.time >= row["time"] + gran_seconds]
+            if not after:
+                if closed and closed[0].time > row["time"] + gran_seconds:
+                    self._update(row["id"], status="expired")
+                continue
+            side, trig = row["side"], row["entry"]
+            res = follow(side, trig, trig - side * row["stop_dist"], reward_risk, after)
+            if res is None:
+                continue
+            r, bars = res
+            if r == "cancel":
+                self._update(row["id"], status="cancelled")
+                continue
+            self._update(row["id"], status="done", r=r, bars_held=bars, max_r=max(r, 0), mistakes="[]")
+            self.last_resolved.append({**row, "r": r, "bars_held": bars, "max_r": max(r, 0), "mistakes": []})
+            done += 1
+        return done
+
     def set_real_result(self, trade_id, real_r):
         with self.lock:
             self.db.execute("UPDATE signals SET real_r=? WHERE trade_id=?", (real_r, str(trade_id)))
@@ -524,6 +549,13 @@ class Learner:
                 "off_session": _card(outside),
             },
             "report_card": self.get("report_card"),
+            "shadow_30d": _card([r for r in rows if not r["taken"]]),
+            "shadow_by_pair": sorted([{"pair": k, **_card([r for r in rows if not r["taken"] and r["instrument"] == k])}
+                                      for k in {r["instrument"] for r in rows if not r["taken"]}],
+                                     key=lambda x: -x["total_r"])[:15],
+            "real_30d": self.closed_summary(self.clock() - 30 * 86400),
+            "research": self.get("research"),
+            "trade_list": self.get("trade_list", []),
             "experiments": self.get("experiments"),
             "universe": self.get("universe", "all"),
             "rules_version": self.rules_version(),

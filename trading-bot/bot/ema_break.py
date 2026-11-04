@@ -129,6 +129,30 @@ def read_chart(instrument, candles, params=None, bars=80):
     return out
 
 
+ALL_DAY = [["00:00", "24:00"]]
+
+
+def follow(side, trig, stop, rr, bars):
+    """Shadow follow of one setup: bars[0] is the candle after the alert.
+    Returns (r, bars_used) / ("cancel", 1) if the level was not broken / None if not finished yet."""
+    if not bars:
+        return None
+    nxt = bars[0]
+    if not (nxt.h >= trig if side > 0 else nxt.l <= trig):
+        return "cancel", 1
+    entry = max(nxt.o, trig) if side > 0 else min(nxt.o, trig)
+    dist = abs(entry - stop)
+    if dist <= 0:
+        return "cancel", 1
+    tp = entry + side * rr * dist
+    for k, bar in enumerate(bars):
+        if (bar.l <= stop) if side > 0 else (bar.h >= stop):
+            return (stop - entry) * side / dist, k + 1
+        if (bar.h >= tp) if side > 0 else (bar.l <= tp):
+            return rr, k + 1
+    return None
+
+
 def backtest(candles, params=None, spread=0.0, windows=None):
     """Walk the history with the live rules. Trades: [{time, r, side, day}]. Spread is paid in R.
     Conservative: if stop and target are inside the same candle, the stop counts."""
@@ -176,6 +200,7 @@ def backtest(candles, params=None, spread=0.0, windows=None):
             j += 1
         if r is None:
             break
-        trades.append({"time": nxt.time, "day": day, "side": side, "r": r - spread / dist})
+        trades.append({"time": nxt.time, "day": day, "side": side, "r": r - spread / dist,
+                       "hour": datetime.fromtimestamp(nxt.time, timezone.utc).astimezone(NY).hour})
         i = j + 1
     return trades

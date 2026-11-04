@@ -48,6 +48,14 @@ DEFAULTS = {
     "gate_min_unseen_trades": 100,   # ema_break trades on demo only after the backtest passes on unseen data
     "gate_min_pf": 1.2,
     "backtest_days": 730,
+    # shadow mode: scan everything, place demo orders only on the trading list
+    "base_instrument": "XAU_USD",            # first trading-list entry (needs the main backtest gate)
+    "base_window_ny": [["08:00", "12:00"]],
+    "research_days": 365,                    # per instrument x hour backtest, all instruments
+    "cell_min_unseen_trades": 30,            # an instrument+hour joins the list only with this many unseen trades
+    "cell_min_unseen_pf": 1.2,
+    "cell_min_tuning_pf": 1.1,               # ...and it must also be good on the older data (no luck picks)
+    "auto_add_cells": True,
 }
 
 
@@ -68,6 +76,13 @@ LIQUID = {"EUR_USD", "GBP_USD", "USD_JPY", "USD_CHF", "USD_CAD", "AUD_USD", "NZD
           "GBP_JPY", "EUR_CHF", "EUR_AUD", "EUR_CAD", "AUD_JPY", "CAD_JPY", "CHF_JPY", "GBP_CHF", "GBP_AUD",
           "AUD_CAD", "AUD_NZD", "NZD_JPY", "GBP_CAD", "EUR_NZD", "GBP_NZD", "AUD_CHF", "CAD_CHF", "NZD_CAD",
           "NZD_CHF", "XAU_USD", "XAG_USD", "NAS100_USD", "SPX500_USD", "US30_USD"}
+
+
+def pf_of(card):
+    """Profit factor for comparisons: no losing trade at all counts as infinite, no trades as 0."""
+    if not card or not card.get("n"):
+        return 0.0
+    return float("inf") if card.get("pf") is None and card.get("total_r", 0) > 0 else (card.get("pf") or 0.0)
 
 
 def pf(v):
@@ -103,6 +118,9 @@ def hinglish_reason(reason):
         return f"{r[21:].replace('_', '/')} pehle se open hai, aur yeh pair uske saath hi chalta hai (double risk se bachne ke liye)"
     if r.startswith("too much ") and r.endswith(" exposure"):
         return f"{r[9:-9]} mein pehle se kaafi trades hain (ek currency pe zyada risk nahi)"
+    if r == "shadow":
+        return ("Shadow: yeh pair/ghanta abhi trading list mein nahi. Sirf record ho raha hai, "
+                "Time Machine chart pe dekhega ki SL lagta ya TP")
     if r == "backtest gate":
         return ("Backtest gate: nayi strategy ka backtest abhi unseen data pe pass nahi hua "
                 "(PF 1.2+ aur 100+ trades chahiye), isliye demo pe bhi trade nahi")
@@ -173,7 +191,17 @@ class Engine:
 
     def ema_params(self):
         return {**ema_break.DEFAULTS, **self.base_params,
-                "window_ny": self.cfg["entry_sessions_ny"] or ema_break.DEFAULTS["window_ny"]}
+                "window_ny": self.cfg["base_window_ny"] or ema_break.DEFAULTS["window_ny"]}
+
+    def trade_allowed(self, inst_name, now):
+        """Real demo order only for the trading list; everything else is shadow (recorded, followed, not traded)."""
+        if inst_name == self.cfg["base_instrument"] and self.gate() and ema_break.in_window(now, self.cfg["base_window_ny"]):
+            return True
+        if not self.cfg["auto_add_cells"]:
+            return False
+        hour = datetime.fromtimestamp(now, timezone.utc).astimezone(NY).hour
+        return any(c["instrument"] == inst_name and c["hour"] == hour for c in self.learner.get("trade_list", [])) \
+            and ema_break.in_window(now, ema_break.ALL_DAY)
 
     def reward_risk(self):
         if self.ema:
@@ -300,7 +328,8 @@ class Engine:
             else:
                 run()
         self.brain.maybe_brief(now, self._brief_done)
-        need = (self.learner.get("ema_backtest") or {}).get("rules") != self.ema_params() if self.ema \
+        need = ((self.learner.get("ema_backtest") or {}).get("rules") != self.ema_params()
+                or not self.learner.get("research")) if self.ema \
             else not self.learner.get("experiments")
         if self.cfg["learn"] and not getattr(self, "_validated_once", False) and need:
             self._validated_once = True
@@ -351,6 +380,9 @@ class Engine:
                 if look_for_trades:
                     if self.cfg["learn"] and not self.ema:
                         self.learner.resolve(inst.name, ltf, tf_s, self.reward_risk(), self.cfg["breakeven_at_r"])
+                        self.report_resolved()
+                    elif self.cfg["learn"]:
+                        self.learner.resolve_ema(inst.name, ltf, tf_s, self.reward_risk())
                         self.report_resolved()
                     sig = (ema_break.evaluate(inst.name, ltf, self.ema_params()) if self.ema
                            else strategy.evaluate(inst.name, htf, ltf, params))
@@ -477,8 +509,8 @@ class Engine:
                     and not self.ema:
                 blocked_now = "liquid only"
             if not blocked_now and self.ema:
-                if not self.gate():
-                    blocked_now = "backtest gate"
+                if not self.trade_allowed(inst.name, self.clock()):
+                    blocked_now = "shadow"
                 elif self.trades_today() >= self.ema_params()["max_trades_per_day"]:
                     blocked_now = "max trades today"
             ev = None if blocked_now else self.news.blocking(inst.name, self.clock())
@@ -895,7 +927,7 @@ class Engine:
         from .learner import _card_r
         A, ep = self.agents, self.ema_params()
         tf = self.cfg["entry_timeframe"]
-        names = [i.name for i in self.universe()]
+        names = [self.cfg["base_instrument"]]
         A.did("learner", f"Backtest shuru: {', '.join(map(pair, names))} ke ~{self.cfg['backtest_days']} din ke asli "
                          f"{tf} candles download ho rahe hain (spread ke saath)…")
         start = self.clock() - self.cfg["backtest_days"] * 86400
@@ -926,7 +958,7 @@ class Engine:
                "all": _card_r([t["r"] for t in trades]), "tuning": _card_r(old), "unseen": _card_r(new),
                "need_trades": self.cfg["gate_min_unseen_trades"], "need_pf": self.cfg["gate_min_pf"]}
         u = res["unseen"]
-        res["passed"] = u["n"] >= self.cfg["gate_min_unseen_trades"] and (u["pf"] or 0) >= self.cfg["gate_min_pf"]
+        res["passed"] = u["n"] >= self.cfg["gate_min_unseen_trades"] and pf_of(u) >= self.cfg["gate_min_pf"]
         res["reason"] = ("pass" if res["passed"] else
                          f"unseen mein sirf {u['n']} trades (chahiye {self.cfg['gate_min_unseen_trades']}+)"
                          if u["n"] < self.cfg["gate_min_unseen_trades"] else
@@ -941,17 +973,90 @@ class Engine:
               tone="good" if res["passed"] else "bad")
         return res
 
+    def ema_research(self, day):
+        """Backtest the breakout rules on every instrument, all hours, spread included, split 70/30 per
+        instrument. Instrument+hour cells good on BOTH halves join the trading list."""
+        from .learner import _card_r
+        A, ep = self.agents, {**self.ema_params(), "max_trades_per_day": 99}
+        tf = self.cfg["entry_timeframe"]
+        names = [i.name for i in self.universe()]
+        A.did("learner", f"Research shuru: {len(names)} instruments, har ghanta, ~{self.cfg['research_days']} din ka "
+                         f"{tf} data (spread ke saath). Ismein 10-30 minute lagte hain…")
+        try:
+            spreads = {k: p.spread for k, p in self.broker.prices(names).items()}
+        except Exception as e:
+            log.error("spreads for research: %s", e)
+            spreads = {}
+        start = self.clock() - self.cfg["research_days"] * 86400
+        rows, cells = [], []
+        for n in names:
+            try:
+                candles = self.broker.candles_range(n, tf, start)
+            except Exception as e:
+                log.error("research %s: %s", n, e)
+                continue
+            if len(candles) < 500:
+                continue
+            ts = ema_break.backtest(candles, ep, spreads.get(n, 0.0), windows=ema_break.ALL_DAY)
+            split = candles[0].time + 0.7 * (candles[-1].time - candles[0].time)
+            del candles
+            old = [t for t in ts if t["time"] < split]
+            new = [t for t in ts if t["time"] >= split]
+            row = {"pair": n, "spread": spreads.get(n), "all": _card_r([t["r"] for t in ts]),
+                   "tuning": _card_r([t["r"] for t in old]), "unseen": _card_r([t["r"] for t in new]), "hours": []}
+            for h in range(24):
+                ho = [t["r"] for t in old if t["hour"] == h]
+                hn = [t["r"] for t in new if t["hour"] == h]
+                if len(hn) < 5:
+                    continue
+                cell = {"instrument": n, "hour": h, "tuning": _card_r(ho), "unseen": _card_r(hn)}
+                row["hours"].append(cell)
+                if (len(hn) >= self.cfg["cell_min_unseen_trades"]
+                        and pf_of(cell["unseen"]) >= self.cfg["cell_min_unseen_pf"]
+                        and pf_of(cell["tuning"]) >= self.cfg["cell_min_tuning_pf"]):
+                    cells.append(cell)
+            rows.append(row)
+        rows.sort(key=lambda r: -r["unseen"]["total_r"])
+        tested = sum(len(r["hours"]) for r in rows)
+        res = {"made": self.clock(), "day": day, "days": self.cfg["research_days"], "timeframe": tf,
+               "instruments": rows, "cells_tested": tested, "passed": cells,
+               "rules": {"min_unseen_trades": self.cfg["cell_min_unseen_trades"],
+                         "min_unseen_pf": self.cfg["cell_min_unseen_pf"], "min_tuning_pf": self.cfg["cell_min_tuning_pf"]}}
+        self.learner.put("research", res)
+        old_list = {(c["instrument"], c["hour"]) for c in self.learner.get("trade_list", [])}
+        new_list = [{"instrument": c["instrument"], "hour": c["hour"], "unseen_pf": c["unseen"]["pf"],
+                     "unseen_n": c["unseen"]["n"]} for c in cells]
+        self.learner.put("trade_list", new_list)
+        added = [c for c in new_list if (c["instrument"], c["hour"]) not in old_list]
+        removed = old_list - {(c["instrument"], c["hour"]) for c in new_list}
+        if added or removed:
+            self.learner.bump_rules(f"trading list: +{len(added)} / -{len(removed)}")
+        self.learner.lesson(day, "research", f"Research: {len(rows)} instruments, {tested} pair+ghanta test kiye. "
+                            f"{len(cells)} pass hue (unseen PF {self.cfg['cell_min_unseen_pf']}+, "
+                            f"{self.cfg['cell_min_unseen_trades']}+ trades, purane data pe bhi PF "
+                            f"{self.cfg['cell_min_tuning_pf']}+)."
+                            + (" Naye: " + ", ".join(f"{pair(c['instrument'])} {c['hour']}:00" for c in added[:8]) if added else ""))
+        A.did("learner", f"Research poori: {len(cells)} pair+ghanta trading list mein"
+              + (f" (naye {len(added)})" if added else ""), tone="good" if cells else "info")
+        return res
+
     def validate_setup(self, day):
         """Report card + experiments: today's rules and 5 alternatives on real broker history, spread included."""
         A = self.agents
         n = self.learner.p["validate_bars"]
         if self.ema:
+            out = None
             try:
-                return self.ema_backtest(day)
+                out = self.ema_backtest(day)
             except Exception as e:
                 log.exception("ema backtest failed: %s", e)
                 A.did("learner", f"Backtest fail: {e}", tone="bad")
-                return None
+            try:
+                self.ema_research(day)
+            except Exception as e:
+                log.exception("research failed: %s", e)
+                A.did("learner", f"Research fail: {e}", tone="bad")
+            return out
 
         def history(name):
             return (self.broker.candles(name, self.cfg["trend_timeframe"], n),
