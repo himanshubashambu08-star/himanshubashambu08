@@ -92,7 +92,7 @@
       has: k => !!s.flags[k],
       ledger(tag, who, amount, weight = 1) { s.ledger.push({ c: s.chapter, t: s.turn, clock: s.clock, tag, who: who || null, amount: amount || 0, weight }); },
       lie(who) { s.stats.lies++; g.ledger('lied_to', who, 0, 2); },
-      memory(caption) { s.memories.push({ ch: s.chapter, when: P.timeLabel(s), caption }); },
+      memory(caption) { s.memories.push({ ch: s.chapter, when: P.timeLabel(s), caption, art: P.artFor ? P.artFor(s, s.scene) : null }); },
       queue(id) { s.queue.unshift(id); },
       queueLast(id) { s.queue.push(id); },
       rand: () => P.rand(s),

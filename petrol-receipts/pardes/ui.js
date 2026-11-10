@@ -5,6 +5,7 @@
   let s = null;
   let plan = { day: null, eve: null, send: 0 };
   let phoneTab = null;
+  let prev = {}; // last values shown in the HUD, so changes can animate
 
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const val = (x, st) => (typeof x === 'function' ? x(st) : x);
@@ -30,13 +31,19 @@
     else if (s.phase === 'chapterEnd') body = renderChapterEnd();
     app.innerHTML = hud() + `<main class="stage ch${s.chapter}">${body}</main>` + (phoneTab ? phone() : '');
     bind();
+    animateMeters();
+  }
+  function animateMeters() {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      app.querySelectorAll('.m-fill[data-to]').forEach(el => { el.style.width = el.dataset.to + '%'; });
+    }));
   }
 
   function renderTitle() {
     const saved = P.load();
     app.innerHTML = `
       <main class="title-screen">
-        <div class="title-mark" aria-hidden="true"><span></span></div>
+        <div class="title-art">${P.drawArt('village')}</div>
         <h1>Pardes</h1>
         <p class="title-sub">From Zero</p>
         <p class="tagline">Leave home. Start over. Live with it.</p>
@@ -67,7 +74,11 @@
 
   function hud() {
     const ch = P.CHAPTERS[s.chapter];
-    const bar = (label, v, cls) => `<div class="meter ${cls} ${v <= 25 ? 'low' : ''}"><span class="m-label">${label}</span><span class="m-track"><span class="m-fill" style="width:${v}%"></span></span></div>`;
+    // Bars start at last screen's value and slide to the new one (see animateMeters).
+    const bar = (label, v, cls) => { const from = prev[cls] ?? v; prev[cls] = v; return `<div class="meter ${cls} ${v <= 25 ? 'low' : ''}"><span class="m-label">${label}</span><span class="m-track"><span class="m-fill" style="width:${from}%" data-to="${v}"></span></span></div>`; };
+    const dm = prev.money == null ? 0 : Math.round(s.money - prev.money);
+    prev.money = s.money;
+    const delta = dm ? `<span class="delta ${dm < 0 ? 'down' : 'up'}" aria-hidden="true">${dm > 0 ? '+' : ''}${P.fmt(s, dm)}</span>` : '';
     return `
       <header class="hud">
         <div class="hud-top">
@@ -77,7 +88,7 @@
           </button>
         </div>
         <div class="meters">
-          <div class="money ${s.money < 0 ? 'neg' : ''}"><span class="m-label">Money</span><span class="m-num" data-testid="money">${P.fmt(s, s.money)}</span></div>
+          <div class="money ${s.money < 0 ? 'neg' : ''}"><span class="m-label">Money</span><span class="m-num" data-testid="money">${P.fmt(s, s.money)}</span>${delta}</div>
           ${bar('Energy', s.energy, 'energy')}
           ${bar('Mood', s.mood, 'mood')}
           ${s.job || (s.biz && s.biz.open) ? bar(s.biz && s.biz.open ? 'Business' : 'Work', s.biz && s.biz.open ? s.biz.health : s.career, 'career') : ''}
@@ -99,6 +110,7 @@
     const word = P.periodWord(s);
     return `
       <section class="card plan">
+        <div class="illus">${P.drawArt(P.homeArt(s))}</div>
         <p class="eyebrow">${esc(s.home)}</p>
         <h2>How will you spend this ${word}?</h2>
         <h3>Days</h3><div class="opts">${list('day', days, plan.day)}</div>
@@ -115,10 +127,11 @@
     const choices = P.visibleChoices(s, sc);
     return `
       <section class="card scene" data-scene="${esc(s.scene)}">
+        <div class="illus">${P.drawArt(P.artFor(s, s.scene))}</div>
         ${sc.title ? `<h2>${esc(sc.title(s))}</h2>` : ''}
         <div class="prose">${rich(sc.text(s))}</div>
         <div class="choices">
-          ${choices.map((c, i) => `<button class="choice" data-act="choose" data-i="${i}" data-testid="choice">${esc(val(c.label, s))}</button>`).join('')}
+          ${choices.map((c, i) => `<button class="choice" style="--i:${i}" data-act="choose" data-i="${i}" data-testid="choice">${esc(val(c.label, s))}</button>`).join('')}
         </div>
       </section>`;
   }
@@ -139,6 +152,7 @@
     const close = Object.entries(s.people).filter(([, p]) => p.met && !p.gone).sort((a, b) => b[1].bond - a[1].bond).slice(0, 3).map(([id]) => P.PEOPLE[id].name);
     return `
       <section class="card chapter-end">
+        <div class="illus tall">${P.drawArt(nx ? P.chapterArt(s.chapter + 1) : 'balcony')}</div>
         <p class="eyebrow">End of ${ch.sub}</p>
         <h2>${esc(ch.title)}</h2>
         <dl class="facts">
@@ -156,6 +170,7 @@
     const state = { close: 'Close', warm: 'Warm', distant: 'Distant', estranged: 'Estranged', lasting: 'A lasting friendship', lost: 'Lost touch', betrayed: 'Betrayed you' };
     app.innerHTML = `
       <main class="ending">
+        <div class="illus hero">${P.drawArt(e.axes.place === 'returned' ? 'village' : 'balcony')}</div>
         <p class="eyebrow">${esc(s.name)} · twenty years</p>
         <h1 class="headline" data-testid="headline">${esc(e.headline)}</h1>
         <section class="summary prose">${e.summary.map(l => `<p>${esc(l)}</p>`).join('')}</section>
@@ -165,7 +180,7 @@
         <ul class="regrets">${e.regrets.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
         <h3>The album</h3>
         <p class="narrator">${e.narrator === 'no one' ? 'There is no one left to read it to you. You turn the pages yourself.' : `Read aloud by ${esc(e.narrator)}.`}</p>
-        <div class="album">${s.memories.map((m, i) => `<figure class="photo ch${m.ch}" style="--tilt:${(i % 5) - 2}deg"><div class="ph"></div><figcaption>${esc(m.caption)}<small>${esc(m.when)}</small></figcaption></figure>`).join('')}</div>
+        <div class="album">${s.memories.map((m, i) => `<figure class="photo ch${m.ch}" style="--tilt:${(i % 5) - 2}deg;--i:${i}"><div class="ph">${P.drawArt(m.art || P.chapterArt(m.ch), true)}</div><figcaption>${esc(m.caption)}<small>${esc(m.when)}</small></figcaption></figure>`).join('')}</div>
         <div class="title-actions">
           <button class="btn primary" data-act="restart" data-testid="restart">Live another life</button>
         </div>
@@ -186,7 +201,7 @@
         return `<li><span class="avatar">${esc(P.PEOPLE[id].name[0])}</span><span>${esc(P.PEOPLE[id].name)}<small>${esc(id === 'farah' && s.partner === 'married' ? 'Your spouse' : P.PEOPLE[id].role)}${p.gone ? ' · out of your life' : ago <= 1 ? ' · recently' : ` · ${ago} ${P.periodWord(s)}${ago === 1 ? '' : 's'} ago`}</small></span></li>`;
       }).join('')}</ul><p class="fine">How they feel about you is never shown. You find out.</p>`;
     } else if (phoneTab === 'album') {
-      inner = s.memories.length ? `<div class="album small">${s.memories.map((m, i) => `<figure class="photo ch${m.ch}" style="--tilt:${(i % 5) - 2}deg"><div class="ph"></div><figcaption>${esc(m.caption)}</figcaption></figure>`).join('')}</div>` : '<p class="empty">No photos yet.</p>';
+      inner = s.memories.length ? `<div class="album small">${s.memories.map((m, i) => `<figure class="photo ch${m.ch}" style="--tilt:${(i % 5) - 2}deg"><div class="ph">${P.drawArt(m.art || P.chapterArt(m.ch), true)}</div><figcaption>${esc(m.caption)}</figcaption></figure>`).join('')}</div>` : '<p class="empty">No photos yet.</p>';
     } else {
       inner = `<ul class="skills">${Object.entries(s.skills).map(([k, v]) => `<li><span>${k[0].toUpperCase() + k.slice(1)}</span><span class="dots">${'●'.repeat(v)}${'○'.repeat(10 - v)}</span></li>`).join('')}</ul>
         ${s.job ? `<p class="fine">Job: ${esc(P.JOBS[s.job].label)}</p>` : ''}${s.biz && s.biz.open ? `<p class="fine">Business: ${esc(s.biz.label)} · ${s.biz.scale} ${P.BIZ[s.biz.type].unit}${s.biz.scale > 1 ? 's' : ''} · your share ${s.biz.share}%</p>` : ''}`;
@@ -214,11 +229,11 @@
     if (act === 'new' || act === 'restart') {
       P.clearSave();
       const seed = seedFromUrl() ?? Math.floor(Math.random() * 2 ** 31);
-      s = { phase: 'create', pronoun: 'they', seed };
+      s = { phase: 'create', pronoun: 'they', seed }; prev = {};
       plan = { day: null, eve: null, send: 0 };
       return render();
     }
-    if (act === 'continue') { s = P.load(); plan = { day: null, eve: null, send: 0 }; return render(); }
+    if (act === 'continue') { s = P.load(); plan = { day: null, eve: null, send: 0 }; prev = {}; return render(); }
     if (act === 'begin') {
       const name = (document.getElementById('name').value || '').trim() || 'Arjun';
       const st = P.newState(name, s.pronoun, s.seed);
