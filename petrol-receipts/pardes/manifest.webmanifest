@@ -1,0 +1,10 @@
+{
+  "name": "Pardes: From Zero",
+  "short_name": "Pardes",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4EEE4",
+  "theme_color": "#F4EEE4",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
