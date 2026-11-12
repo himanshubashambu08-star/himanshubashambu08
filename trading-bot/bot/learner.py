@@ -1,0 +1,708 @@
+"""Self-learning memory.
+
+Every signal the bot sees is stored with the conditions at that moment (hour, RSI, trend strength,
+spread, how stretched price was...). That includes signals it did NOT take (blocked by a rule,
+outside the US session, risk limits). Each one is then followed on the real chart until it would
+have hit the stop or the target, so the bot learns from every chart, not only from its own trades.
+
+Once per trading day (after 17:00 New York) daily_review():
+  1. Labels the mistakes in losing trades (stopped out fast, gave back profit, chased a big candle...).
+  2. Finds conditions that keep losing money (enough samples + statistically below zero) and
+     switches on a filter to avoid them. A filter switches itself off again when the shadow
+     results for that condition turn positive.
+  3. Tunes ONE strategy setting a small step at a time, with a walk-forward test: the new value
+     must beat the current one on older data AND not be worse on the most recent unseen data.
+  4. Writes a plain-language report to reports/YYYY-MM-DD.md.
+It never touches risk per trade, the daily loss limit or the drawdown limit.
+"""
+import json
+import math
+import os
+import sqlite3
+import threading
+import time
+
+from . import backtest
+from .backtest import signals, variant
+
+DEFAULTS = {
+    "min_samples": 20,          # never learn from fewer trades than this
+    "window_days": 90,          # look back this far
+    "margin_r": 0.25,           # a condition must be this much worse than normal to be filtered
+    "tune": True,
+    "tune_bars": 3000,
+    "tune_instruments": 8,
+    "test_fraction": 0.3,       # most recent 30% of history = unseen test data
+    "validate_bars": 5000,      # report card: ~7 months of H1 per pair (OANDA max per request)
+    "reports_dir": "reports",
+}
+
+# conditions the learner may switch on as filters: name -> (test, plain words)
+CONDITIONS = {
+    "weak_trend": (lambda f, s: f.get("trend_strength", 9) < 0.15, "H4 ka trend kamzor tha"),
+    "overextended_rsi": (lambda f, s: (f.get("rsi", 50) > 65) if s > 0 else (f.get("rsi", 50) < 35),
+                         "RSI pehle se trade ki disha mein bahut khinch chuka tha"),
+    "far_from_ema": (lambda f, s: f.get("dist_ema_atr", 0) > 0.8, "entry EMA se door thi (der se entry)"),
+    "big_candle_chase": (lambda f, s: f.get("body_atr", 0) > 1.5, "bahut badi candle ke baad entry (peeche bhaagna)"),
+    "wide_spread": (lambda f, s: f.get("spread_ratio", 0) > 0.08, "spread SL ke mukable bada tha"),
+    "late_session": (lambda f, s: 15 <= f.get("hour_ny", 12) < 17, "New York session ke aakhri ghante mein entry"),
+    "early_session": (lambda f, s: 8 <= f.get("hour_ny", 12) < 9, "New York ke pehle ghante mein entry"),
+    "friday": (lambda f, s: f.get("dow") == 4, "Friday ki entry"),
+}
+
+MISTAKE_WORDS = {
+    "stopped_fast": "2 candle ke andar SL lag gaya: entry jaldi thi, aur confirmation chahiye tha",
+    "gave_back": "+1R ya zyada profit mein tha, phir 0 ya loss pe band hua",
+    **{k: v[1] for k, v in CONDITIONS.items()},
+}
+
+# settings the learner may tune: (min, max, step)
+TUNABLE = {
+    "atr_stop_mult": (1.0, 3.0, 0.25),
+    "ltf_ema_pullback": (10, 50, 5),
+    "rsi_buy_min": (30, 50, 5),
+    "rsi_sell_max": (50, 70, 5),
+    "reward_risk": (1.0, 3.0, 0.5),
+}
+
+
+OFF_SESSION = "outside US session"
+
+
+# Time-of-day rules may only be learned from setups inside the entry window (a night setup says
+# nothing about 3 PM). Every other rule (weak trend, chasing, RSI, spread, pair) learns from ALL
+# setups, in or out of session, because the setup itself is the same.
+TIME_CONDITIONS = {"late_session", "early_session", "friday"}
+
+
+def in_window(row):
+    return (row.get("skip_reason") or "") != OFF_SESSION
+
+
+def learnable(row, name=None):
+    if name is None:
+        return True
+    if name in TIME_CONDITIONS or str(name).startswith("hour:"):
+        return in_window(row)
+    return True
+
+
+def _dyn_conditions(row):
+    return [f"instrument:{row['instrument']}", f"hour:{row['features'].get('hour_ny')}"]
+
+
+def matches(name, row):
+    f, s = row["features"], row["side"]
+    if name in CONDITIONS:
+        return bool(CONDITIONS[name][0](f, s))
+    if name.startswith("instrument:"):
+        return row["instrument"] == name.split(":", 1)[1]
+    if name.startswith("hour:"):
+        return str(f.get("hour_ny")) == name.split(":", 1)[1]
+    return False
+
+
+def describe(name):
+    if name in MISTAKE_WORDS:
+        return MISTAKE_WORDS[name]
+    k, v = name.split(":", 1)
+    return f"{v.replace('_', '/')} pe trade" if k == "instrument" else f"{v}:00 New York ki entries"
+
+
+def tag_mistakes(row, r, bars_held, max_r):
+    tags = []
+    if r < 0 and bars_held <= 2:
+        tags.append("stopped_fast")
+    if max_r >= 1.0 and r <= 0:
+        tags.append("gave_back")
+    if r < 0:
+        tags += [c for c in CONDITIONS if learnable(row, c) and matches(c, row)]
+    return tags
+
+
+def _card_r(rs):
+    wins = [x for x in rs if x > 0]
+    losses = [x for x in rs if x < 0]
+    eq = peak = dd = 0.0
+    for x in rs:
+        eq += x
+        peak = max(peak, eq)
+        dd = max(dd, peak - eq)
+    return {"n": len(rs), "win_pct": round(100 * len(wins) / len(rs), 1) if rs else 0,
+            "total_r": round(sum(rs), 2), "avg_r": round(sum(rs) / len(rs), 3) if rs else 0,
+            "pf": round(sum(wins) / -sum(losses), 2) if losses else None, "max_dd_r": round(dd, 2)}
+
+
+def _card(rows):
+    return _card_r([r["r"] for r in rows])
+
+
+def _mean_se(xs):
+    n = len(xs)
+    m = sum(xs) / n
+    var = sum((x - m) ** 2 for x in xs) / (n - 1) if n > 1 else 0.0
+    return m, math.sqrt(var / n) if n else 0.0
+
+
+class Learner:
+    def __init__(self, params=None, path=":memory:", clock=time.time):
+        self.p = {**DEFAULTS, **(params or {})}
+        self.clock = clock
+        self.last_resolved = []
+        self.lock = threading.Lock()
+        self.db = sqlite3.connect(path, check_same_thread=False)
+        self.db.row_factory = sqlite3.Row
+        self.db.executescript("""
+            CREATE TABLE IF NOT EXISTS signals(
+              id INTEGER PRIMARY KEY, instrument TEXT, side INTEGER, time REAL, entry REAL,
+              stop_dist REAL, features TEXT, taken INTEGER, skip_reason TEXT, trade_id TEXT,
+              status TEXT DEFAULT 'open', r REAL, bars_held INTEGER, max_r REAL,
+              real_r REAL, mistakes TEXT);
+            CREATE TABLE IF NOT EXISTS lessons(day TEXT, kind TEXT, text TEXT, data TEXT);
+            CREATE TABLE IF NOT EXISTS kv(key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE IF NOT EXISTS closed(
+              trade_id TEXT PRIMARY KEY, instrument TEXT, side INTEGER, units REAL, entry REAL, exit REAL,
+              stop REAL, tp REAL, r REAL, pl REAL, opened REAL, closed REAL, how TEXT, ref TEXT);
+        """)
+
+    # ---- key/value ---------------------------------------------------
+    def get(self, key, default=None):
+        with self.lock:
+            row = self.db.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
+        return json.loads(row[0]) if row else default
+
+    def put(self, key, value):
+        with self.lock:
+            self.db.execute("INSERT OR REPLACE INTO kv VALUES(?,?)", (key, json.dumps(value)))
+            self.db.commit()
+
+    def params(self):
+        return self.get("params", {})
+
+    def filters(self):
+        return self.get("filters", [])
+
+    # ---- recording ---------------------------------------------------
+    def record_signal(self, sig, taken, skip_reason=None, trade_id=None, entry=None):
+        with self.lock:
+            dup = self.db.execute("SELECT id FROM signals WHERE instrument=? AND time=? AND side=?",
+                                  (sig.instrument, sig.time, sig.side)).fetchone()
+            if dup:                                  # same signal seen again (e.g. after a restart): keep one row
+                return dup[0]
+            cur = self.db.execute(
+                "INSERT INTO signals(instrument, side, time, entry, stop_dist, features, taken, skip_reason, trade_id)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
+                (sig.instrument, sig.side, sig.time, entry or sig.features.get("entry_ref"),
+                 sig.stop_distance, json.dumps(sig.features), int(taken), skip_reason,
+                 str(trade_id) if trade_id else None))
+            self.db.commit()
+            return cur.lastrowid
+
+    def blocked(self, sig):
+        row = {"instrument": sig.instrument, "side": sig.side, "features": sig.features}
+        for name in self.filters():
+            if matches(name, row):
+                return f"learned filter: avoid {describe(name)}"
+        return None
+
+    def _rows(self, where, args=()):
+        with self.lock:
+            rows = self.db.execute(f"SELECT * FROM signals WHERE {where}", args).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["features"] = json.loads(d["features"] or "{}")
+            d["mistakes"] = json.loads(d["mistakes"] or "[]")
+            out.append(d)
+        return out
+
+    def resolve(self, instrument, candles, gran_seconds, reward_risk=2.0, breakeven_at_r=1.0):
+        """Follow every unfinished signal of this instrument on the chart."""
+        done = 0
+        self.last_resolved = []
+        closed = [c for c in candles if c.complete]
+        for row in self._rows("instrument=? AND status='open'", (instrument,)):
+            after = [c for c in closed if c.time >= row["time"] + gran_seconds]
+            if not after:
+                if closed and closed[0].time > row["time"] + gran_seconds:
+                    self._update(row["id"], status="expired")
+                continue
+            entry = after[0].o if not row["taken"] else row["entry"]
+            res = backtest.simulate(row["side"], entry, row["stop_dist"], after, reward_risk, breakeven_at_r)
+            if res is None:
+                continue
+            r, bars, max_r = res
+            tags = tag_mistakes(row, r, bars, max_r)
+            self._update(row["id"], status="done", r=r, bars_held=bars, max_r=max_r, mistakes=json.dumps(tags))
+            self.last_resolved.append({**row, "r": r, "bars_held": bars, "max_r": max_r, "mistakes": tags})
+            done += 1
+        return done
+
+    # ---- closed trades (the bot's real trade history) ------------------------
+    def record_close(self, **row):
+        cols = ["trade_id", "instrument", "side", "units", "entry", "exit", "stop", "tp", "r", "pl", "opened",
+                "closed", "how", "ref"]
+        with self.lock:
+            self.db.execute(f"INSERT OR REPLACE INTO closed({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
+                            [row.get(c) for c in cols])
+            self.db.commit()
+
+    def closed_trades(self, limit=200):
+        with self.lock:
+            rows = self.db.execute("SELECT * FROM closed ORDER BY closed DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def rules_version(self):
+        return self.get("rules_version", 1)
+
+    def bump_rules(self, why):
+        v = self.rules_version() + 1
+        self.put("rules_version", v)
+        hist = self.get("rules_history", [])
+        hist.insert(0, {"v": v, "time": self.clock(), "why": why})
+        self.put("rules_history", hist[:20])
+        return v
+
+    def untracked_taken(self, open_ids):
+        """Trades the bot opened whose close was never recorded (e.g. closed while an older version ran)."""
+        with self.lock:
+            rows = self.db.execute("SELECT s.* FROM signals s LEFT JOIN closed c ON c.trade_id = s.trade_id "
+                                   "WHERE s.taken=1 AND s.trade_id IS NOT NULL AND c.trade_id IS NULL").fetchall()
+        return [dict(r) for r in rows if str(r["trade_id"]) not in open_ids]
+
+    def taken_since(self, since):
+        with self.lock:
+            return self.db.execute("SELECT COUNT(*) FROM signals WHERE taken=1 AND time>=?", (since,)).fetchone()[0]
+
+    def closed_summary(self, since=0):
+        with self.lock:
+            rows = self.db.execute("SELECT r, pl FROM closed WHERE closed>=?", (since,)).fetchall()
+        rs = [r["r"] or 0 for r in rows]
+        pls = [r["pl"] for r in rows if r["pl"] is not None]
+        return {**_card_r(rs), "wins": sum(1 for x in rs if x > 0.05), "losses": sum(1 for x in rs if x < -0.05),
+                "be": sum(1 for x in rs if abs(x) <= 0.05), "pl": round(sum(pls), 2)}
+
+    def resolve_ema(self, instrument, candles, gran_seconds, reward_risk=3.0):
+        """Shadow follow with the breakout rules: next candle must break the level, then SL / TP."""
+        from .ema_break import follow
+        done = 0
+        self.last_resolved = []
+        closed = [c for c in candles if c.complete]
+        for row in self._rows("instrument=? AND status='open' AND taken=0", (instrument,)):
+            after = [c for c in closed if c.time >= row["time"] + gran_seconds]
+            if not after:
+                if closed and closed[0].time > row["time"] + gran_seconds:
+                    self._update(row["id"], status="expired")
+                continue
+            side, trig = row["side"], row["entry"]
+            res = follow(side, trig, trig - side * row["stop_dist"], reward_risk, after)
+            if res is None:
+                continue
+            r, bars = res
+            if r == "cancel":
+                self._update(row["id"], status="cancelled")
+                continue
+            self._update(row["id"], status="done", r=r, bars_held=bars, max_r=max(r, 0), mistakes="[]")
+            self.last_resolved.append({**row, "r": r, "bars_held": bars, "max_r": max(r, 0), "mistakes": []})
+            done += 1
+        return done
+
+    def set_real_result(self, trade_id, real_r):
+        with self.lock:
+            self.db.execute("UPDATE signals SET real_r=? WHERE trade_id=?", (real_r, str(trade_id)))
+            self.db.commit()
+
+    def _update(self, rid, **kw):
+        cols = ", ".join(f"{k}=?" for k in kw)
+        with self.lock:
+            self.db.execute(f"UPDATE signals SET {cols} WHERE id=?", (*kw.values(), rid))
+            self.db.commit()
+
+    def lesson(self, day, kind, text, data=None):
+        with self.lock:
+            self.db.execute("INSERT INTO lessons VALUES(?,?,?,?)", (day, kind, text, json.dumps(data or {})))
+            self.db.commit()
+
+    def lessons(self, limit=20):
+        with self.lock:
+            rows = self.db.execute("SELECT * FROM lessons ORDER BY rowid DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+    # ---- learning: filters --------------------------------------------
+    def learn_filters(self, day):
+        since = self.clock() - self.p["window_days"] * 86400
+        rows = self._rows("status='done' AND time>=?", (since,))
+        names = set(CONDITIONS)
+        for r in rows:
+            names.update(c for c in _dyn_conditions(r) if learnable(r, c))
+        active = set(self.filters())
+        changes = []
+        for name in sorted(names):
+            pool = [r for r in rows if learnable(r, name)]
+            w = [r["r"] for r in pool if matches(name, r)]
+            wo = [r["r"] for r in pool if not matches(name, r)]
+            if len(w) < self.p["min_samples"]:
+                continue
+            m, se = _mean_se(w)
+            base = sum(wo) / len(wo) if wo else 0.0
+            if name not in active and m + se < 0 and m < base - self.p["margin_r"]:
+                active.add(name)
+                changes.append(("filter_on", name, m, len(w), base))
+            elif name in active and m > 0:
+                active.discard(name)
+                changes.append(("filter_off", name, m, len(w), base))
+        self.put("filters", sorted(active))
+        if changes:
+            self.bump_rules(", ".join(("+" if k == "filter_on" else "-") + describe(nm) for k, nm, *_ in changes))
+        for kind, name, m, n, base in changes:
+            if kind == "filter_on":
+                txt = (f"Naya rule: {describe(name)} se bachna hai. {n} setups mein iska average {m:+.2f}R tha, "
+                       f"baaki setups ka {base:+.2f}R. Agle signal se laagu.")
+            else:
+                txt = (f"Rule hataya: {describe(name)} ab {n} setups mein {m:+.2f}R average de raha hai, "
+                       f"isliye phir se allowed.")
+            self.lesson(day, kind, txt, {"condition": name, "avg_r": m, "n": n})
+        return changes
+
+    def candidates(self, limit=10):
+        """Every condition the learner is watching: how much data it has and how close it is to a rule."""
+        since = self.clock() - self.p["window_days"] * 86400
+        rows = self._rows("status='done' AND time>=?", (since,))
+        names = set(CONDITIONS)
+        for r in rows:
+            names.update(c for c in _dyn_conditions(r) if learnable(r, c))
+        active, need, out = set(self.filters()), self.p["min_samples"], []
+        for name in names:
+            pool = [r for r in rows if learnable(r, name)]
+            w = [r["r"] for r in pool if matches(name, r)]
+            wo = [r["r"] for r in pool if not matches(name, r)]
+            if not w:
+                continue
+            m, se = _mean_se(w) if len(w) > 1 else (w[0], 0.0)
+            base = sum(wo) / len(wo) if wo else 0.0
+            if name in active:
+                state = "active"
+            elif len(w) < need:
+                state = "collecting"
+            elif m + se < 0 and m < base - self.p["margin_r"]:
+                state = "next_review"
+            elif m < base:
+                state = "watching"
+            else:
+                state = "fine"
+            out.append({"name": name, "text": describe(name), "n": len(w), "need": need, "avg_r": round(m, 2),
+                        "base_r": round(base, 2), "state": state})
+        order = {"active": 0, "next_review": 1, "watching": 2}
+        main = sorted([c for c in out if c["state"] in order], key=lambda c: (order[c["state"]], c["avg_r"] - c["base_r"]))
+        # of the ones still collecting data, only the 3 closest to having enough (and losing): less noise
+        coll = sorted([c for c in out if c["state"] == "collecting" and c["avg_r"] < c["base_r"]],
+                      key=lambda c: (-c["n"], c["avg_r"]))[:3]
+        return (main + coll)[:limit]
+
+    def closed_by_day(self, day_of, days=14):
+        """Closed trades grouped by trading day (newest first), each with its trades."""
+        groups = {}
+        for c in self.closed_trades(500):
+            d = day_of(c["closed"] or 0)
+            groups.setdefault(d, []).append(c)
+        out = []
+        for d in sorted(groups, reverse=True)[:days]:
+            ts = groups[d]
+            pls = [t["pl"] for t in ts if t["pl"] is not None]
+            out.append({"day": d, **_card_r([t["r"] or 0 for t in ts]),
+                        "wins": sum(1 for t in ts if (t["r"] or 0) > 0.05),
+                        "losses": sum(1 for t in ts if (t["r"] or 0) < -0.05),
+                        "pl": round(sum(pls), 2), "trades": ts})
+        return out
+
+    # ---- learning: parameter tuning (walk-forward) ----------------------
+    def tune(self, day, history, base_params, base_rr, instruments, breakeven_at_r=1.0):
+        """history(instrument) -> (htf, ltf). Changes at most one setting by one step."""
+        if not self.p["tune"] or not instruments:
+            return None
+        data = []
+        for n in instruments[: self.p["tune_instruments"]]:
+            try:
+                htf, ltf = history(n)
+            except Exception:
+                continue
+            if len(ltf) > 400:
+                data.append((n, htf, ltf))
+        if not data:
+            return None
+        cur = {**base_params, **self.params()}
+        cur_rr = cur.pop("reward_risk", base_rr)
+
+        def score(params, rr):
+            train = test = 0.0
+            n_train = 0
+            for name, htf, ltf in data:
+                split = ltf[int(len(ltf) * (1 - self.p["test_fraction"]))].time
+                for t in backtest.run(name, htf, ltf, params=params, reward_risk=rr,
+                                      breakeven_at_r=breakeven_at_r):
+                    if t["time"] < split:
+                        train += t["r"]
+                        n_train += 1
+                    else:
+                        test += t["r"]
+            return train, test, n_train
+
+        from .strategy import DEFAULTS as SD
+        base = score(cur, cur_rr)
+        best = None
+        for key, (lo, hi, step) in TUNABLE.items():
+            now = cur_rr if key == "reward_risk" else cur.get(key, SD.get(key))
+            for new in (now - step, now + step):
+                if not lo <= new <= hi:
+                    continue
+                new = int(new) if isinstance(step, int) else round(new, 4)
+                params, rr = dict(cur), cur_rr
+                if key == "reward_risk":
+                    rr = new
+                else:
+                    params[key] = new
+                tr, te, n = score(params, rr)
+                gain_needed = max(2.0, 0.1 * abs(base[0]))
+                if n >= self.p["min_samples"] and tr >= base[0] + gain_needed and te >= base[1] and te > 0:
+                    if best is None or tr > best[2]:
+                        best = (key, new, tr, te, now)
+        if not best:
+            self.lesson(day, "tune", f"{len(TUNABLE) * 2} chhote setting badlav {len(data)} charts pe test kiye; koi bhi "
+                        f"naye (unseen) data pe abhi wali settings se behtar nahi nikla. Koi badlav nahi.",
+                        {"train_r": base[0], "test_r": base[1]})
+            return None
+        key, new, tr, te, old = best
+        learned = self.params()
+        learned[key] = new
+        self.put("params", learned)
+        self.bump_rules(f"setting {key}: {old} -> {new}")
+        self.lesson(day, "tune", f"Setting badli {key}: {old} -> {new}. Purana data {base[0]:+.1f}R -> {tr:+.1f}R, "
+                    f"naya unseen data {base[1]:+.1f}R -> {te:+.1f}R. Agle scan se laagu.",
+                    {"key": key, "old": old, "new": new})
+        return best
+
+    # ---- daily review --------------------------------------------------
+    def daily_review(self, day, history=None, base_params=None, base_rr=2.0, instruments=(),
+                     breakeven_at_r=1.0):
+        since = self.clock() - 86400 * 1.5
+        recent = self._rows("status='done' AND time>=?", (since,))
+        counts = {}
+        for r in recent:
+            for m in r["mistakes"]:
+                counts[m] = counts.get(m, 0) + 1
+        changes = self.learn_filters(day)
+        tuned = self.tune(day, history, base_params or {}, base_rr, list(instruments), breakeven_at_r) \
+            if history else None
+        self.put("last_review_day", day)
+        self._write_report(day, recent, counts)
+        return {"mistakes": counts, "filter_changes": changes, "tuned": tuned}
+
+    def _write_report(self, day, recent, counts):
+        taken = [r for r in recent if r["taken"]]
+        shadow = [r for r in recent if not r["taken"]]
+
+        def line(rows):
+            if not rows:
+                return "none"
+            rs = [r["real_r"] if r["real_r"] is not None else r["r"] for r in rows]
+            wins = sum(1 for x in rs if x > 0)
+            return f"{len(rs)} trades, {wins} wins, total {sum(rs):+.2f}R"
+
+        lines = [f"# Daily review {day}", "",
+                 f"- Bot trades: {line(taken)}",
+                 f"- Setups it watched but skipped: {line(shadow)}", "", "## Mistakes found"]
+        lines += [f"- {n} x {MISTAKE_WORDS.get(k, k)}" for k, n in sorted(counts.items(), key=lambda x: -x[1])] \
+            or ["- none"]
+        lines += ["", "## What changed today"]
+        today = [l for l in self.lessons(50) if l["day"] == day]
+        lines += [f"- {l['text']}" for l in reversed(today)] or ["- nothing"]
+        lines += ["", "## Active learned rules"]
+        lines += [f"- avoid {describe(f)}" for f in self.filters()] or ["- none"]
+        lines += ["", "## Learned settings", f"- {json.dumps(self.params()) if self.params() else 'defaults'}"]
+        os.makedirs(self.p["reports_dir"], exist_ok=True)
+        with open(os.path.join(self.p["reports_dir"], f"{day}.md"), "w") as f:
+            f.write("\n".join(lines) + "\n")
+
+    # ---- dashboard ------------------------------------------------------
+    def snapshot(self):
+        since = self.clock() - 30 * 86400
+        rows = self._rows("status='done' AND time>=?", (since,))
+        shadow = [r for r in rows if not r["taken"] and r["time"] >= (self.get("setup_since") or 0)]
+        inside = [r for r in rows if in_window(r)]
+        outside = [r for r in rows if not in_window(r)]
+        counts = {}
+        for r in rows:
+            for m in r["mistakes"]:
+                counts[m] = counts.get(m, 0) + 1
+        taken = [r for r in rows if r["taken"]]
+        return {
+            "filters": [{"name": f, "text": describe(f)} for f in self.filters()],
+            "params": self.params(),
+            "lessons": [{"day": l["day"], "text": l["text"]} for l in self.lessons(10)],
+            "mistakes_30d": [{"text": MISTAKE_WORDS.get(k, describe(k)), "count": n}
+                             for k, n in sorted(counts.items(), key=lambda x: -x[1])[:8]],
+            "stats_30d": {
+                "setups_followed": len(rows),
+                "bot_trades": len(taken),
+                "bot_total_r": round(sum((r["real_r"] if r["real_r"] is not None else r["r"]) for r in taken), 2),
+                "all_setups_total_r": round(sum(r["r"] for r in rows), 2),
+                "in_session": _card(inside),
+                "off_session": _card(outside),
+            },
+            "report_card": self.get("report_card"),
+            "setup_since": self.get("setup_since"),
+            "shadow_30d": _card(shadow),
+            "shadow_by_pair": sorted([c for c in ({"pair": k, **_card([r for r in shadow if r["instrument"] == k])}
+                                                  for k in {r["instrument"] for r in shadow}) if c["n"]],
+                                     key=lambda x: -x["total_r"])[:15],
+            "real_30d": self.closed_summary(max(self.clock() - 30 * 86400, self.get("setup_since") or 0)),
+            "research": self.get("research"),
+            "trade_list": self.get("trade_list", []),
+            "experiments": self.get("experiments"),
+            "universe": self.get("universe", "all"),
+            "rules_version": self.rules_version(),
+            "rules_history": self.get("rules_history", []),
+        }
+
+    # ---- experiments: several rule versions on the same real history -----------
+    VARIANTS = [
+        {"id": "now", "name": "Abhi wala setup (saare charts)", "universe": "all", "confirm": 0},
+        {"id": "liquid", "name": "Sirf bade pairs", "universe": "liquid", "confirm": 0},
+        {"id": "confirm", "name": "Confirmation candle (saare charts)", "universe": "all", "confirm": 1},
+        {"id": "liquid_confirm", "name": "Bade pairs + confirmation", "universe": "liquid", "confirm": 1},
+        {"id": "liquid_confirm_wide", "name": "Bade pairs + confirmation + SL 2 ATR", "universe": "liquid",
+         "confirm": 1, "stop_mult": 2.0},
+        {"id": "liquid_confirm_rr15", "name": "Bade pairs + confirmation + TP 1.5R", "universe": "liquid",
+         "confirm": 1, "rr": 1.5},
+    ]
+
+    def current_variant(self, base_params, base_rr):
+        lp = self.params()
+        return {"universe": self.get("universe", "all"),
+                "confirm": int(lp.get("confirm_candles", base_params.get("confirm_candles", 0))),
+                "stop_mult": float(lp.get("atr_stop_mult", base_params.get("atr_stop_mult", 1.5))),
+                "rr": float(lp.get("reward_risk", base_rr))}
+
+    def experiment(self, day, history, instruments, liquid, base_params, base_rr, breakeven_at_r=1.0,
+                   spreads=None, in_session=None, adopt=True):
+        """Run every variant on the same real history (spread cost included), split older 70% / recent 30%,
+        write the report card for the active rules, and adopt a clearly better variant."""
+        cur = self.current_variant(base_params, base_rr)
+        variants = [dict(v, stop_mult=v.get("stop_mult", cur["stop_mult"]), rr=v.get("rr", cur["rr"]))
+                    for v in self.VARIANTS]
+        active = {**cur, "id": "active", "name": "Abhi laagu rules"}
+        if not any(all(v[k] == active[k] for k in ("universe", "confirm", "stop_mult", "rr")) for v in variants):
+            variants.insert(0, active)
+        res = {v["id"]: [] for v in variants}
+        span, per, had = [None, None], {}, False
+        for n in instruments:
+            try:
+                htf, ltf = history(n)
+            except Exception as e:
+                per[n] = {"error": str(e)}
+                continue
+            if len(ltf) < 400:
+                continue
+            had = True
+            sigs = signals(n, htf, ltf, params={**base_params, **self.params()})
+            sp = (spreads or {}).get(n, 0.0)
+            for v in variants:
+                if v["universe"] == "liquid" and n not in liquid:
+                    continue
+                ts = variant(ltf, sigs, v["confirm"], v["stop_mult"], v["rr"], breakeven_at_r, sp)
+                for t in ts:
+                    t["pair"] = n
+                    t["in"] = bool(in_session(t["time"], n)) if in_session else True
+                res[v["id"]] += ts
+            span[0] = min(span[0] or ltf[0].time, ltf[0].time)
+            span[1] = max(span[1] or ltf[-1].time, ltf[-1].time)
+        if not had:
+            self.put("report_card", {"day": day, "made": self.clock(), "verdict": "nodata", "pairs": []})
+            return None
+        split = span[0] + 0.7 * (span[1] - span[0])
+        table = []
+        for v in variants:
+            ts = res[v["id"]]
+            table.append({"id": v["id"], "name": v["name"], "universe": v["universe"], "confirm": v["confirm"],
+                          "stop_mult": v["stop_mult"], "rr": v["rr"],
+                          "all": _card_r([t["r"] for t in ts]),
+                          "old": _card_r([t["r"] for t in ts if t["time"] < split]),
+                          "new": _card_r([t["r"] for t in ts if t["time"] >= split])})
+        def is_active(v):
+            return all(v[k] == cur[k] for k in ("universe", "confirm", "stop_mult", "rr"))
+        now_row = next(v for v in table if is_active(v))
+        # report card = the rules that are live right now (with spread cost)
+        ts = res[now_row["id"]]
+        pairs = {}
+        for t in ts:
+            pairs.setdefault(t["pair"], []).append(t["r"])
+        a = now_row["all"]
+        card = {"day": day, "from": span[0], "to": span[1], "made": self.clock(), "spread_cost": True,
+                "all": a, "in_session": _card_r([t["r"] for t in ts if t["in"]]),
+                "off_session": _card_r([t["r"] for t in ts if not t["in"]]),
+                "pairs": sorted([{"pair": k, **_card_r(v)} for k, v in pairs.items()], key=lambda x: -x["total_r"]),
+                "verdict": ("pass" if a["n"] >= 30 and a["total_r"] > 0 and (a["pf"] or 0) >= 1.1 else
+                            "weak" if a["n"] >= 30 else "few")}
+        self.put("report_card", card)
+        # adopt only with proof on BOTH the older and the most recent (unseen) part
+        ok = [v for v in table if v["new"]["n"] >= 30 and (v["new"]["pf"] or 0) >= 1.2 and (v["old"]["pf"] or 0) >= 1.1
+              and v["new"]["total_r"] > now_row["new"]["total_r"] + 2 and not is_active(v)]
+        best = max(ok, key=lambda v: v["new"]["total_r"]) if ok and adopt else None
+        result = {"day": day, "made": self.clock(), "from": span[0], "to": span[1], "split": split,
+                  "table": table, "active_id": now_row["id"], "adopted": best["id"] if best else None}
+        if best:
+            lp = self.params()
+            lp.update(confirm_candles=best["confirm"], atr_stop_mult=best["stop_mult"], reward_risk=best["rr"])
+            self.put("params", lp)
+            self.put("universe", best["universe"])
+            self.bump_rules(f"version: {best['name']}")
+            self.lesson(day, "experiment", f"Naya version apnaya: \"{best['name']}\". Naye data pe "
+                        f"{best['new']['total_r']:+.1f}R (PF {best['new']['pf']}) vs abhi wala "
+                        f"{now_row['new']['total_r']:+.1f}R. Agle scan se laagu.", {"id": best["id"]})
+        else:
+            self.lesson(day, "experiment", f"{len(table)} versions test kiye (spread ke kharche ke saath). Koi bhi naye "
+                        f"data pe pakka behtar (PF 1.2+) nahi nikla, isliye rules nahi badle.", {})
+        self.lesson(day, "validate", f"Report card (spread ke saath): {a['n']} trades, win {a['win_pct']}%, "
+                    f"total {a['total_r']:+.1f}R, PF {a['pf']}.", {"all": a})
+        self.put("experiments", result)
+        return result
+
+    # ---- setup report card on real broker history ----------------------------
+    def validate(self, day, history, instruments, params, rr, breakeven_at_r=1.0, in_session=None, bars=None):
+        """Backtest the CURRENT setup on real history for every pair, split in/out of the entry window."""
+        per, every = [], []
+        span = [None, None]
+        had_data = False
+        for n in instruments:
+            try:
+                htf, ltf = history(n)
+            except Exception as e:
+                per.append({"pair": n, "error": str(e)})
+                continue
+            if len(ltf) < 400:
+                continue
+            had_data = True
+            ts = backtest.run(n, htf, ltf, params=params, reward_risk=rr, breakeven_at_r=breakeven_at_r)
+            for t in ts:
+                t["in"] = bool(in_session(t["time"], n)) if in_session else True
+            every += ts
+            span[0] = min(span[0] or ltf[0].time, ltf[0].time)
+            span[1] = max(span[1] or ltf[-1].time, ltf[-1].time)
+            per.append({"pair": n, **_card_r([t["r"] for t in ts])})
+        if not had_data:
+            self.put("report_card", {"day": day, "made": self.clock(), "verdict": "nodata", "pairs": per})
+            return None
+        card = {"day": day, "from": span[0], "to": span[1], "made": self.clock(),
+                "all": _card_r([t["r"] for t in every]),
+                "in_session": _card_r([t["r"] for t in every if t["in"]]),
+                "off_session": _card_r([t["r"] for t in every if not t["in"]]),
+                "pairs": sorted(per, key=lambda x: -(x.get("total_r") or -1e9))}
+        a = card["all"]
+        card["verdict"] = ("pass" if a["n"] >= 30 and a["total_r"] > 0 and (a["pf"] or 0) >= 1.1 else
+                           "weak" if a["n"] >= 30 else "few")
+        self.put("report_card", card)
+        words = {"pass": "setup asli data pe plus mein hai", "weak": "setup asli data pe kamzor hai, abhi live mat lo",
+                 "few": "trades kam hain, abhi pakka nahi keh sakte"}[card["verdict"]]
+        self.lesson(day, "validate", f"Report card: {a['n']} trades, win {a['win_pct']}%, total {a['total_r']:+.1f}R, "
+                    f"profit factor {a['pf']} — {words}.", {"all": a})
+        return card
