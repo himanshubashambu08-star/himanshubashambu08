@@ -58,7 +58,8 @@ async function playLife(page, base, seed, pick, name = 'Test') {
 (async () => {
   const server = await serve(), base = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  // Reduced motion: skips entrance animations so clicks don't wait, and checks that setting works.
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
   const endings = new Set();
 
   const strategies = {
