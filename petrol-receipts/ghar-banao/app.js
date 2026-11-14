@@ -580,9 +580,9 @@
     if (id === 'elev' || id === 'view') setTimeout(() => View3D.viewPreset('corner'), 50);
     $('#side').scrollTop = 0;
   }
-  function buyPlot(p) {
+  async function buyPlot(p) {
     const has = S.floors.some(Fl => Fl.rooms.length);
-    if (has && !confirm('Naya plot lene se purana naksha hat jayega. Theek hai?')) return;
+    if (has && !(await ask('Naya plot lene se purana naksha hat jayega. Theek hai?'))) return;
     mutate(() => {
       S.plot = { id: p.id, w: p.wft, d: p.dft, facing: p.facing, gaj: p.wft * p.dft / GAJ, rate: p.rate, price: p.price, corner: p.corner };
       defaultSetback(); S.floors = S.floors.map(() => ({ rooms: [], open: [], furn: [] }));
@@ -594,8 +594,8 @@
     const g = S.plot.gaj, d = S.plot.d;
     S.setback = g >= 300 ? { front: 12, back: 6, left: 5, right: 5 } : g >= 180 ? { front: 8, back: 4, left: 3, right: 3 } : d >= 50 ? { front: 6, back: 3, left: 0, right: 0 } : { front: 3, back: 2, left: 0, right: 0 };
   }
-  function autoLayout() {
-    if (S.floors.some(Fl => Fl.rooms.length) && !confirm('Is se abhi ka naksha badal jayega. Auto naksha banaye?')) return;
+  async function autoLayout() {
+    if (S.floors.some(Fl => Fl.rooms.length) && !(await ask('Is se abhi ka naksha badal jayega. Auto naksha banaye?'))) return;
     mutate(() => {
       S.floors = Plan.autoLayout(S, ui.bhk);
       S.floors.forEach((_, f) => { Plan.autoOpenings(S, f); Plan.autoFurnish(S, f); });
@@ -604,7 +604,7 @@
     if (!S.floors[0].rooms.length) toast('Plot bahut chhota hai ya setback bahut zyada. Khud kamre banao.'); else toast(`${BHK_PRESETS[ui.bhk]} ka naksha ready! Ab apne hisaab se badlo.`);
   }
 
-  function act(a, ds, el) {
+  async function act(a, ds, el) {
     switch (a) {
       case 'stage': return setStage(ds.id);
       case 'choose-brief': return showBriefs();
@@ -615,12 +615,12 @@
         const gaj = +$('#cg').value, w = Math.round(+$('#cw').value), fac = $('#cf').value, rate = +$('#cr').value || 40000;
         if (!(gaj >= 25 && gaj <= 2000) || !(w >= 10 && w <= 150)) return toast('Gaj 25-2000 aur chaudai 10-150 ft rakho.');
         const d = Math.round(gaj * GAJ / w); if (d < 15 || d > 250) return toast('Ye size ajeeb hai. Chaudai badlo.');
-        if (S.floors.some(Fl => Fl.rooms.length) && !confirm('Naya plot lene se purana naksha hat jayega. Theek hai?')) return;
+        if (S.floors.some(Fl => Fl.rooms.length) && !(await ask('Naya plot lene se purana naksha hat jayega. Theek hai?'))) return;
         mutate(() => { S.plot = { id: '', w, d, facing: fac, gaj: w * d / GAJ, rate, price: Math.round(w * d / GAJ * rate), custom: true }; defaultSetback(); S.floors = S.floors.map(() => ({ rooms: [], open: [], furn: [] })); });
         return toast(`Plot: ${w} × ${d} ft (${Math.round(w * d / GAJ)} gaj)`);
       }
       case 'floors+': if (S.floors.length >= 4) return toast('4 manzil se zyada ki permission nahi milegi!'); return mutate(() => { S.floors.push({ rooms: [], open: [], furn: [] }); ui.floor = S.floors.length - 1; });
-      case 'floors-': if (S.floors.length <= 1) return; if (S.floors[S.floors.length - 1].rooms.length && !confirm('Sabse upar wala floor hata dein?')) return; return mutate(() => { S.floors.pop(); ui.sel = null; });
+      case 'floors-': if (S.floors.length <= 1) return; if (S.floors[S.floors.length - 1].rooms.length && !(await ask('Sabse upar wala floor hata dein?'))) return; return mutate(() => { S.floors.pop(); ui.sel = null; });
       case 'auto-layout': return autoLayout();
       case 'tool': ui.tool = ds.t; ui.furnType = null; renderSide(); return;
       case 'rtype': ui.roomType = ds.t; ui.tool = 'room'; if (ui.sel?.kind === 'room') { const r = F().rooms.find(x => x.id === ui.sel.id); } renderSide(); return;
@@ -628,7 +628,7 @@
       case 'del-sel': return deleteSel();
       case 'copy-up': { const r = F().rooms.find(x => x.id === ui.sel?.id); if (!r) return; return mutate(() => { S.floors[ui.floor + 1].rooms.push({ ...r, id: Plan.uid(S) }); toast('Upar wale floor pe copy ho gaya'); }); }
       case 'dup-room': { const r = F().rooms.find(x => x.id === ui.sel?.id); if (!r) return; return mutate(() => { const n = { ...r, id: Plan.uid(S), x: r.x + 2, y: r.y + 2 }; F().rooms.push(n); ui.sel = { kind: 'room', id: n.id }; }); }
-      case 'copy-below': if (F().rooms.length && !confirm('Is floor ka naksha neeche wale jaisa ho jayega. Theek?')) return;
+      case 'copy-below': if (F().rooms.length && !(await ask('Is floor ka naksha neeche wale jaisa ho jayega. Theek?'))) return;
         return mutate(() => { const b = S.floors[ui.floor - 1]; S.floors[ui.floor] = JSON.parse(JSON.stringify(b)); const Fl = F(); Fl.rooms.forEach(r => { r.id = Plan.uid(S); if (r.type === 'parking' || r.type === 'lawn') { r.type = r.type === 'parking' ? 'bedroom' : 'balcony'; } }); Fl.open.forEach(o => { o.id = Plan.uid(S); if (o.kind === 'main') o.kind = 'door'; }); Fl.furn = []; Plan.autoOpenings(S, ui.floor); Plan.autoFurnish(S, ui.floor); });
       case 'auto-open': return mutate(() => { Plan.autoOpenings(S, ui.floor); ui.sel = null; toast('Darwaze aur khidkiyan lag gayi'); });
       case 'floor': ui.floor = +ds.f; ui.sel = null; renderSide(); layoutViews(); draw(); schedule3D(); return;
@@ -651,11 +651,11 @@
       case 'dup-furn': return mutate(() => { const it = F().furn.find(x => x.id === ui.sel?.id); if (it) { const n = { ...it, id: Plan.uid(S), x: it.x + 1, y: it.y + 1 }; F().furn.push(n); ui.sel = { kind: 'furn', id: n.id }; } });
       case 'auto-furn-room': return mutate(() => { Plan.autoFurnish(S, ui.floor, ui.sel?.id); });
       case 'clear-furn-room': return mutate(() => { const r = F().rooms.find(x => x.id === ui.sel?.id); if (r) F().furn = F().furn.filter(q => !inRoom(q, r)); });
-      case 'auto-furn-all': if (S.floors.some(Fl => Fl.furn.length) && !confirm('Saara furniture dobara auto-set ho jayega. Theek?')) return; return mutate(() => { S.floors.forEach((_, f) => Plan.autoFurnish(S, f)); toast('Poora ghar saj gaya ✨'); });
+      case 'auto-furn-all': if (S.floors.some(Fl => Fl.furn.length) && !(await ask('Saara furniture dobara auto-set ho jayega. Theek?'))) return; return mutate(() => { S.floors.forEach((_, f) => Plan.autoFurnish(S, f)); toast('Poora ghar saj gaya ✨'); });
       case 'photo': { const url = View3D.shot(); if (!url) return; const a2 = document.createElement('a'); a2.href = url; a2.download = 'mera-ghar.png'; a2.click(); return toast('Photo download ho gayi 📸'); }
       case 'export': { const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }); const a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = 'mera-ghar.ghar.json'; a2.click(); return toast('File save ho gayi'); }
       case 'import': return $('#importFile').click();
-      case 'new': if (!confirm('Naya ghar shuru karein? Abhi wala mit jayega (pehle File save kar lo).')) return; S = Plan.newState(S.brief); undo.length = 0; ui.floor = 0; ui.sel = null; ui.mapSel = null; ui.walk = false; View3D.setMode('orbit'); built3 = ''; setStage('map'); return showBriefs();
+      case 'new': if (!(await ask('Naya ghar shuru karein? Abhi wala mit jayega (pehle File save kar lo).'))) return; S = Plan.newState(S.brief); undo.length = 0; ui.floor = 0; ui.sel = null; ui.mapSel = null; ui.walk = false; View3D.setMode('orbit'); built3 = ''; setStage('map'); return showBriefs();
       case 'start': closeModal(); return;
       case 'help': return showHelp();
     }
@@ -696,7 +696,16 @@
 
   // ---------- modals ----------
   function modal(html) { const m = $('#modal'); m.innerHTML = `<div class="mbox">${html}</div>`; m.classList.add('on'); }
-  function closeModal() { $('#modal').classList.remove('on'); }
+  function closeModal() { $('#modal').classList.remove('on'); if (askDone) { const d = askDone; askDone = null; d(false); } }
+  let askDone = null;
+  function ask(msg) {
+    return new Promise(res => {
+      modal(`<h2>Pakka?</h2><p>${esc(msg)}</p><div class="row wrap"><button class="btn primary" id="askYes" data-testid="ask-yes">Haan</button><button class="btn" id="askNo">Nahi</button></div>`);
+      askDone = res;
+      $('#askYes').onclick = () => { askDone = null; closeModal(); res(true); };
+      $('#askNo').onclick = () => closeModal();
+    });
+  }
   function showBriefs() {
     modal(`<h2>Aaj kiska ghar banayein?</h2><p class="hint">Client chuno. Har client ki apni maang aur budget hai. Sab poora karo to 3 star!</p>
       <div class="briefs">${BRIEFS.map(b => `<button class="bcard ${S.brief === b.id ? 'on' : ''}" data-act="pick-brief" data-id="${b.id}" data-testid="brief-${b.id}"><b>${esc(b.name)}</b><small>${esc(b.who)}</small><span>${esc(b.story)}</span><em>Budget ${L(b.budget)}</em></button>`).join('')}</div>`);

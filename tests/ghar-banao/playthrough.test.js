@@ -36,7 +36,7 @@ async function screenOf(page, fx, fy) {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  page.on('dialog', d => d.accept());
+  page.on('dialog', d => { errors.push('native dialog: ' + d.message()); d.accept(); });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
   await page.goto(base);
   await page.evaluate(() => localStorage.clear());
@@ -140,6 +140,7 @@ async function screenOf(page, fx, fy) {
   await test('interior: whole-house furnish puts furniture in every floor', async () => {
     await page.click('[data-testid=stage-interior]');
     await page.click('[data-testid=auto-furn]');
+    await page.click('[data-testid=ask-yes]');
     const s = await state(page);
     assert.ok(s.floors.every(F => F.furn.length >= 3));
     assert.ok(s.floors[0].furn.some(f => f.type === 'car'), 'car in the parking');
