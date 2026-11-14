@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F3EFE6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11171D" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ghar Banao">
+<meta name="description" content="Ghar Banao: architect game. Colony map se plot chuno, gaj mein size, naksha, 1-4 manzil, elevation, interior aur 3D mein ghoom ke dekho.">
+<title>Ghar Banao</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="icon.svg" alt="" width="34" height="34"><div><b>Ghar Banao</b><small>architect game</small></div></div>
+  <nav class="stages" id="stages" aria-label="Stages"></nav>
+  <div class="money" id="money"></div>
+  <button class="ib help" id="helpBtn" aria-label="Kaise khelein">?</button>
+</header>
+<main class="work">
+  <section class="stage">
+    <div class="viewbar" id="viewbar"></div>
+    <div class="views" id="views">
+      <div class="v2" id="v2">
+        <canvas id="plan" data-testid="plan-canvas"></canvas>
+        <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zfit" aria-label="Fit">⤢</button></div>
+      </div>
+      <div class="v3" id="v3"><div id="v3c" class="v3c" data-testid="view3d"></div><div id="v3ui" class="v3ui"></div></div>
+    </div>
+  </section>
+  <aside class="side" id="side"></aside>
+</main>
+<div class="modal" id="modal"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+<noscript><p style="padding:24px">Ghar Banao ko JavaScript chahiye.</p></noscript>
+<script src="vendor/three.min.js"></script>
+<script src="data.js"></script>
+<script src="plan.js"></script>
+<script src="view3d.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

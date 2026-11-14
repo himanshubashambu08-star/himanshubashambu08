@@ -1,0 +1,10 @@
+{
+  "name": "Ghar Banao",
+  "short_name": "Ghar Banao",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3EFE6",
+  "theme_color": "#F3EFE6",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
