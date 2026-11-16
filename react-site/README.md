@@ -30,3 +30,10 @@ Components in `src/components/` come from [React Bits](https://reactbits.dev): A
 ```bash
 npx shadcn@latest add https://reactbits.dev/r/<Component>-TS-TW
 ```
+
+## MotionSites
+
+Two layouts are adapted from free [MotionSites](https://motionsites.ai) designs, with this site's own content and artwork:
+
+- Start screen: "AI Trip Planner" (typewriter wordmark, frosted-glass prompt card, top fade over a moving background).
+- Read mode header: "Maya Lind Profile" (intro with avatar, bento grid of live cards).

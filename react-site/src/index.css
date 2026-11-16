@@ -2,10 +2,12 @@
 
 @theme {
   --font-serif: Georgia, 'Times New Roman', serif;
+  --font-sans: 'Geist', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Special Elite', Georgia, serif;
 }
 
 html, body, #root { min-height: 100%; }
-body { margin: 0; background: #FAF3E8; color: #5E544B; font-family: system-ui, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+body { margin: 0; background: #FAF3E8; color: #5E544B; font-family: 'Geist', system-ui, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
 
 /* Paper surfaces and small controls */
 .lw-paper { background: #FAF3E8f2; border: 1.5px solid #D9C8B4; box-shadow: 0 10px 30px -12px rgba(94, 84, 75, .45), inset 0 0 0 4px #FAF3E8, inset 0 0 0 5px #E8DCCB66; backdrop-filter: blur(6px); }
@@ -45,7 +47,7 @@ body { margin: 0; background: #FAF3E8; color: #5E544B; font-family: system-ui, '
 @keyframes lw-nudge { 50% { transform: translateX(4px); } }
 @keyframes lw-ripple { from { transform: scale(.4); opacity: 1; } to { transform: scale(2); opacity: 0; } }
 @keyframes lw-sweep { to { transform: rotate(360deg); } }
-@keyframes lw-drift { from { transform: translate(-52%, -50%) scale(1); } to { transform: translate(-48%, -52%) scale(1.08); } }
+@keyframes lw-drift { from { transform: translate(-2%, 0) scale(1); } to { transform: translate(2%, -2%) scale(1.08); } }
 @keyframes lw-fade { from { opacity: 0; } }
 @keyframes lw-rise { from { opacity: 0; transform: translateY(18px) scale(.96); } }
 @keyframes lw-bounce-in { from { opacity: 0; transform: scale(.3) rotate(-20deg); } }
@@ -55,3 +57,27 @@ body { margin: 0; background: #FAF3E8; color: #5E544B; font-family: system-ui, '
 @media (prefers-reduced-motion: reduce) {
   .lw-cloud, .lw-bob, .lw-float, .lw-breathe, .lw-twinkle, .lw-rock, .lw-nudge, .lw-sweep, .lw-drift, .lw-start { animation: none; }
 }
+
+/* Start screen and bento profile (layouts adapted from MotionSites: "AI Trip Planner" and "Maya Lind Profile") */
+.lw-glass { background: rgba(255, 255, 255, .18); border: 3px solid #fff; border-radius: 44px; box-shadow: 0 0 4px rgba(0, 0, 0, .15), 0 30px 60px -30px rgba(94, 84, 75, .5); backdrop-filter: blur(20px); }
+.lw-caret::after { content: ''; display: inline-block; width: 2px; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: #905831; animation: lw-blink 1s steps(1) infinite; }
+.lw-navlink { font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; color: #1a1a1a; background: none; border: 0; cursor: pointer; transition: opacity .2s; }
+.lw-navlink:hover { opacity: .55; }
+.lw-pill-dark { background: #0a0a0a; color: #fafafa; border: 0; border-radius: 999px; padding: 14px 22px; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; white-space: nowrap; transition: background .2s, transform .15s; }
+.lw-pill-dark:hover { background: #333; }
+.lw-pill-dark:active { transform: scale(.95); }
+.lw-bento { background: #F5F3EF; border: 1px solid rgba(0, 0, 0, .07); border-radius: 14px; box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 8px 24px -16px rgba(0, 0, 0, .18); transition: transform .25s, box-shadow .25s; position: relative; overflow: hidden; }
+.lw-bento:hover { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(0, 0, 0, .05), 0 18px 34px -18px rgba(0, 0, 0, .3); }
+.lw-chip { width: fit-content; display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px; background: #E9E6E1; font-size: 12.5px; color: #1E1C1A; }
+.lw-enter { animation: lw-enter .7s cubic-bezier(.2, .7, .2, 1) both; }
+.lw-halo { position: relative; width: 9px; height: 9px; border-radius: 99px; background: #3BC45E; }
+.lw-halo::after { content: ''; position: absolute; inset: 0; border-radius: 99px; background: #3BC45E; animation: lw-halo 1.8s ease-out infinite; }
+.lw-drift-up { animation: lw-drift-up 22s linear infinite; }
+.lw-mask-y { mask-image: linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent); }
+.lw-swap { animation: lw-swap .42s cubic-bezier(.2, .7, .2, 1) both; }
+@keyframes lw-blink { 50% { opacity: 0; } }
+@keyframes lw-enter { from { opacity: 0; transform: translateY(14px); } }
+@keyframes lw-halo { from { transform: scale(1); opacity: .6; } to { transform: scale(2.4); opacity: 0; } }
+@keyframes lw-drift-up { to { transform: translateY(-50%); } }
+@keyframes lw-swap { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .lw-drift-up, .lw-halo::after, .lw-enter, .lw-swap, .lw-caret::after { animation: none; } }

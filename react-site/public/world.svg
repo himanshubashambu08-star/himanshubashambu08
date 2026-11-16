@@ -7,7 +7,7 @@
 </defs>
 <g>
 <rect width="1000" height="640" fill="#FAF3E8"/>
-<rect width="1000" height="640" filter="url(#paper)"/>
+
 
 <path d="M820 420 Q900 380 990 420 L1000 640 L760 640 Q740 520 820 420Z" fill="#D7E4EA" opacity=".8"/>
 <path d="M0 470 Q70 430 140 480 Q190 530 150 640 L0 640Z" fill="#D7E4EA" opacity=".7"/>

@@ -1,21 +1,22 @@
 import FadeContent from '@/components/FadeContent/FadeContent'
 import SpotlightCard from '@/components/SpotlightCard/SpotlightCard'
+import Bento from './Bento'
 import { Beyond, Contact } from './game/Game'
-import { BACKPACK, ME, PLACES, SCROLLS } from './game/data'
+import { BACKPACK, PLACES, SCROLLS } from './game/data'
 
 /** Everything in the game, on one plain scrolling page. */
 export default function ReadMode({ onPlay }: { onPlay: () => void }) {
   return (
-    <main className="min-h-screen bg-[#FAF3E8] text-[#5E544B]">
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:py-16">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-[12px] tracking-[0.2em] text-[#9A8D80]">{ME.fullName.toUpperCase()} · {ME.city.toUpperCase()}</span>
-          <button onClick={onPlay} className="lw-cta">▶ Play the map instead</button>
+    <main className="min-h-screen bg-[#EEECE8] text-[#1E1C1A]">
+      <div className="px-4 pt-8 sm:px-8 sm:pt-14">
+        <div className="mx-auto mb-8 flex max-w-[1290px] flex-wrap items-center justify-between gap-3">
+          <span className="font-display text-[28px] leading-none">himanshu</span>
+          <button onClick={onPlay} className="lw-pill-dark">▶ Play the map instead</button>
         </div>
-        <h1 className="mt-8 font-serif text-5xl italic sm:text-6xl">Himanshu's Little World</h1>
-        <p className="mt-4 max-w-2xl font-serif text-xl italic leading-relaxed text-[#6B635B]">{ME.intro}</p>
-
-        <h2 className="mb-4 mt-14 font-serif text-3xl italic">The places, one by one</h2>
+        <Bento />
+      </div>
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:py-16">
+        <h2 className="mb-4 font-serif text-3xl italic">The places, one by one</h2>
         <FadeContent className="grid gap-4 sm:grid-cols-2" stagger={0.06}>
           {PLACES.map(p => (
             <SpotlightCard key={p.id} spotlightColor={`${p.color}88`} className="!rounded-2xl !border !border-[#E8DCCB] !bg-white/60 !p-5">
