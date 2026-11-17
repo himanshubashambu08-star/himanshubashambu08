@@ -1,0 +1,15 @@
+[
+ {"say": "This vault has ten thousand boxes.", "show": "This vault has 10,000 boxes."},
+ {"say": "Every single one is empty.", "show": "Every single one is empty."},
+ {"say": "Follow this account, and one of them gets your name on it.", "show": "Follow this account, and one of them gets your name on it."},
+ {"say": "Right now, zero are claimed.", "show": "Right now, zero are claimed."},
+ {"say": "At one thousand, the lights come on.", "show": "At 1,000, the lights come on."},
+ {"say": "At ten thousand, the vault seals. Forever.", "show": "At 10,000, the vault seals. Forever."},
+ {"say": "But there's something I haven't told you.", "show": "But there's something I haven't told you."},
+ {"say": "Box seven seven seven was already locked when we built this place.", "show": "Box 777 was already locked when we built this place."},
+ {"say": "Nobody has the key.", "show": "Nobody has the key."},
+ {"say": "And every night, at exactly three A M, it shakes.", "show": "And every night, at exactly 3 AM, it shakes."},
+ {"say": "So pick your box carefully.", "show": "So pick your box carefully."},
+ {"say": "Comment a number, and it's yours.", "show": "Comment a number, and it's yours."},
+ {"say": "Just... not seven seven seven.", "show": "Just... not 777."}
+]

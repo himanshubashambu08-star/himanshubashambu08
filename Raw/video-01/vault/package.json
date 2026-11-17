@@ -1,0 +1,11 @@
+{
+  "name": "vault",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.9.35 preview",
+    "check": "npx --yes hyperframes@0.9.35 check",
+    "render": "npx --yes hyperframes@0.9.35 render",
+    "publish": "npx --yes hyperframes@0.9.35 publish"
+  }
+}

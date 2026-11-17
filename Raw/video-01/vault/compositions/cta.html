@@ -1,0 +1,48 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #0a0c0e; }
+    #cta-wall { position: absolute; left: -260px; top: -240px; width: 1600px; height: 2400px;
+      background-color: #171b1f;
+      background-image: linear-gradient(#07090a 8px, transparent 8px), linear-gradient(90deg, #07090a 8px, transparent 8px),
+        radial-gradient(circle at 54% 58%, #0d1012 7px, #5d6870 8px, transparent 10px), linear-gradient(165deg, #3a434b 0%, #222830 55%, #1a1f24 100%);
+      background-size: 160px 120px; }
+    #cta-dim { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, rgba(0,0,0,.55), rgba(0,0,0,.93) 75%); }
+    .cta-bubble { position: absolute; left: 70px; width: 820px; height: 130px; border-radius: 26px; background: rgba(255,255,255,.96); box-shadow: 0 20px 50px rgba(0,0,0,.6); }
+    .cta-av { position: absolute; left: 24px; top: 29px; width: 72px; height: 72px; border-radius: 50%; }
+    .cta-user { position: absolute; left: 120px; top: 22px; font-family: "Inter", sans-serif; font-weight: 700; font-size: 28px; color: #6b7177; }
+    .cta-msg { position: absolute; left: 120px; top: 58px; font-family: "Inter", sans-serif; font-weight: 900; font-size: 42px; color: #0d0f11; }
+    #cta-title { position: absolute; left: 0; right: 0; top: 230px; text-align: center; font-family: "Montserrat", sans-serif; font-weight: 900; font-size: 112px; line-height: 112px; color: #fff; letter-spacing: -2px; text-shadow: 0 8px 40px rgba(0,0,0,.9); }
+    #cta-title b { color: #2eff8c; }
+    #cta-warn { position: absolute; left: 0; right: 0; top: 700px; text-align: center; font-family: "Montserrat", sans-serif; font-weight: 900; font-size: 110px; line-height: 130px; color: #fff; text-shadow: 0 8px 40px rgba(0,0,0,.9); }
+    #cta-warn b { display: block; color: #ff2a3c; font-family: "Space Mono", monospace; font-size: 200px; line-height: 220px; text-shadow: 0 0 60px rgba(255,42,60,.7); }
+  </style>
+  <div id="root" data-composition-id="cta" data-width="1080" data-height="1920">
+    <div id="cta-wall"></div>
+    <div id="cta-dim"></div>
+    <div id="cta-b1" class="cta-bubble clip" data-start="0.4" data-duration="4.5" style="top:640px">
+      <div class="cta-av" style="background:#ff9f43"></div><div class="cta-user">sam.k</div><div class="cta-msg">Box 4521 is mine</div>
+    </div>
+    <div id="cta-b2" class="cta-bubble clip" data-start="1.0" data-duration="3.9" style="top:800px">
+      <div class="cta-av" style="background:#54a0ff"></div><div class="cta-user">priya.v</div><div class="cta-msg">1209!!</div>
+    </div>
+    <div id="cta-b3" class="cta-bubble clip" data-start="1.6" data-duration="3.3" style="top:960px">
+      <div class="cta-av" style="background:#c56cf0"></div><div class="cta-user">jordan_m</div><div class="cta-msg">88 please</div>
+    </div>
+    <div id="cta-title" class="clip" data-start="2.35" data-duration="6.37">COMMENT<br>A <b>NUMBER</b></div>
+    <div id="cta-warn" class="clip" data-start="5.0" data-duration="3.72">JUST... NOT<b>0777</b></div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#cta-wall", { scale: 1.1, y: -60 }, { scale: 1, y: 0, duration: 8.7, ease: "none" }, 0);
+    ["#cta-b1", "#cta-b2", "#cta-b3"].forEach((id, i) => {
+      tl.fromTo(id, { opacity: 0 }, { opacity: 1, duration: 0.15 }, 0.4 + i * 0.6);
+      tl.fromTo(id + " .cta-av", { scale: 0 }, { scale: 1, duration: 0.3, ease: "back.out(3)" }, 0.4 + i * 0.6);
+      tl.fromTo(id, { opacity: 1 }, { opacity: 0, duration: 0.25, immediateRender: false }, 4.6);
+    });
+    tl.fromTo("#cta-title", { scale: 1.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.3, ease: "back.out(2)" }, 2.4);
+    tl.fromTo("#cta-warn", { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 5.05);
+    tl.fromTo("#cta-warn b", { opacity: 1 }, { opacity: 0.3, duration: 0.07, yoyo: true, repeat: 3, ease: "none", immediateRender: false }, 6.2);
+    window.__timelines["cta"] = tl;
+  </script>
+</template>

@@ -1,0 +1,61 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #0a0c0e; }
+    #wall-cam { position: absolute; left: -260px; top: -240px; width: 1600px; height: 2400px; }
+    #wall-tiles { position: absolute; inset: 0;
+      background-color: #171b1f;
+      background-image:
+        linear-gradient(#07090a 8px, transparent 8px),
+        linear-gradient(90deg, #07090a 8px, transparent 8px),
+        radial-gradient(circle at 54% 58%, #0d1012 7px, #5d6870 8px, transparent 10px),
+        linear-gradient(165deg, #3a434b 0%, #222830 55%, #1a1f24 100%);
+      background-size: 160px 120px; }
+    #wall-you { position: absolute; left: 808px; top: 1088px; width: 152px; height: 112px; background: linear-gradient(165deg, #3fffa0, #13a35a); box-shadow: 0 0 80px 20px rgba(46,255,140,.55); opacity: 0; }
+    #wall-tag { position: absolute; left: 744px; top: 990px; width: 280px; height: 72px; border-radius: 36px; background: #2eff8c; color: #04140b;
+      font-family: "Montserrat", sans-serif; font-weight: 900; font-size: 34px; line-height: 72px; text-align: center; letter-spacing: 1px; }
+    #wall-dim { position: absolute; inset: 0; background: radial-gradient(circle at 50% 46%, rgba(0,0,0,.35), rgba(0,0,0,.92) 75%); }
+    #wall-lights { position: absolute; inset: 0; background: radial-gradient(circle at 50% 20%, rgba(255,232,170,.28), rgba(255,232,170,0) 60%); opacity: 0; }
+    #wall-flash { position: absolute; inset: 0; background: #ff2a3c; }
+    #wall-panel { position: absolute; left: 110px; right: 110px; top: 220px; height: 230px; border-radius: 28px; background: rgba(8,10,12,.82); border: 3px solid #2a3238; text-align: center; }
+    #wall-label { position: absolute; left: 0; right: 0; top: 30px; font-family: "Space Mono", monospace; font-weight: 700; font-size: 34px; letter-spacing: 6px; color: #8d9aa3; }
+    #wall-count { position: absolute; left: 0; right: 0; top: 80px; font-family: "Montserrat", sans-serif; font-weight: 900; font-size: 86px; color: #fff; letter-spacing: -2px; }
+    #wall-count b { color: #2eff8c; }
+    #wall-sealed { position: absolute; left: 0; right: 0; top: 760px; text-align: center; font-family: "Montserrat", sans-serif; font-weight: 900; font-size: 170px; color: #ff2a3c; letter-spacing: 4px; text-shadow: 0 0 60px rgba(255,42,60,.7); }
+  </style>
+  <div id="root" data-composition-id="wall" data-width="1080" data-height="1920">
+    <div id="wall-cam">
+      <div id="wall-tiles"></div>
+      <div id="wall-lights"></div>
+      <div id="wall-dim"></div>
+      <div id="wall-you"></div>
+      <div id="wall-tag" class="clip" data-start="2.5" data-duration="9.9">YOUR NAME</div>
+    </div>
+    <div id="wall-flash" style="opacity:0"></div>
+    <div id="wall-panel" class="clip" data-start="3.9" data-duration="8.5">
+      <div id="wall-label">BOXES CLAIMED</div>
+      <div id="wall-count"><b id="wall-num">0</b> / 10,000</div>
+    </div>
+    <div id="wall-sealed" class="clip" data-start="10.85" data-duration="1.55">SEALED</div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    const fmt = (n) => Math.round(n).toLocaleString("en-US");
+    tl.fromTo("#wall-cam", { scale: 1.25, y: 120 }, { scale: 1, y: 0, duration: 3.5, ease: "power3.out" }, 0);
+    tl.fromTo("#wall-cam", { x: 0 }, { x: -40, duration: 8.9, ease: "none", immediateRender: false }, 3.5);
+    tl.fromTo("#wall-you", { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.out" }, 1.9);
+    tl.fromTo("#wall-tag", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "back.out(2)" }, 2.5);
+    tl.fromTo("#wall-panel", { y: -40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "power3.out" }, 3.95);
+    const c = { v: 0 };
+    tl.fromTo(c, { v: 0 }, { v: 1000, duration: 1.1, ease: "power2.out", onUpdate: () => { document.getElementById("wall-num").textContent = fmt(c.v); } }, 6.25);
+    tl.fromTo("#wall-lights", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 6.9);
+    tl.fromTo("#wall-dim", { opacity: 1 }, { opacity: 0.45, duration: 0.5, ease: "power2.out" }, 6.9);
+    const c2 = { v: 1000 };
+    tl.fromTo(c2, { v: 1000 }, { v: 10000, duration: 1.4, ease: "power2.inOut", onUpdate: () => { document.getElementById("wall-num").textContent = fmt(c2.v); } }, 8.9);
+    tl.fromTo("#wall-sealed", { scale: 1.8, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.2, ease: "power4.in" }, 10.85);
+    tl.fromTo("#wall-flash", { opacity: 0.55 }, { opacity: 0, duration: 0.5, ease: "power2.out", immediateRender: false }, 11.05);
+    tl.fromTo("#wall-cam", { y: 0 }, { y: 14, duration: 0.05, yoyo: true, repeat: 5, ease: "none", immediateRender: false }, 11.05);
+    tl.fromTo("#wall-lights", { opacity: 1 }, { opacity: 0, duration: 0.3, immediateRender: false }, 11.05);
+    window.__timelines["wall"] = tl;
+  </script>
+</template>

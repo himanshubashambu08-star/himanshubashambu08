@@ -1,0 +1,50 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #050607; }
+    #b7-bg { position: absolute; left: -260px; top: -240px; width: 1600px; height: 2400px; opacity: .35;
+      background-color: #171b1f;
+      background-image: linear-gradient(#07090a 8px, transparent 8px), linear-gradient(90deg, #07090a 8px, transparent 8px), linear-gradient(165deg, #3a434b, #1a1f24);
+      background-size: 160px 120px; }
+    #b7-vignette { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, rgba(0,0,0,0) 20%, rgba(0,0,0,.95) 70%); }
+    #b7-glow { position: absolute; left: 40px; top: 350px; width: 1000px; height: 1000px; border-radius: 50%; background: radial-gradient(circle, rgba(46,255,140,.45), rgba(46,255,140,0) 60%); }
+    #b7-box { position: absolute; left: 260px; top: 640px; width: 560px; height: 420px; border-radius: 14px;
+      background: linear-gradient(165deg, #4a545d 0%, #2a3138 55%, #1d2227 100%);
+      box-shadow: inset 0 0 0 10px #12161a, inset 0 0 0 14px #59646d, 0 30px 80px rgba(0,0,0,.9); }
+    #b7-plate { position: absolute; left: 130px; top: 50px; width: 300px; height: 110px; border-radius: 10px; background: #0b0f0d; border: 4px solid #2eff8c;
+      font-family: "Space Mono", monospace; font-weight: 700; font-size: 76px; line-height: 102px; text-align: center; color: #2eff8c; text-shadow: 0 0 24px rgba(46,255,140,.9); }
+    #b7-shackle { position: absolute; left: 236px; top: 200px; width: 88px; height: 90px; border: 16px solid #9aa4ad; border-bottom: none; border-radius: 50px 50px 0 0; }
+    #b7-lock { position: absolute; left: 216px; top: 270px; width: 128px; height: 104px; border-radius: 14px; background: linear-gradient(165deg, #c9d1d7, #6c757d); }
+    #b7-keyhole { position: absolute; left: 52px; top: 30px; width: 24px; height: 44px; border-radius: 12px 12px 4px 4px; background: #14181b; }
+    .b7-tag { position: absolute; left: 0; right: 0; text-align: center; font-family: "Montserrat", sans-serif; font-weight: 900; }
+    #b7-nokey { top: 300px; font-size: 96px; color: #ff2a3c; letter-spacing: 2px; text-shadow: 0 0 40px rgba(255,42,60,.6); }
+    #b7-clock { top: 280px; font-family: "Space Mono", monospace; font-weight: 700; font-size: 140px; color: #fff; text-shadow: 0 0 30px rgba(255,255,255,.35); }
+    #b7-clock-sub { top: 460px; font-size: 40px; letter-spacing: 8px; color: #8d9aa3; }
+  </style>
+  <div id="root" data-composition-id="box777" data-width="1080" data-height="1920">
+    <div id="b7-bg"></div>
+    <div id="b7-vignette"></div>
+    <div id="b7-glow"></div>
+    <div id="b7-box">
+      <div id="b7-plate">0777</div>
+      <div id="b7-shackle"></div>
+      <div id="b7-lock"><div id="b7-keyhole"></div></div>
+    </div>
+    <div id="b7-nokey" class="b7-tag clip" data-start="7.1" data-duration="1.9">NO KEY EXISTS</div>
+    <div id="b7-clock" class="b7-tag clip" data-start="9.0" data-duration="3.45">03:00</div>
+    <div id="b7-clock-sub" class="b7-tag clip" data-start="9.0" data-duration="3.45">EVERY NIGHT</div>
+  </div>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#b7-box", { scale: 0.55, opacity: 0.5 }, { scale: 0.7, opacity: 0.8, duration: 2.4, ease: "none" }, 0);
+    tl.fromTo("#b7-glow", { opacity: 0.15 }, { opacity: 0.4, duration: 2.4, ease: "none" }, 0);
+    tl.fromTo("#b7-box", { scale: 0.7, opacity: 0.8 }, { scale: 1, opacity: 1, duration: 0.6, ease: "power3.out", immediateRender: false }, 2.5);
+    tl.fromTo("#b7-glow", { opacity: 0.4 }, { opacity: 1, duration: 0.6, ease: "power2.out", immediateRender: false }, 2.5);
+    tl.fromTo("#b7-box", { scale: 1 }, { scale: 1.08, duration: 4.5, ease: "none", immediateRender: false }, 3.1);
+    tl.fromTo("#b7-nokey", { scale: 1.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.2, ease: "power4.in" }, 7.1);
+    tl.fromTo(["#b7-clock", "#b7-clock-sub"], { y: 20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, ease: "power3.out" }, 9.05);
+    tl.fromTo("#b7-box", { x: 0, rotation: 0 }, { x: 18, rotation: 1.6, duration: 0.06, yoyo: true, repeat: 15, ease: "none", immediateRender: false }, 11.35);
+    tl.fromTo("#b7-glow", { opacity: 1 }, { opacity: 0.35, duration: 0.08, yoyo: true, repeat: 11, ease: "none", immediateRender: false }, 11.35);
+    window.__timelines["box777"] = tl;
+  </script>
+</template>

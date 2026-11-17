@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0a0c0e; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="38.57" data-width="1080" data-height="1920">
+      <div id="door" data-composition-id="door" data-composition-src="compositions/door.html" data-start="0" data-duration="5.0" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="wall" data-composition-id="wall" data-composition-src="compositions/wall.html" data-start="5.0" data-duration="12.38" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="box777" data-composition-id="box777" data-composition-src="compositions/box777.html" data-start="17.38" data-duration="12.47" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="cta" data-composition-id="cta" data-composition-src="compositions/cta.html" data-start="29.85" data-duration="8.72" data-track-index="1" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
+      <div id="captions" data-composition-id="captions" data-composition-src="compositions/captions.html" data-start="0" data-duration="38.57" data-track-index="2" data-track-kind="captions" data-width="1080" data-height="1920" style="z-index:10"></div>
+      <audio id="voiceover" class="clip" src="assets/voiceover.wav" data-start="0" data-duration="38.57" data-track-index="3" data-volume="1"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>
