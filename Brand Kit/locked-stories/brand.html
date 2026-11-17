@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  @import url('file:///dev/null');
+  :root { --g:#2eff8c; --bg:#0a0c0e; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#000; }
+  .wall { background-color:#171b1f;
+    background-image: linear-gradient(#07090a 8px, transparent 8px), linear-gradient(90deg,#07090a 8px, transparent 8px),
+      radial-gradient(circle at 54% 58%, #0d1012 7px, #5d6870 8px, transparent 10px), linear-gradient(165deg,#3a434b 0%,#222830 55%,#1a1f24 100%);
+    background-size:160px 120px; }
+  .art { position:relative; overflow:hidden; }
+  .dim { position:absolute; inset:0; background: radial-gradient(circle at 50% 50%, rgba(0,0,0,.25), rgba(0,0,0,.92) 70%); }
+  .lock { position:absolute; }
+  .shackle { position:absolute; left:22%; top:0; width:56%; height:52%; border:solid #c9d1d7; border-bottom:none; border-radius:999px 999px 0 0; }
+  .body { position:absolute; left:0; right:0; bottom:0; height:58%; border-radius:12%; background:linear-gradient(165deg,#3fffa0,#12a057); box-shadow:0 0 120px 30px rgba(46,255,140,.45); }
+  .hole { position:absolute; left:44%; top:28%; width:12%; height:40%; border-radius:999px 999px 20% 20%; background:#062312; }
+  .title { font-family: "Montserrat", "Arial Black", sans-serif; font-weight:900; color:#fff; letter-spacing:-2px; text-shadow:0 8px 40px rgba(0,0,0,.9); }
+  .title b { color:var(--g); text-shadow:0 0 40px rgba(46,255,140,.55); }
+  .tag { font-family:"Space Mono", "DejaVu Sans Mono", monospace; font-weight:700; color:#9aa6ae; letter-spacing:8px; }
+  #pfp { width:1080px; height:1080px; }
+  #yt { width:2560px; height:1440px; }
+  #fb { width:1640px; height:624px; }
+</style></head>
+<body>
+  <div id="pfp" class="art wall"><div class="dim" style="background:radial-gradient(circle,rgba(0,0,0,.35),rgba(0,0,0,.95) 62%)"></div>
+    <div class="lock" style="left:340px;top:250px;width:400px;height:560px">
+      <div class="shackle" style="border-width:56px"></div>
+      <div class="body"><div class="hole"></div></div>
+    </div>
+  </div>
+  <div id="yt" class="art wall"><div class="dim"></div>
+    <div style="position:absolute;left:507px;top:508px;width:1546px;height:423px;display:flex;align-items:center;justify-content:center;gap:56px">
+      <div class="lock" style="position:relative;width:200px;height:280px;flex:none">
+        <div class="shackle" style="border-width:30px"></div>
+        <div class="body"><div class="hole"></div></div>
+      </div>
+      <div>
+        <div class="title" style="font-size:118px;line-height:124px;white-space:nowrap">LOCKED <b>STORIES</b></div>
+        <div class="tag" style="font-size:32px;margin-top:20px;letter-spacing:6px;white-space:nowrap">EVERY BOX HAS A SECRET · NEW STORY DAILY</div>
+      </div>
+    </div>
+  </div>
+  <div id="fb" class="art wall"><div class="dim"></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:40px">
+      <div class="lock" style="position:relative;width:130px;height:182px;flex:none">
+        <div class="shackle" style="border-width:20px"></div>
+        <div class="body"><div class="hole"></div></div>
+      </div>
+      <div>
+        <div class="title" style="font-size:100px;line-height:100px">LOCKED <b>STORIES</b></div>
+        <div class="tag" style="font-size:26px;margin-top:16px;letter-spacing:6px">EVERY BOX HAS A SECRET</div>
+      </div>
+    </div>
+  </div>
+</body></html>
