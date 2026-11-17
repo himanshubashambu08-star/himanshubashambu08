@@ -1,0 +1,189 @@
+{
+ "id": "01_InCab_Part1",
+ "episode": "01",
+ "title": "In-Cab Part 1",
+ "view": "dash",
+ "practice_title": "IN-CAB PART 1",
+ "next": "02 · In-Cab Part 2",
+ "segments": [
+  {
+   "t": "narr",
+   "cue": "truck-cab",
+   "hi": "आज हिमांशु का ड्राइव टेस्ट का दिन है। एग्ज़ामिनर बगल में बैठा है।",
+   "cap": "Aaj Himanshu ka DriveTest din hai. Examiner bagal mein baitha hai."
+  },
+  {
+   "t": "examiner",
+   "text": "Start your in-cab inspection."
+  },
+  {
+   "t": "narr",
+   "cue": "truck-cab",
+   "hi": "अब हिमांशु क्या करेगा?",
+   "cap": "Ab Himanshu kya karega?"
+  },
+  {
+   "t": "do",
+   "text": "Ignition on, wait, start the engine",
+   "cue": "start",
+   "hi": "सबसे पहले इग्निशन ऑन करो, थोड़ा वेट करो, फिर इंजन स्टार्ट।",
+   "cap": "Sabse pehle ignition on karo, thoda wait karo, phir engine start."
+  },
+  {
+   "t": "say",
+   "text": "Wheels are chocked, gear is neutral, brakes are applied"
+  },
+  {
+   "t": "section",
+   "name": "DISPLAY"
+  },
+  {
+   "t": "narr",
+   "cue": "dash-all",
+   "hi": "अब डिस्प्ले। गेजेस एक एक करके चेक करो।",
+   "cap": "Ab Display. Gauges ek-ek karke check karo."
+  },
+  {
+   "t": "say",
+   "cue": "dash-warn",
+   "text": "All warning lights are gone except parking brake and stability light"
+  },
+  {
+   "t": "say",
+   "cue": "dash-rpm",
+   "text": "RPM gauge is working",
+   "speak": "R.P.M. gauge is working"
+  },
+  {
+   "t": "say",
+   "cue": "dash-oil",
+   "text": "Engine oil gauge is working"
+  },
+  {
+   "t": "say",
+   "cue": "dash-fuel",
+   "text": "Fuel & DEF gauge is working",
+   "speak": "Fuel and D.E.F. gauge is working"
+  },
+  {
+   "t": "say",
+   "cue": "dash-air",
+   "text": "Both primary and secondary air gauges are working in normal operating range which is 80–145 PSI,",
+   "speak": "Both primary and secondary air gauges are working in normal operating range, which is eighty to one hundred forty five P.S.I."
+  },
+  {
+   "t": "flash",
+   "big": "80–145",
+   "unit": "PSI",
+   "range": [
+    80,
+    145
+   ],
+   "needle": 120,
+   "hi": "याद रखो, अस्सी से एक सौ पैंतालीस पी एस आई। ये नॉर्मल रेंज है।",
+   "cap": "Yaad rakho: 80 se 145 PSI. Yeh normal range hai."
+  },
+  {
+   "t": "say",
+   "cue": "dash-air",
+   "text": "currently stable at ___ PSI",
+   "speak": "currently stable at ... P.S.I."
+  },
+  {
+   "t": "narr",
+   "cue": "dash-air",
+   "hi": "खाली जगह पे, गेज का नंबर बोलो।",
+   "cap": "Blank mein gauge ka number bolo."
+  },
+  {
+   "t": "say",
+   "cue": "dash-water",
+   "text": "Water heater gauge is working"
+  },
+  {
+   "t": "say",
+   "cue": "dash-speed",
+   "text": "Speedometer gauge I will show you on the road"
+  },
+  {
+   "t": "section",
+   "name": "STEERING WHEEL"
+  },
+  {
+   "t": "narr",
+   "cue": "wheel",
+   "hi": "अब स्टीयरिंग व्हील।",
+   "cap": "Ab Steering Wheel."
+  },
+  {
+   "t": "say",
+   "cue": "wheel",
+   "text": "no crack, no damage, properly mounted"
+  },
+  {
+   "t": "say",
+   "cue": "wheel-turn",
+   "text": "turns left and turns right"
+  },
+  {
+   "t": "say",
+   "cue": "wheel",
+   "text": "no extra free play"
+  },
+  {
+   "t": "say",
+   "cue": "horn-city",
+   "text": "City horn is working"
+  },
+  {
+   "t": "say",
+   "cue": "horn-hwy",
+   "text": "This is highway horn"
+  },
+  {
+   "t": "trick",
+   "letters": "L R O F A W S",
+   "words": "Lights · RPM · Oil · Fuel · Air · Water · Speedo",
+   "hi": "मेमोरी ट्रिक। डिस्प्ले का ऑर्डर याद रखो: लकी राजू ऑर्डर्स फ्रेश आलू वाला समोसा। लाइट्स, आर पी एम, ऑयल, फ्यूल, एयर, वॉटर, स्पीडो।",
+   "cap": "Memory trick: Display ka order yaad rakho.",
+   "phrase": "Lucky Raju Orders Fresh Aloo Wala Samosa"
+  },
+  {
+   "t": "trick",
+   "letters": "CONDITION → L/R → PLAY → 2 HORNS",
+   "words": "Steering: condition · left-right · free play · city horn · highway horn",
+   "hi": "स्टीयरिंग में: कंडीशन, लेफ्ट राइट, फ्री प्ले, फिर दो हॉर्न: सिटी, फिर हाईवे।",
+   "cap": "Steering mein: condition, left-right, free play, phir do horn: city, phir highway."
+  },
+  {
+   "t": "practice",
+   "silence": 9,
+   "hi": "अब आप बोलो! तीन, दो, एक।",
+   "cap": "Ab aap bolo! 3… 2… 1…",
+   "items": [
+    [
+     "START",
+     "Ignition on, wait…"
+    ],
+    [
+     "SAY",
+     "Wheels are chocked…"
+    ],
+    [
+     "DISPLAY",
+     "All warning lights… · RPM… · Engine oil… · Fuel & DEF… · Both primary… · Water heater… · Speedometer…"
+    ],
+    [
+     "STEERING",
+     "no crack… · turns left… · no extra… · City horn… · This is…"
+    ]
+   ]
+  },
+  {
+   "t": "say",
+   "final": true,
+   "text": "My inspection is done — I will read minor and major defects.",
+   "speak": "My inspection is done. I will read minor and major defects."
+  }
+ ]
+}
