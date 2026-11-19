@@ -1,0 +1,109 @@
+{
+  "engine": {
+    "instruments": [
+      "ALL:CURRENCY",
+      "ALL:METAL",
+      "ALL:CFD"
+    ],
+    "instrument_types": [
+      "CURRENCY"
+    ],
+    "entry_timeframe": "H1",
+    "trend_timeframe": "H4",
+    "entry_sessions_ny": [],
+    "board_refresh_seconds": 60,
+    "breakeven_at_r": 1.0,
+    "trail_start_r": 1.5,
+    "trail_atr_mult": 1.0,
+    "blackout_utc": [],
+    "learn": true,
+    "entry_sessions_by_type": {},
+    "strategy": "ema_break",
+    "gate_min_unseen_trades": 100,
+    "gate_min_pf": 1.2,
+    "backtest_days": 730,
+    "base_instrument": "XAU_USD",
+    "base_window_ny": [
+      [
+        "00:00",
+        "24:00"
+      ]
+    ],
+    "research_days": 730,
+    "cell_min_unseen_trades": 30,
+    "cell_min_unseen_pf": 1.2,
+    "cell_min_tuning_pf": 1.1,
+    "trade_mode": "list",
+    "research_timeframe": "H1",
+    "research_rr": 3.0,
+    "forward_tests": [
+      {
+        "instrument": "ALL",
+        "timeframe": "H1",
+        "reward_risk": 3.0
+      }
+    ],
+    "auto_add_cells": false
+  },
+  "strategy": {
+    "ema_fast": 9,
+    "ema_slow": 15,
+    "atr_period": 14,
+    "min_stop_atr": 0.5,
+    "max_stop_atr": 2.0,
+    "reward_risk": 3.0,
+    "max_trades_per_day": 0
+  },
+  "risk": {
+    "risk_per_trade_pct": 0.5,
+    "daily_loss_limit_pct": 2.0,
+    "max_drawdown_pct": 10.0,
+    "max_open_trades": 5,
+    "max_trades_per_instrument": 1,
+    "max_trades_per_currency": 2,
+    "reward_risk": 2.0,
+    "correlated_groups": [
+      [
+        "AUD_USD",
+        "NZD_USD"
+      ],
+      [
+        "AUD_JPY",
+        "NZD_JPY"
+      ],
+      [
+        "NAS100_USD",
+        "SPX500_USD",
+        "US30_USD"
+      ]
+    ]
+  },
+  "learning": {
+    "min_samples": 20,
+    "window_days": 90,
+    "margin_r": 0.25,
+    "tune": true,
+    "tune_bars": 3000,
+    "tune_instruments": 8,
+    "test_fraction": 0.3
+  },
+  "news": {
+    "enabled": true,
+    "block_impacts": [
+      "High"
+    ],
+    "before_min": 15,
+    "after_min": 15,
+    "refresh_minutes": 60
+  },
+  "brain": {
+    "enabled": true,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "max_searches": 5,
+    "brief_times_ny": [
+      "07:30",
+      "16:30"
+    ]
+  }
+}

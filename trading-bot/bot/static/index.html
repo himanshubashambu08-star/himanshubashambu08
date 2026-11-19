@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trade Bot">
+<title>Forex Trade Bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{--bg:#F3F5FA;--surface:#FFFFFF;--ink:#141A2B;--muted:#5B6479;--line:#DDE2EC;--gold:#946500;--gold-hi:#C8901A;
+ --gold-soft:#FBF1D9;--on-gold:#FFFFFF;--good:#0F7A55;--good-soft:#DDF3EA;--bad:#C2352B;--bad-soft:#FBE4E1;
+ --warn:#9A5B00;--warn-soft:#FBEBD3;--up:#0F9D6B;--down:#D64545;--ema:#7C5CD6;--zone:rgba(200,144,26,.18);
+ --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+ --f-num:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0B1020;--surface:#141B2E;--ink:#ECEFF7;--muted:#8E98B2;--line:#25304A;
+ --gold:#E9B949;--gold-hi:#F7D57E;--gold-soft:#2E2817;--on-gold:#1A1300;--good:#3FD69A;--good-soft:#11291F;
+ --bad:#FF7A6E;--bad-soft:#331917;--warn:#F2B35A;--warn-soft:#30230F;--up:#3FD69A;--down:#FF7A6E;--ema:#A58CF0;--zone:rgba(233,185,73,.2)}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 var(--f-body)}
+.wrap{display:flex;flex-direction:column;gap:12px}
+.app{max-width:1100px;margin:0 auto;padding:12px 16px calc(28px + env(safe-area-inset-bottom))}
+header.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 10px;margin:0 0 6px;display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.brand h1{font:700 26px/1 var(--f-display);margin:0;letter-spacing:.01em}
+.brand h1 span{color:var(--gold)}
+.sym{font:500 12px var(--f-num);color:var(--muted)}
+.tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:1 0 auto;white-space:nowrap;font:600 14px var(--f-body);padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:var(--on-gold);border-color:transparent;box-shadow:0 4px 14px -6px var(--gold)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+h2{font:700 20px/1.1 var(--f-display);margin:0 0 8px;letter-spacing:.01em}
+h3{font:600 15px var(--f-body);margin:0}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.muted{color:var(--muted)}.small{font-size:13px}
+.num{font-family:var(--f-num)}
+.status{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;font-weight:600}
+.status .dot{width:10px;height:10px;border-radius:50%;background:currentColor;flex:none}
+.status small{display:block;font-weight:500;opacity:.85;font-size:13px}
+.status.ok{background:var(--good-soft);color:var(--good)}
+.status.open{background:var(--gold-soft);color:var(--gold)}
+.status.lock{background:var(--bad-soft);color:var(--bad)}
+.daybar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.daybar div{background:var(--surface);padding:10px 8px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.daybar b{font:500 17px var(--f-num);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:420px){.daybar{grid-template-columns:repeat(2,1fr)}}
+.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+/* pipeline */
+.flow{display:flex;flex-direction:column;gap:0}
+.flow .arrow{height:16px;margin-left:27px;border-left:2px dashed var(--line)}
+.agent-row{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;text-align:left;color:inherit;font:inherit;width:100%}
+.agent-row:hover{border-color:var(--gold)}
+.emo{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;font-size:22px;background:var(--bg);border:1px solid var(--line)}
+.agent-row .name{font-weight:600}
+.agent-row .st{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tone{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--muted);vertical-align:1px}
+.tone.ok{background:var(--good)}.tone.warn{background:var(--warn)}.tone.bad{background:var(--bad)}.tone.idle{background:var(--line)}
+.big{font:500 18px var(--f-num);text-align:right}
+.big small{display:block;font:600 10px var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.side-note{font-size:12px;color:var(--muted);margin-left:56px;padding:2px 0}
+/* agent cards */
+.agents{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.acard{display:flex;flex-direction:column;gap:8px;cursor:pointer;text-align:left;color:inherit;font:inherit}
+.acard:hover{border-color:var(--gold)}
+.acard .head{display:flex;gap:10px;align-items:center}
+.plan{background:var(--gold-soft);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:13.5px}
+.plan b{color:var(--gold)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.chip.to{border-color:var(--gold);color:var(--gold);background:var(--gold-soft);cursor:pointer}
+/* agent detail */
+.back{align-self:flex-start;background:none;border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 12px;font:600 14px var(--f-body);cursor:pointer}
+.hero{display:flex;gap:12px;align-items:center}
+.hero .emo{width:56px;height:56px;font-size:28px}
+.hero h2{margin:0}
+.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.tl li{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.tl li:first-child{border-top:none}
+.tl .t{font:500 12px var(--f-num);color:var(--muted);padding-top:2px}
+.tl .to{font-size:12px;color:var(--gold);font-weight:600}
+.tl li.good .txt{color:var(--good)}.tl li.bad .txt{color:var(--bad)}.tl li.warn .txt{color:var(--warn)}
+.tl li[data-ref]{cursor:pointer}
+.tl li[data-ref] .txt::after{content:"  ›";color:var(--muted)}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+/* journeys */
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font:600 13px var(--f-body);cursor:pointer}
+.seg button.on{border-color:var(--gold);background:var(--gold-soft);color:var(--gold)}
+.jcard{display:flex;flex-direction:column;gap:8px}
+.jhead{display:flex;justify-content:space-between;gap:8px;align-items:center;cursor:pointer}
+.badge{font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 8px;border-radius:6px;text-transform:uppercase;white-space:nowrap}
+.b-open{background:var(--gold-soft);color:var(--gold)}.b-block{background:var(--warn-soft);color:var(--warn)}
+.b-win{background:var(--good-soft);color:var(--good)}.b-loss{background:var(--bad-soft);color:var(--bad)}.b-run{background:var(--bg);color:var(--muted)}
+.steps{list-style:none;margin:0;padding:0 0 0 6px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.steps li{position:relative;padding-left:14px;font-size:14px}
+.steps li::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--muted)}
+.steps li.pass::before{border-color:var(--good);background:var(--good)}
+.steps li.block::before{border-color:var(--bad);background:var(--bad)}
+.steps li.info::before{border-color:var(--gold)}
+.steps .who{font-weight:600}
+/* charts */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.ccard{border-top:4px solid var(--line)}
+.ccard.signal{border-top-color:var(--good)}.ccard.forming{border-top-color:var(--gold-hi)}.ccard.watch{border-top-color:#4c7bd9}
+canvas{width:100%;height:150px;display:block;margin:6px 0}
+canvas.mini{height:110px}
+canvas.big{height:min(60vh,420px)}
+.ccard a,.jcard a{color:var(--gold);text-decoration:none;font-weight:600}
+.live{font-size:12px;color:var(--muted)}.live.on{color:var(--good);animation:glow2 1.2s ease-in-out infinite}
+@keyframes glow2{50%{opacity:.25}}
+.cbadge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;color:#fff;background:var(--muted)}
+.signal .cbadge{background:var(--good)}.forming .cbadge{background:var(--gold-hi)}.watch .cbadge{background:#4c7bd9}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted)}
+ul.plain{margin:0;padding-left:18px}ul.plain li{margin:4px 0}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px}
+.kv b{font-family:var(--f-num);font-weight:500}
+details summary{cursor:pointer;font-weight:600}
+
+/* ---- Manager robot ---- */
+.app{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+#robot{position:fixed;left:0;top:0;z-index:20;width:64px;height:76px;padding:0;border:0;background:none;cursor:pointer;
+ transition:transform 1.1s cubic-bezier(.4,.1,.2,1);filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}
+#robot svg{display:block;animation:bob 2.4s ease-in-out infinite;transform-origin:50% 100%}
+#robot.walking svg{animation:walk .34s ease-in-out infinite}
+#robot.walking .leg-l{animation:legs .34s infinite}#robot.walking .leg-r{animation:legs .34s infinite reverse}
+#robot.jump svg{animation:jump .45s ease-in-out 3}
+#robot .eyes{animation:blink 4.5s infinite;transform-origin:32px 30px;transform-box:view-box}
+#robot .glow{animation:glow 1.6s infinite}
+#robot[data-mood="good"] .eye{fill:#3FD69A}#robot[data-mood="bad"] .eye{fill:#FF7A6E}#robot[data-mood="warn"] .eye{fill:#F2B35A}
+@keyframes bob{50%{transform:translateY(-4px)}}
+@keyframes walk{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg) translateY(-3px)}}
+@keyframes legs{50%{transform:translateY(-3px)}}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes glow{50%{opacity:.3}}
+@keyframes jump{50%{transform:translateY(-16px)}}
+#bubble{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:19;
+ width:min(560px,calc(100% - 24px));max-height:52vh;overflow:auto;background:var(--surface);border:1px solid var(--gold);
+ border-radius:14px;padding:14px;box-shadow:0 14px 40px -12px rgba(0,0,0,.45)}
+#bubble[hidden]{display:none}
+.bhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.bhead b{font:700 18px var(--f-display)}
+.bx{background:none;border:0;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{font:600 14px var(--f-body);padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.pri{background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:var(--on-gold);border-color:transparent}
+.news{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:6px}
+.news li{display:flex;gap:8px;align-items:flex-start;padding:9px 10px;border-radius:8px;background:var(--bg);cursor:pointer;font-size:14px}
+.news li::after{content:"›";margin-left:auto;color:var(--muted)}
+.pill{font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:6px;white-space:nowrap;text-transform:uppercase}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.info{background:var(--gold-soft);color:var(--gold)}
+.ev{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:10px 0;border-top:1px solid var(--line)}
+.ev:first-child{border-top:none}
+.ev .t{font:500 14px var(--f-num)}
+.ev.past{opacity:.55}
+.ev.on{background:var(--bad-soft);border-radius:8px;padding:10px 8px;margin:4px 0}
+.cur{font:600 12px var(--f-num);padding:1px 6px;border-radius:5px;background:var(--bg);border:1px solid var(--line)}
+.imp{font-size:11px;font-weight:700;padding:1px 6px;border-radius:5px;text-transform:uppercase}
+.imp.High{background:var(--bad-soft);color:var(--bad)}.imp.Medium{background:var(--warn-soft);color:var(--warn)}
+.otr{padding:10px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:3px}.otr:first-of-type{border-top:none}
+.otr a{color:var(--gold);font-weight:600;text-decoration:none}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:5px 0 3px}.bar span{display:block;height:100%;background:var(--gold-hi)}
+.dayrow{border-top:1px solid var(--line);padding:8px 0}.dayrow:first-of-type{border-top:none}
+.dayrow summary{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;cursor:pointer;font-size:14px}
+.dayrow summary .dname{font-weight:700;min-width:84px}.dayrow summary b{margin-left:auto}
+.xt{display:flex;flex-direction:column;gap:6px;margin-top:8px}.xr{display:grid;grid-template-columns:1fr 92px 92px;gap:6px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px}
+.sh .xr{grid-template-columns:1fr 130px}.sh .xc{grid-column:auto!important}
+.xr.win{border-color:var(--good);background:var(--good-soft)}.xn{font-size:14px;font-weight:600}.xc{font-size:13px;text-align:right}.xc .lbl{display:block;font-size:10px}
+.rc{display:flex;flex-direction:column;gap:1px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+.rc:first-child{border-top:none}.rc b{font:500 14px var(--f-num)}
+.chat{display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 12px;border-radius:12px;font-size:14.5px;max-width:92%;overflow-wrap:anywhere}
+.msg.user{align-self:flex-end;background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:var(--on-gold)}
+.msg.assistant{align-self:flex-start;background:var(--bg);border:1px solid var(--line)}
+.msg a,.card a{color:var(--gold)}
+.askrow{display:flex;gap:8px;align-items:flex-end}
+.askrow textarea{flex:1;font:15px var(--f-body);padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical;min-height:44px}
+.hl{outline:3px solid var(--gold-hi);outline-offset:3px;border-radius:12px;animation:pulse 1.3s infinite}
+@keyframes pulse{50%{outline-color:transparent}}
+@media (prefers-reduced-motion:reduce){#robot,#robot *,.hl{animation:none!important;transition:none!important}}
+
+/* ---- clean app layout ---- */
+header.top{position:static;padding:6px 0 4px}
+.brand h1{font-size:22px}
+.app{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+.bnav{position:fixed;left:0;right:0;bottom:0;z-index:15;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+.bnav button{background:none;border:0;color:var(--muted);font:600 12px var(--f-body);display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:10px;cursor:pointer}
+.bnav button span{font-size:20px;line-height:1}
+.bnav button.on{color:var(--gold);background:var(--gold-soft)}
+.menu{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mi{display:grid;grid-template-columns:40px 1fr auto 14px;gap:10px;align-items:center;padding:12px 12px;border:0;border-top:1px solid var(--line);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;width:100%}
+.mi:first-child{border-top:none}
+.mi:active,.mi:hover{background:var(--bg)}
+.mi .ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:20px;background:var(--bg);border:1px solid var(--line)}
+.mi .tt{font-weight:600;font-size:15px}.mi .ss{font-size:12.5px;color:var(--muted);margin-top:1px}
+.mi .bd{font:600 12px var(--f-num);padding:3px 8px;border-radius:999px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.mi .bd.good{color:var(--good);border-color:var(--good);background:var(--good-soft)}.mi .bd.bad{color:var(--bad);border-color:var(--bad);background:var(--bad-soft)}
+.mi .bd.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.mi .ch{color:var(--muted);font-size:18px}
+.mgroup{font:600 11px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:6px 2px -4px}
+.phead{display:flex;align-items:center;gap:10px}
+.phead .back{padding:6px 10px}
+.phead h2{margin:0;font-size:22px}
+.phead .sub{font-size:12.5px;color:var(--muted)}
+details.sec{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+details.sec>summary{list-style:none;display:grid;grid-template-columns:1fr auto 14px;gap:8px;align-items:center;padding:13px 14px;cursor:pointer}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary .st{font-weight:600}details.sec>summary .sm{font-size:12.5px;color:var(--muted);text-align:right}
+details.sec>summary::after{content:"›";color:var(--muted);font-size:18px;transition:transform .15s}
+details.sec[open]>summary::after{transform:rotate(90deg)}
+details.sec>.sb{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px}
+details.sec>.sb>.card{border:0;padding:0;background:none}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kpi b{display:block;font:500 20px var(--f-num);margin-top:2px}
+.status.slim{padding:10px 12px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div class="brand"><h1>Forex <span>Trade Bot</span></h1><span class="sym" id="sym">OANDA · demo</span></div>
+</header>
+<main id="view" class="wrap"><p class="empty">Bot se data aa raha hai…</p></main>
+</div>
+<nav class="bnav" id="bnav">
+  <button data-go="home" data-nav="home"><span>🏠</span>Home</button>
+  <button data-go="trades" data-nav="trades"><span>🎯</span>Trades</button>
+  <button data-go="charts" data-nav="charts"><span>📈</span>Charts</button>
+  <button data-go="menu" data-nav="menu"><span>☰</span>Menu</button>
+</nav>
+<button id="robot" aria-label="Manager robot: khabrein dikhao" data-mood="info">
+<svg viewBox="0 0 64 76" width="64" height="76" aria-hidden="true">
+ <defs><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D57E"/><stop offset="1" stop-color="#C8901A"/></linearGradient></defs>
+ <line x1="32" y1="5" x2="32" y2="14" stroke="#946500" stroke-width="3" stroke-linecap="round"/>
+ <circle class="glow" cx="32" cy="5" r="4.5" fill="#3FD69A"/>
+ <rect x="7" y="13" width="50" height="36" rx="13" fill="url(#rg)" stroke="#946500" stroke-width="2"/>
+ <rect x="13" y="20" width="38" height="21" rx="10" fill="#141A2B"/>
+ <g class="eyes"><rect class="eye" x="20" y="25" width="8" height="11" rx="4" fill="#7FE7FF"/><rect class="eye" x="36" y="25" width="8" height="11" rx="4" fill="#7FE7FF"/></g>
+ <rect x="17" y="51" width="30" height="16" rx="6" fill="url(#rg)" stroke="#946500" stroke-width="2"/>
+ <circle class="glow" cx="32" cy="59" r="3" fill="#3FD69A"/>
+ <rect x="5" y="53" width="10" height="5" rx="2.5" fill="#C8901A"/><rect x="49" y="53" width="10" height="5" rx="2.5" fill="#C8901A"/>
+ <rect class="leg-l" x="21" y="67" width="8" height="8" rx="2.5" fill="#946500"/><rect class="leg-r" x="35" y="67" width="8" height="8" rx="2.5" fill="#946500"/>
+</svg></button>
+<div id="bubble" role="dialog" aria-live="polite" hidden></div>
+<script>
+const FLOW = ['scanner','reader','rules','timer','risk','executor','manager','learner'];
+const COUNT_LABELS = {scans:'Scans',charts:'Charts padhe',signals:'Signal mile',checked:'Checks',passed:'Pass hue',
+  blocked:'Roke',go:'GO diye',approved:'Approve kiye',orders:'Orders lage',closed:'Trades close',sl_moves:'SL move',
+  r_x100:'Kul R',followed:'Results dekhe'};
+const FEEDS = {scanner:[],reader:['scanner'],rules:['reader','learner'],timer:['rules','learner','budget','news'],risk:['timer'],
+  executor:['risk'],manager:['executor'],learner:['timer','risk','manager'],budget:[],news:[]};
+let S = null, route = location.hash.slice(1) || 'home', jfilter = 'all', cfilter = 'all', openJ = new Set();
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const pair = n => String(n || '').replace('_','/');
+const money = (x, c) => x == null ? '-' : Number(x).toLocaleString(undefined,{maximumFractionDigits:0}) + (c ? ' ' + c : '');
+const px = v => v == null ? '-' : Math.abs(v) >= 1000 ? Number(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : Number(v).toFixed(Math.abs(v) < 20 ? 5 : 3);
+const tfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false});
+const dfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',day:'numeric',month:'short'});
+const nyT = ts => ts ? tfmt.format(new Date(ts*1000)) : '-';
+const dfmtY = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',day:'numeric',month:'short',year:'numeric'});
+const nyDT = ts => { if (!ts) return '-'; const d = new Date(ts*1000);
+  return (d.getFullYear() === new Date().getFullYear() ? dfmt.format(d) : dfmtY.format(d)) + ' ' + tfmt.format(d); };
+const nyD = ts => ts ? dfmtY.format(new Date(ts*1000)) : '-';
+const agent = id => (S?.agents || []).find(a => a.id === id) || {id, emoji:'•', name:id, counts:{}, handoffs:{}, events:[]};
+const aname = id => { const a = agent(id); return `${a.emoji} ${a.name}`; };
+const countVal = (k, v) => k === 'r_x100' ? (v/100 >= 0 ? '+' : '') + (v/100).toFixed(2) + 'R' : v;
+
+window.addEventListener('hashchange', () => { route = location.hash.slice(1) || 'home'; render(); if (!BOT.guiding) window.scrollTo(0,0); });
+function go(r){ if (location.hash.slice(1) === r) { route = r; render(); } else location.hash = r; }
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-go]'); if (a) { e.preventDefault(); go(a.dataset.go); return; }
+  const j = e.target.closest('[data-ref]'); if (j) { openJ.add(j.dataset.ref); go('journeys'); setTimeout(() => document.getElementById('j-' + CSS.escape(j.dataset.ref))?.scrollIntoView({block:'center'}), 50); }
+});
+
+function render(){
+  const brainOn = !!(S && S.brain && S.brain.available);
+  if (route === 'ask' && S && !brainOn) { route = 'home'; history.replaceState(null, '', '#home'); }
+  const base = route.split('/')[0];
+  document.querySelectorAll('#bnav button').forEach(b => b.classList.toggle('on', b.dataset.nav === navKey(base)));
+  if (!S) return;
+  const sym = $('#sym'); if (sym && S.version) sym.textContent = `OANDA · demo · v${S.version.app} · ${(S.mode || {}).strategy === 'ema_break' ? 'EMA9/15' : 'R' + S.version.rules}`;
+  const v = $('#view');
+  if (base === 'agent') v.innerHTML = viewAgent(route.split('/')[1]);
+  else if (base === 'agents') v.innerHTML = viewAgents();
+  else if (base === 'journeys') v.innerHTML = viewJourneys();
+  else if (base === 'charts') v.innerHTML = viewCharts();
+  else if (base === 'chart') v.innerHTML = viewChart(decodeURIComponent(route.split('/')[1] || ''));
+  else if (base === 'learn') v.innerHTML = viewLearn();
+  else if (base === 'news') v.innerHTML = viewNews();
+  else if (base === 'closed') v.innerHTML = viewClosed();
+  else if (base === 'ask') { const q = document.getElementById('q')?.value || ''; v.innerHTML = viewAsk(); const t = document.getElementById('q'); if (t) t.value = q; }
+  else if (base === 'menu') v.innerHTML = viewMenu();
+  else if (base === 'trades') v.innerHTML = viewTrades();
+  else if (base === 'strategy') v.innerHTML = viewStrategy();
+  else if (base === 'shadow') v.innerHTML = viewShadow();
+  else if (base === 'settings') v.innerHTML = viewSettings();
+  else v.innerHTML = viewHome();
+  if (v.querySelector('canvas[data-inst]')) { applyLive(false); drawCharts(); }
+  applyHL();
+}
+
+function statusBanner(st){
+  const blocked = st.no_new_trades;
+  let cls = 'ok', text = (S.mode || {}).trade_mode === 'all' && (S.mode || {}).strategy === 'ema_break' ? 'Bot chal raha hai · har chart, 24 ghante' : 'Bot chal raha hai · entry window khuli hai', sub = st.session_text || '';
+  if (blocked && blocked !== 'outside US session') { cls = 'lock'; text = 'Naye trades band'; sub = blocked; }
+  else if (blocked) { cls = 'open'; text = 'Sirf dekh raha hai (US session band)'; sub = st.session_text; }
+  const sc = S.scan || {};
+  const scanTxt = sc.running ? `🔄 Scan chal raha hai: ${sc.done}/${sc.total} charts` : sc.finished ? `✅ Aakhri scan ${nyT(sc.finished)} NY: ${sc.total} charts, ${sc.signals} signal${sc.failed ? `, ${sc.failed} fail` : ''}` : '';
+  return `<div class="status ${cls}"><span class="dot"></span><span>${esc(text)}<small>${scanTxt ? esc(scanTxt) + ' · ' : ''}${st.next_scan ? 'agla scan ' + nyT(st.next_scan) + ' NY' : ''}</small></span></div>${sc.running ? `<div class="bar"><span style="width:${Math.round(100 * sc.done / Math.max(1, sc.total))}%"></span></div>` : ''}`;
+}
+
+function todayCard(){
+  const T = S.today; if (!T) return '';
+  const ccy = (S.status || {}).currency || '';
+  return `<div class="card" id="c-today"><div class="row"><h2>📊 Aaj ka hisaab</h2><span class="small muted">${nyDT(T.since)} NY se</span></div>
+    <div class="daybar">
+      <div><span class="lbl">Aaj khule</span><b>${T.opened}</b></div>
+      <div><span class="lbl">Abhi chal rahe</span><b>${T.open_now}</b></div>
+      <div><span class="lbl">Band hue</span><b>${T.closed} <span class="small"><span class="good">${T.wins}✅</span> <span class="bad">${T.losses}❌</span>${T.be ? ` ${T.be}➖` : ''}</span></b></div>
+      <div><span class="lbl">Band ka P&amp;L</span><b class="${T.pl >= 0 ? 'good' : 'bad'}">${T.pl >= 0 ? '+' : ''}${money(T.pl)} <span class="small">${ccy}</span></b></div>
+    </div>
+    <div class="small" style="margin-top:6px">Aaj bot ne <b>${T.opened}</b> trade khole, abhi <b>${T.open_now}</b> chal rahe hain. Aaj <b>${T.closed}</b> band hue (inme kal ke khule trade bhi ho sakte hain), kul <b class="${T.r >= 0 ? 'good' : 'bad'}">${T.r >= 0 ? '+' : ''}${T.r.toFixed(2)}R</b>.${T.missing ? ` <b class="warn">${T.missing} trade ka result abhi aa raha hai</b> (bot OANDA se khud laa raha hai, 10 min mein).` : ''}</div>
+    <div class="small" style="margin-top:4px"><a href="#charts" data-go="charts" onclick="cfilter='open'" style="color:var(--gold);font-weight:600">🎯 Chal rahe dekho ›</a> · <a href="#closed" data-go="closed" onclick="kperiod='day'" style="color:var(--gold);font-weight:600">📒 Band hue dekho ›</a></div></div>`;
+}
+function versionCard(){
+  const V = S.version || {}, H = (S.learning || {}).rules_history || [];
+  return `<div class="card" id="c-version"><h2>🏷️ Version</h2><div class="kv">
+    <span>App version</span><b>v${esc(V.app || '?')}</b>
+    <span>Code (server pe chal raha)</span><b>${esc(V.build || '-')}</b>
+    <span>Rules version</span><b>R${esc(V.rules || 1)}</b>
+    <span>Pairs mode</span><b>${(S.learning || {}).universe === 'liquid' ? 'Sirf bade pairs' : 'Saare charts'}</b></div>
+    ${H.length ? `<div class="lbl" style="margin-top:8px">Rules kab badle</div><ul class="tl">${H.slice(0, 6).map(h => `<li><span class="t">R${h.v}</span><span>${esc(h.why)} <span class="small muted">· ${nyDT(h.time)}</span></span></li>`).join('')}</ul>` : '<p class="small muted" style="margin:6px 0 0">R1 = shuru wale rules. Bot jab bhi rule ya setting badlega, number badhega aur yahan likha jayega.</p>'}</div>`;
+}
+
+function navKey(base){ return base === 'home' ? 'home' : ['trades','closed'].includes(base) ? 'trades' : ['charts','chart'].includes(base) ? 'charts' : 'menu'; }
+function pageHead(title, sub, back){
+  return `<div class="phead">${back ? `<button class="back" data-go="${back}">‹</button>` : ''}<div><h2>${title}</h2>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
+}
+function sec(id, title, summary, body, open){
+  return `<details class="sec" id="${id}" ${open ? 'open' : ''}><summary><span class="st">${title}</span><span class="sm">${summary || ''}</span></summary><div class="sb">${body}</div></details>`;
+}
+function menuItems(){
+  const st = S.status || {}, T = S.today || {}, ch = S.charts || [], M = S.mode || {}, L = S.learning || {};
+  const n = s => ch.filter(c => c.state === s).length;
+  const tr = st.open_trades || [], upl = tr.reduce((a, t) => a + (t.unrealized_pl || 0), 0);
+  const N = (S.news || []).filter(e => e.block && e.time > Date.now() / 1000);
+  const act = (S.news || []).filter(e => e.active);
+  const nr = S.next_review, mins = nr ? Math.max(0, Math.round((nr - Date.now() / 1000) / 60)) : null;
+  const ema = M.strategy === 'ema_break';
+  const G = M.gate || {};
+  const it = (go, ic, tt, ss, bd, cls) => ({go, ic, tt, ss, bd, cls});
+  return [
+    ['Trading', [
+      it('trades', '🎯', 'Chal rahe trades', tr.length ? tr.slice(0, 3).map(t => pair(t.instrument) + (t.units > 0 ? ' BUY' : ' SELL')).join(', ') : 'Abhi koi trade open nahi', tr.length ? `${tr.length} · ${upl >= 0 ? '+' : ''}${money(upl)}` : '0', tr.length ? (upl >= 0 ? 'good' : 'bad') : ''),
+      it('closed', '📒', 'Band trades', `Aaj ${T.closed || 0} band · ${T.wins || 0} jeete · ${T.losses || 0} haare`, `${(T.pl || 0) >= 0 ? '+' : ''}${money(T.pl || 0)}`, (T.pl || 0) > 0 ? 'good' : (T.pl || 0) < 0 ? 'bad' : ''),
+      it('journeys', '🧭', 'Signals ka safar', 'Har signal kahan pass hua, kahan ruka', String((S.journeys || []).length)),
+      it('charts', '📈', 'Charts', (S.scan || {}).running && !ch.length ? `Scan chal raha hai: ${S.scan.done}/${S.scan.total}` : `${n('signal')} signal · ${n('forming')} ban rahe · ${n('watch')} watch`, String(ch.length)),
+    ]],
+    ['Strategy aur seekhna', [
+      it('strategy', '🥇', 'Strategy & backtest', ema ? (M.backtest ? `XAU/USD backtest: unseen ${M.backtest.unseen.n} trades · PF ${M.backtest.unseen.pf ?? '-'}` : (M.gate_progress || {}).running ? 'XAU/USD backtest chal raha hai…' : 'XAU/USD backtest abhi nahi bana') : 'Purani pullback strategy', ema ? (M.trade_mode === 'all' ? '⚡ ON' : G.passed ? '✅ PASS' : '🔒') : '', ema ? (M.trade_mode === 'all' || G.passed ? 'good' : 'warn') : ''),
+      ...(ema ? [it('shadow', '🌙', 'Shadow vs asli · Research', (M.research_progress || {}).current ? `Research: ${M.research_progress.done}/${M.research_progress.total} charts ho gaye…` : L.research ? `${L.research.instruments.length} charts ka result · ${L.research.passed.length} pass` : 'Research abhi nahi bana', (M.research_progress || {}).current ? `${Math.round(100 * M.research_progress.done / Math.max(1, M.research_progress.total))}%` : String(((L.trade_list) || []).length) + ' pass')] : []),
+      it('learn', '🧠', 'Seekhna', 'Din ka hisaab, sabak, galtiyan, naye rule', mins != null ? `${Math.floor(mins / 60)}h ${mins % 60}m` : ''),
+    ]],
+    ['Bot ke andar', [
+      it('agents', '🤖', 'Agents', 'Har agent kya kar raha hai, kya plan hai', String((S.agents || []).length)),
+      it('news', '📰', 'News calendar', act.length ? 'Abhi news ki wajah se kuch pairs band' : N.length ? `Agla: ${N[0].currency} ${N[0].title} ${nyT(N[0].time)} NY` : 'Aage koi bada news nahi', act.length ? '⛔' : N.length ? inTxt(N[0].time) : '', act.length ? 'bad' : ''),
+      ...((S.brain || {}).available ? [it('ask', '💬', 'Manager se pucho', 'Market ya bot ke baare mein kuch bhi', '')] : []),
+      it('settings', '⚙️', 'Settings & version', `Risk ${(st.risk || {}).risk_per_trade_pct ?? '-'}%/trade · daily limit ${(st.risk || {}).daily_loss_limit_pct ?? '-'}%`, 'v' + ((S.version || {}).app || '?')),
+    ]],
+  ];
+}
+function menuList(groups){
+  return groups.map(([g, items]) => `<div class="mgroup">${g}</div><div class="menu">${items.map(i => `<button class="mi" data-go="${i.go}"><span class="ic">${i.ic}</span><span><div class="tt">${i.tt}</div><div class="ss">${esc(i.ss)}</div></span>${i.bd ? `<span class="bd ${i.cls || ''}">${esc(i.bd)}</span>` : '<span></span>'}<span class="ch">›</span></button>`).join('')}</div>`).join('');
+}
+function viewHome(){
+  const st = S.status || {}, T = S.today || {}, ccy = st.currency || '';
+  const pl = st.nav != null && st.day_start_nav ? st.nav - st.day_start_nav : null;
+  return `${statusBanner(st).replace('class="status ', 'class="status slim ')}
+  <div class="kpis">
+    <div class="kpi"><span class="lbl">Equity</span><b>${money(st.nav)} <span class="small muted">${ccy}</span></b></div>
+    <div class="kpi"><span class="lbl">Aaj P&amp;L</span><b class="${pl == null ? '' : pl >= 0 ? 'good' : 'bad'}">${pl == null ? '-' : (pl >= 0 ? '+' : '') + money(pl)}</b></div>
+    <div class="kpi"><span class="lbl">Chal rahe</span><b>${(st.open_trades || []).length}</b></div>
+    <div class="kpi"><span class="lbl">Aaj band</span><b>${T.closed || 0} <span class="small"><span class="good">${T.wins || 0}✅</span> <span class="bad">${T.losses || 0}❌</span></span></b></div>
+  </div>
+  ${menuList(menuItems())}`;
+}
+function viewMenu(){ return pageHead('Menu', 'Sab kuch yahan se khulta hai') + menuList(menuItems()); }
+function viewTrades(){
+  return `${pageHead('🎯 Trades', 'Chal rahe aur aaj ka hisaab')}
+  ${todayCard()}
+  ${openList()}
+  ${(S.mode || {}).pending && S.mode.pending.length ? `<div class="card"><h2>⏳ Pending stop orders</h2>${S.mode.pending.map(o => `<div class="small">${o.side > 0 ? 'BUY' : 'SELL'} ${esc(pair(o.instrument))} jab price ${px(o.entry)} tode · SL ${px(o.stop)} · TP ${px(o.tp)} · ${nyT(o.expire)} NY tak</div>`).join('')}</div>` : ''}
+  <div class="menu"><button class="mi" data-go="closed"><span class="ic">📒</span><span><div class="tt">Saare band trades</div><div class="ss">Jeete / haare / breakeven filter</div></span><span></span><span class="ch">›</span></button></div>`;
+}
+function variationsCard(){
+  const V = (S.mode || {}).variations;
+  if (!V) return `<div class="card" id="c-var"><h2>🧪 Variations test</h2><p class="empty">Chal raha hai: targets 1:1.5 se 1:5 × M5 / M15 / H1 / H4 × har ghanta, 2 saal ka data (10–25 min).</p></div>`;
+  const cell = c => c && c.n ? `<b class="num ${c.total_r >= 0 ? 'good' : 'bad'}">PF ${c.pf ?? '∞'}</b><br><span class="small muted">${c.total_r >= 0 ? '+' : ''}${c.total_r}R · ${c.n} · ${c.win_pct}%</span>` : '<span class="muted">-</span>';
+  const nPass = V.rows.filter(r => r.passed).length;
+  return `<div class="card" id="c-var"><div class="row"><h2>🧪 Variations test (${esc(pair(V.instrument))})</h2><span class="small muted">${nyDT(V.made)} NY</span></div>
+    <div class="status ${nPass || V.hours_ok.length ? 'ok' : 'lock'}"><span class="dot"></span><span>${nPass ? `✅ ${nPass} combination pass` : '❌ Koi combination pass nahi'}${V.hours_ok.length ? ` · ${V.hours_ok.length} ghante pass` : ' · koi ghanta pass nahi'}<small>Pass = unseen (naya 30%) pe PF 1.2+ aur 30+ trades, aur purane 70% pe bhi PF 1.1+. ${V.tested} cheezein test hui hain, isliye 1-2 ka luck se pass hona mumkin hai.</small></span></div>
+    <div class="xt">${V.rows.map(r => `<div class="xr ${r.passed ? 'win' : ''}"><div class="xn">${esc(r.tf)} · 1:${r.rr}${r.passed ? ' <span class="pill good">PASS</span>' : ''}</div>
+      <div class="xc"><span class="lbl">Purana 70%</span>${cell(r.tuning)}</div><div class="xc"><span class="lbl">Unseen 30%</span>${cell(r.unseen)}</div></div>`).join('')}</div>
+    ${V.hours_ok.length ? `<div class="lbl" style="margin-top:10px">Pass hue ghante (NY time)</div>${V.hours_ok.map(h => `<div class="rc"><span>${esc(h.tf)} · 1:${h.rr} · ${h.hour}:00–${h.hour + 1}:00</span><b class="good">unseen PF ${h.unseen.pf ?? '∞'} · ${h.unseen.n} trades · purana PF ${h.tuning.pf ?? '∞'}</b></div>`).join('')}` : ''}</div>`;
+}
+function forwardCard(){
+  const F = (S.mode || {}).forward || [];
+  if (!F.length) return '';
+  return F.map(f => { const c = f.card || {};
+    return `<div class="card" id="c-fwd"><h2>🔭 Forward test: ${esc(f.timeframe)} · 1:${f.reward_risk} · ${f.charts} charts</h2>
+    <p class="small muted" style="margin:0 0 8px">Har chart pe yeh setup <b>live naye data</b> pe follow ho raha hai (sirf shadow, koi order nahi). Shuru: ${nyDT(f.started)} NY. 50+ band setups ke baad hi bharosa karna.</p>
+    <div class="kpis"><div class="kpi"><span class="lbl">Band setups</span><b>${c.n || 0}</b></div>
+      <div class="kpi"><span class="lbl">Win</span><b>${c.n ? c.win_pct + '%' : '-'}</b></div>
+      <div class="kpi"><span class="lbl">Kul R</span><b class="${(c.total_r || 0) >= 0 ? 'good' : 'bad'}">${c.n ? (c.total_r >= 0 ? '+' : '') + c.total_r + 'R' : '-'}</b></div>
+      <div class="kpi"><span class="lbl">PF</span><b>${c.n ? (c.pf ?? '∞') : '-'}</b></div></div>
+    <div class="small muted" style="margin-top:6px">Abhi chal rahe: ${f.open} · cancel (level nahi tuta): ${f.cancelled}</div>
+    ${f.by.length ? `<details style="margin-top:6px"><summary>Chart ke hisaab se (${f.by.length})</summary>${f.by.map(x => `<div class="rc"><span>${esc(pair(x.pair))}</span><b class="${x.total_r >= 0 ? 'good' : 'bad'}">${x.total_r >= 0 ? '+' : ''}${x.total_r}R · ${x.n} setups · win ${x.win_pct}%</b></div>`).join('')}</details>` : ''}
+    ${f.recent.length ? `<details style="margin-top:6px"><summary>Aakhri setups</summary>${f.recent.map(x => `<div class="rc"><span>${esc(pair(x.instrument))} · ${nyDT(x.time)} NY · ${x.side > 0 ? 'BUY' : 'SELL'} @ ${px(x.trig)}</span><b class="${x.state === 'done' ? (x.r > 0 ? 'good' : 'bad') : 'muted'}">${x.state === 'done' ? (x.r >= 0 ? '+' : '') + x.r + 'R' : x.state === 'open' ? 'chal raha' : 'cancel'}</b></div>`).join('')}</details>` : '<p class="empty">Abhi koi setup nahi aaya. Har ghante ke candle close pe check hota hai.</p>'}</div>`; }).join('');
+}
+function viewStrategy(){
+  const L = S.learning || {}, st = L.stats_30d || {};
+  return pageHead('🥇 Strategy & backtest', '', 'menu') + ((S.mode || {}).strategy === 'ema_break' ? emaCard(false) + forwardCard() + variationsCard() : reportCard(L.report_card, st) + experimentsCard(L.experiments));
+}
+function viewShadow(){ return pageHead('🌙 Shadow vs asli', 'Aur research: kahan kaam karti hai strategy', 'menu') + shadowCard() + researchCard(); }
+function viewSettings(){
+  const r = (S.status || {}).risk || {}, b = agent('budget'), params = Object.entries((S.learning || {}).params || {});
+  return `${pageHead('⚙️ Settings & version', '', 'menu')}
+  ${versionCard()}
+  <div class="card"><h2>🛡️ Risk limits</h2><div class="kv">
+    <span>Risk per trade</span><b>${r.risk_per_trade_pct ?? '-'}%</b>
+    <span>Daily loss limit (open risk ke saath)</span><b>${r.daily_loss_limit_pct ?? '-'}%</b>
+    <span>Max drawdown (bot rukega)</span><b>${r.max_drawdown_pct ?? '-'}%</b>
+    <span>Max open trades</span><b>${r.max_open_trades ?? '-'}</b>
+    <span>Spread SL ke max</span><b>${r.max_spread_to_stop != null ? Math.round(r.max_spread_to_stop * 100) + '%' : '-'}</b></div></div>
+  <div class="card"><h2>💰 Paisa aur limits (abhi)</h2><p style="margin:0 0 6px"><span class="tone ${b.tone}"></span>${esc(b.status)}</p><div class="plan">${esc(b.plan)}</div></div>
+  ${params.length ? `<div class="card"><h2>⚙️ Bot ne badli settings</h2><div class="kv">${params.map(([k, v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join('')}</div></div>` : ''}`;
+}
+
+function flowCard(){
+  const rows = FLOW.map((id, i) => {
+    const a = agent(id); const c = a.counts || {};
+    const key = {scanner:'charts',reader:'signals',rules:'passed',timer:'go',risk:'approved',executor:'orders',manager:'closed',learner:'followed'}[id];
+    return `${i ? '<div class="arrow"></div>' : ''}<button class="agent-row" data-go="agent/${id}">
+      <span class="emo">${a.emoji}</span>
+      <span><span class="name"><span class="tone ${a.tone}"></span>${esc(a.name)}</span><span class="st">${esc(a.status)}</span></span>
+      <span class="big">${countVal(key, c[key] || 0)}<small>${COUNT_LABELS[key]}</small></span></button>`;
+  }).join('');
+  return `<div class="card" id="c-flow">
+      <p class="small muted" style="margin:0 0 10px">Har signal upar se neeche jaata hai. Har agent apna kaam karke agle ko bhejta hai. Kisi pe bhi tap karo: usne kya kiya, kya plan hai, kisko bheja.</p>
+      <div class="flow">${rows}</div>
+      <div class="side-note">Saath mein: <a href="#agent/budget" data-go="agent/budget">${esc(aname('budget'))}</a> account ki limits pe, aur <a href="#agent/news" data-go="agent/news">${esc(aname('news'))}</a> bade news pe nazar rakhta hai.</div>
+    </div>`;
+}
+
+function openTrades(st){
+  const tr = st.open_trades || [];
+  if (!tr.length) return '<p class="empty">Koi trade open nahi hai.</p>';
+  return tr.map(t => `<div class="kv" style="padding:6px 0;border-top:1px solid var(--line)"><span><b>${esc(pair(t.instrument))}</b> ${t.units > 0 ? 'BUY' : 'SELL'} ${Math.abs(t.units)}</span>
+    <b class="${t.unrealized_pl >= 0 ? 'good' : 'bad'}">${t.unrealized_pl >= 0 ? '+' : ''}${money(t.unrealized_pl)}</b>
+    <span class="small muted">Entry ${px(t.entry)} · SL ${px(t.stop)} · TP ${px(t.take_profit)}</span><span></span>${slTpLine(t)}</div>`).join('');
+}
+
+function agentChips(a){
+  const counts = Object.entries(a.counts || {}).map(([k,v]) => `<span class="chip">${esc(COUNT_LABELS[k] || k)}: <b class="num">${countVal(k,v)}</b></span>`).join('');
+  const hand = Object.entries(a.handoffs || {}).map(([k,v]) => `<span class="chip to" data-go="agent/${k}">→ ${esc(aname(k))} · ${v}</span>`).join('');
+  return {counts: counts || '<span class="small muted">Aaj abhi kuch nahi</span>', hand: hand || '<span class="small muted">Aaj kisi ko kuch nahi bheja</span>'};
+}
+
+function viewAgents(){
+  const order = [...FLOW, 'news', 'budget'];
+  return `${pageHead('🤖 Agents', 'Har agent ka kaam, plan aur history', 'menu')}
+  ${sec('c-flow-sec', '🔁 Kaam kaise chal raha hai', '', flowCard(), false)}<div class="card"><h2>🤖 9 agents, har ek ka apna kaam</h2><p class="small muted" style="margin:0">Card pe tap karo: poori history, plan, aur kisko kya bheja.</p></div>
+  <div class="agents">${order.map(id => { const a = agent(id), ch = agentChips(a), last = (a.events || [])[0];
+    return `<button class="card acard" data-go="agent/${id}">
+      <div class="head"><span class="emo">${a.emoji}</span><div><h3>${esc(a.name)}</h3><div class="small muted"><span class="tone ${a.tone}"></span>${esc(a.status)}</div></div></div>
+      ${a.plan ? `<div class="plan"><b>Plan:</b> ${esc(a.plan)}</div>` : ''}
+      <div><div class="lbl">Aaj</div><div class="chips">${ch.counts}</div></div>
+      <div><div class="lbl">Aage bheja</div><div class="chips">${ch.hand}</div></div>
+      ${last ? `<div class="small"><span class="muted">${nyT(last.t)}</span> ${esc(last.text)}</div>` : ''}
+    </button>`; }).join('')}</div>`;
+}
+
+function viewAgent(id){
+  const a = agent(id), ch = agentChips(a);
+  const from = (FEEDS[id] || []).map(f => `<span class="chip to" data-go="agent/${f}">${esc(aname(f))}</span>`).join('') || '<span class="small muted">Koi nahi, yeh khud shuru karta hai</span>';
+  const ev = (a.events || []).map(e => `<li class="${e.tone || ''}" ${e.ref ? `data-ref="${esc(e.ref)}"` : ''}><span class="t">${nyT(e.t)}</span>
+    <span>${e.kind === 'handoff' ? `<span class="to">→ ${esc(aname(e.to))} ko bheja</span><br>` : ''}<span class="txt">${esc(e.text)}</span></span></li>`).join('');
+  return `<button class="back" data-go="agents">‹ Saare agents</button>
+  <div class="card wrap">
+    <div class="hero"><span class="emo">${a.emoji}</span><div><h2>${esc(a.name)}</h2><div class="small muted">Iska kaam: ${esc(a.role)}</div></div></div>
+    <div class="status ${a.tone === 'bad' ? 'lock' : a.tone === 'warn' ? 'open' : 'ok'}"><span class="dot"></span><span>Abhi: ${esc(a.status)}</span></div>
+    ${a.plan ? `<div class="plan"><b>Aage ka plan:</b> ${esc(a.plan)}</div>` : ''}
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>📊 Aaj ke numbers</h2><div class="chips">${ch.counts}</div></div>
+    <div class="card"><h2>🔀 Kaun deta hai / kisko bheja</h2>
+      <div class="lbl">Isko kaam kaun deta hai</div><div class="chips" style="margin:4px 0 10px">${from}</div>
+      <div class="lbl">Aaj aage bheja</div><div class="chips" style="margin-top:4px">${ch.hand}</div></div>
+  </div>
+  ${agentCharts(id)}
+  <div class="card"><h2>📝 Kya kiya (naya upar)</h2><p class="small muted" style="margin:0 0 6px">Time New York ka hai. › wali line pe tap karo to us signal ka poora safar khulega.</p>
+    ${ev ? `<ul class="tl">${ev}</ul>` : '<p class="empty">Abhi tak kuch record nahi hua.</p>'}</div>`;
+}
+
+function badgeFor(j){
+  if (j.r != null) return j.r > 0 ? `<span class="badge b-win">${esc(j.result)}</span>` : j.r < 0 ? `<span class="badge b-loss">${esc(j.result)}</span>` : `<span class="badge b-run">${esc(j.result)}</span>`;
+  if (j.taken) return '<span class="badge b-open">Trade open</span>';
+  if (j.state === 'roka gaya') return '<span class="badge b-block">Roka gaya</span>';
+  return '<span class="badge b-run">Chal raha</span>';
+}
+function journeyCard(j){
+  const open = openJ.has(j.ref);
+  const blockedBy = (j.steps || []).find(s => s.verdict === 'block');
+  return `<div class="card jcard" id="j-${esc(j.ref)}">
+    <div class="jhead" data-toggle="${esc(j.ref)}"><div><b>${esc(pair(j.instrument))} ${j.side > 0 ? '▲ BUY' : '▼ SELL'}</b>
+      <div class="small muted">${nyDT(j.time + 3600)} NY · ${j.taken ? 'Bot ne trade liya' : blockedBy ? 'Roka: ' + esc(aname(blockedBy.agent)) : ''}</div></div>${badgeFor(j)}</div>
+    ${(S.charts || []).some(c => c.instrument === j.instrument) ? `<canvas class="mini" data-inst="${esc(j.instrument)}"></canvas><div class="small"><a href="#chart/${esc(j.instrument)}" data-go="chart/${esc(j.instrument)}">🔍 ${esc(pair(j.instrument))} ka bada live chart ›</a></div>` : ''}
+    ${open ? `<ul class="steps">${(j.steps || []).map(s => `<li class="${s.verdict}"><span class="who">${esc(aname(s.agent))}</span> <span class="small muted">${nyT(s.t)}</span><br>${esc(s.text)}</li>`).join('')}</ul>`
+           : `<div class="small muted">${(j.steps || []).map(s => agent(s.agent).emoji + (s.verdict === 'block' ? '✗' : s.verdict === 'pass' ? '✓' : '')).join(' → ')} <span style="color:var(--gold)">· tap karke poora safar</span></div>`}
+  </div>`;
+}
+document.addEventListener('click', e => { const t = e.target.closest('[data-toggle]'); if (!t) return; const r = t.dataset.toggle; openJ.has(r) ? openJ.delete(r) : openJ.add(r); render(); });
+
+function viewJourneys(){
+  const all = S.journeys || [];
+  const list = all.filter(j => jfilter === 'all' || (jfilter === 'taken' ? j.taken : jfilter === 'blocked' ? !j.taken : j.r != null));
+  const btn = (k, t) => `<button class="${jfilter === k ? 'on' : ''}" onclick="jfilter='${k}';render()">${t}</button>`;
+  return `${pageHead('🧭 Signals ka safar', '', 'menu')}<div class="card"><h2>🧭 Har signal ka safar</h2><p class="small muted" style="margin:0 0 8px">Signal kis agent se kis agent tak gaya, kahan pass hua (✓), kahan roka gaya (✗), aur end mein result kya raha. Roke gaye signals ko bhi Time Machine chart pe follow karta hai, taaki pata chale rokna sahi tha ya nahi.</p>
+    <div class="seg">${btn('all','Sab')}${btn('taken','Bot ne liye')}${btn('blocked','Roke gaye')}${btn('done','Result aa gaya')}</div></div>
+  ${list.map(journeyCard).join('') || '<p class="empty">Is group mein abhi kuch nahi.</p>'}`;
+}
+
+const emaName = () => (S && S.mode && S.mode.strategy === 'ema_break') ? 'EMA' + (S.mode.ema || {}).ema_fast : 'EMA20';
+const CLABEL = {signal:'SIGNAL', forming:'BAN RAHA', watch:'WATCH', none:'KUCH NAHI'};
+function chartCard(c, mode){
+  const id = esc(c.instrument);
+  const extra = mode === 'scanner'
+    ? `<div class="small muted">H1 candles: ${(c.candles || []).length} · H4 trend: ${c.bias > 0 ? 'upar ▲' : c.bias < 0 ? 'neeche ▼' : 'saaf nahi'}</div>`
+    : `<div class="small">${esc(c.note)}</div>`;
+  return `<div class="card ccard ${c.state}">
+    <div class="row"><b>${esc(pair(c.instrument))} <span class="${c.bias > 0 ? 'good' : c.bias < 0 ? 'bad' : ''}">${c.bias > 0 ? '▲' : c.bias < 0 ? '▼' : '•'}</span></b>
+      <span class="row" style="gap:6px"><span class="live" data-live="${id}">●</span><span class="cbadge">${CLABEL[c.state] || c.state}</span></span></div>
+    <canvas data-inst="${id}" ${mode === 'scanner' ? 'class="mini"' : ''}></canvas>${extra}
+    <div class="small muted" style="margin-top:4px">Price <b class="num" data-px="${id}">${px(c.price)}</b> · RSI ${esc(c.rsi ?? '-')}${c.zone ? ` · zone ${c.zone[0]}–${c.zone[1]}` : ''}</div>
+    <div class="small" style="margin-top:4px"><a href="#chart/${id}" data-go="chart/${id}">🔍 Bada live chart kholo ›</a></div>
+    ${c.ref && mode !== 'scanner' ? `<div class="small" data-ref="${esc(c.ref)}" style="cursor:pointer;color:var(--gold)">Bot: ${c.decision === 'open' ? 'trade liya' : 'roka - ' + esc(c.decision_reason || '')} ›</div>` : ''}
+  </div>`;
+}
+function liveNote(){
+  const L = LIVE.data; if (!L) return '<span class="small muted">Live price aa raha hai…</span>';
+  const open = Object.values(L.prices || {}).some(p => p.open);
+  return `<span class="small ${open ? 'good' : 'muted'}">${open ? '● LIVE' : '● Market band (weekend/closed)'} · price ${new Date(L.t * 1000).toLocaleTimeString('en-GB', {timeZone:'America/New_York'})} NY${L.error ? ' · ⚠ ' + esc(L.error) : ''}</span>`;
+}
+
+function viewChart(inst){
+  const c = (S.charts || []).find(x => x.instrument === inst);
+  if (!c) return `<button class="back" data-go="charts">‹ Saare charts</button><p class="empty">${esc(pair(inst))} ka chart abhi nahi mila.</p>`;
+  const tr = ((S.status || {}).open_trades || []).filter(t => t.instrument === inst);
+  const js = (S.journeys || []).filter(j => j.instrument === inst).slice(0, 5);
+  const tv = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent('OANDA:' + inst.replace('_', ''));
+  return `<button class="back" data-go="charts">‹ Saare charts</button>
+  <div class="card ccard ${c.state}">
+    <div class="row"><h2 style="margin:0">${esc(pair(inst))} <span class="${c.bias > 0 ? 'good' : c.bias < 0 ? 'bad' : ''}">${c.bias > 0 ? '▲' : c.bias < 0 ? '▼' : '•'}</span></h2>
+      <span class="row" style="gap:6px"><span class="live" data-live="${esc(inst)}">●</span><span class="cbadge">${CLABEL[c.state] || c.state}</span></span></div>
+    <div class="small muted">H1 candles (har candle = 1 ghanta) · <span id="livenote">${liveNote()}</span></div>
+    <canvas class="big" data-inst="${esc(inst)}"></canvas>
+    <div class="legend"><span><b style="color:var(--ema)">━</b> ${emaName()}</span><span><b style="color:var(--gold-hi)">▬</b> entry zone</span>${tr.length ? '<span><b style="color:var(--gold-hi)">┅</b> Entry</span><span><b class="bad">┅</b> SL</span><span><b class="good">┅</b> TP</span>' : ''}</div>
+    <div style="margin-top:8px">${esc(c.note)}</div>
+    <div class="kv" style="margin-top:8px"><span>Price</span><b data-px="${esc(inst)}">${px(c.price)}</b><span>RSI</span><b>${esc(c.rsi ?? '-')}</b>
+      ${c.zone ? `<span>Entry zone</span><b>${c.zone[0]} – ${c.zone[1]}</b>` : ''}${c.stop_hint ? `<span>SL andaaza</span><b>${c.stop_hint}</b>` : ''}
+      <span>Pichhle 20 candles high / low</span><b>${px(c.swing_high)} / ${px(c.swing_low)}</b></div>
+    <div class="btns"><a class="btn" href="${tv}" target="_blank" rel="noopener">📊 TradingView pe kholo</a></div>
+  </div>
+  ${tr.length ? `<div class="card"><h2>🎯 Is pair ka open trade</h2>${openTrades({open_trades: tr})}</div>` : ''}
+  ${js.length ? `<div class="card"><h2>🧭 Is pair ke signals</h2></div>${js.map(journeyCard).join('')}` : ''}`;
+}
+function amt(v){ if (v == null) return ''; const c = (S.status || {}).currency || '';
+  return ` <b class="${v >= 0 ? 'good' : 'bad'}">(${v >= 0 ? '+' : ''}${money(v)} ${c})</b>`; }
+function slTpLine(t){
+  const slTxt = t.sl_amt == null ? '' : t.sl_amt >= 0 ? `SL lage to bhi <b class="good">+${money(t.sl_amt)} ${S.status.currency}</b> pakka (SL profit mein)` : `SL lage to <b class="bad">−${money(-t.sl_amt)} ${S.status.currency}</b> jayega`;
+  const tpTxt = t.tp_amt == null ? '' : `TP lage to <b class="good">+${money(t.tp_amt)} ${S.status.currency}</b> milega`;
+  return slTxt || tpTxt ? `<div class="small" style="grid-column:1/-1">🛑 ${slTxt}${slTxt && tpTxt ? '<br>' : ''}${tpTxt ? '🎯 ' + tpTxt : ''}</div>` : '';
+}
+function liveR(t, price){
+  const risk = t.init_stop != null ? Math.abs(t.entry - t.init_stop) : null;
+  return risk ? (price - t.entry) * Math.sign(t.units) / risk : null;
+}
+function openList(){
+  const tr = (S.status || {}).open_trades || [];
+  if (!tr.length) return `<div class="card" id="c-open-list"><h2>🎯 Chal rahe trades (0)</h2><p class="empty">Abhi koi trade open nahi hai.</p></div>`;
+  const byInst = Object.fromEntries((S.charts || []).map(c => [c.instrument, c]));
+  return `<div class="card" id="c-open-list"><h2>🎯 Chal rahe trades (${tr.length})</h2>${tr.map(t => {
+    const id = esc(t.instrument), price = byInst[t.instrument]?.price ?? t.entry, r = liveR(t, price);
+    return `<div class="otr"><div class="row"><b>${esc(pair(t.instrument))} ${t.units > 0 ? '<span class="good">▲ BUY</span>' : '<span class="bad">▼ SELL</span>'} <span class="small muted">${Math.abs(t.units)}</span></b>
+        <b class="num ${r == null ? '' : r >= 0 ? 'good' : 'bad'}" data-trr="${esc(t.id)}">${r == null ? '' : (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'}</b></div>
+      <div class="small muted">Entry ${px(t.entry)} · Abhi <b class="num" data-px="${id}">${px(price)}</b> · SL ${px(t.stop)}${t.init_stop != null && Math.abs(t.stop - t.init_stop) > 1e-12 ? ' (move hua)' : ''} · TP ${px(t.take_profit)}</div>
+      ${slTpLine(t)}
+      <div class="small">Abhi P&amp;L <b class="${t.unrealized_pl >= 0 ? 'good' : 'bad'}">${t.unrealized_pl >= 0 ? '+' : ''}${money(t.unrealized_pl, S.status.currency)}</b> ·
+        <a href="#chart/${id}" data-go="chart/${id}">🔍 Chart</a>${t.ref ? ` · <a href="#journeys" data-ref="${esc(t.ref)}">🧭 Safar</a>` : ''}</div></div>`; }).join('')}</div>`;
+}
+function viewCharts(){
+  const openSet = new Set(((S.status || {}).open_trades || []).map(t => t.instrument));
+  const charts = (S.charts || []).filter(c => cfilter === 'all' || (cfilter === 'open' ? openSet.has(c.instrument) : c.state === cfilter));
+  const n = s => (S.charts || []).filter(c => c.state === s).length;
+  const btn = (k, t) => `<button class="${cfilter === k ? 'on' : ''}" onclick="cfilter='${k}';render()">${t}</button>`;
+  return `${pageHead('📈 Charts', (S.charts || []).length + ' charts live')}<div class="card" id="c-charts"><div class="row"><h2>Filter</h2><span id="livenote">${liveNote()}</span></div>
+    <div class="legend" style="margin-bottom:8px"><span><b class="good">SIGNAL</b>: abhi rules poore</span><span><b style="color:var(--gold-hi)">BAN RAHA</b>: price zone ki taraf aa raha</span><span><b style="color:#4c7bd9">WATCH</b>: trend hai, price door</span><span><b>KUCH NAHI</b>: trend nahi</span><span>Peeli patti = entry zone · Purple line = ${emaName()} · Aakhri candle live chalti hai</span></div>
+    <div class="seg">${btn('all','Sab')}${btn('open','🎯 Open trades '+openSet.size)}${btn('signal','Signal '+n('signal'))}${btn('forming','Ban raha '+n('forming'))}${btn('watch','Watch '+n('watch'))}${btn('none','Kuch nahi '+n('none'))}</div></div>
+  ${openSet.size || cfilter === 'open' ? openList() : ''}
+  <div class="cgrid">${charts.map(c => chartCard(c)).join('') || '<p class="empty">Is group mein abhi koi chart nahi.</p>'}</div>`;
+}
+function agentCharts(id){
+  const all = S.charts || [];
+  if (id === 'scanner') return `<div class="card"><div class="row"><h2>📡 Live charts jo yeh scan kar raha hai (${all.length})</h2><span id="livenote">${liveNote()}</span></div>
+      <p class="small muted" style="margin:0">Har minute OANDA se H1 + H4 candles laata hai, aur har kuch second mein taaza price. Yahi data Chart Reader ko jaata hai.</p></div>
+    <div class="cgrid">${[...all].sort((a, b) => a.instrument.localeCompare(b.instrument)).map(c => chartCard(c, 'scanner')).join('')}</div>`;
+  if (id === 'reader') { const sorted = [...all].sort((a, b) => (b.score || 0) - (a.score || 0));
+    return `<div class="card"><div class="row"><h2>👁️ Isne har chart pe kya padha</h2><span id="livenote">${liveNote()}</span></div>
+      <p class="small muted" style="margin:0">Sabse kareeb wale mauke upar. Peeli patti = jahan entry ban sakti hai.</p></div>
+    <div class="cgrid">${sorted.map(c => chartCard(c)).join('')}</div>`; }
+  return '';
+}
+function drawCharts(){
+  const byInst = Object.fromEntries((S.charts || []).map(c => [c.instrument, c]));
+  document.querySelectorAll('canvas[data-inst]').forEach(cv => { const c = byInst[cv.dataset.inst]; if (c) draw(cv, c); });
+}
+function tradeLines(inst){
+  return ((S.status || {}).open_trades || []).filter(t => t.instrument === inst).flatMap(t => [
+    t.entry != null && {v:t.entry, c:css('--gold-hi'), l:'Entry'},
+    t.stop != null && {v:t.stop, c:css('--down'), l:'SL' + (t.sl_amt != null ? ` (${t.sl_amt >= 0 ? '+' : '−'}${money(Math.abs(t.sl_amt))})` : '')},
+    t.take_profit != null && {v:t.take_profit, c:css('--up'), l:'TP' + (t.tp_amt != null ? ` (+${money(t.tp_amt)})` : '')}].filter(Boolean));
+}
+function draw(cv, ch){
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w*dpr; cv.height = h*dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const c = ch.candles || []; if (!c.length) return;
+  const lines = tradeLines(ch.instrument);
+  let lo = Math.min(...c.map(x => x[3])), hi = Math.max(...c.map(x => x[2]));
+  lines.forEach(L => { lo = Math.min(lo, L.v); hi = Math.max(hi, L.v); });
+  (ch.ema || []).forEach(v => { if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
+  if (ch.zone) { lo = Math.min(lo, ch.zone[0]); hi = Math.max(hi, ch.zone[1]); }
+  const pad = (hi - lo) * .06 || 1; lo -= pad; hi += pad;
+  const y = v => h - (v - lo) / (hi - lo) * h, bw = w / c.length;
+  if (ch.zone) { g.fillStyle = css('--zone'); g.fillRect(0, y(ch.zone[1]), w, y(ch.zone[0]) - y(ch.zone[1])); }
+  c.forEach((k, i) => { const [t,o,hh,l,cl] = k, x = i*bw + bw/2, col = cl >= o ? css('--up') : css('--down');
+    g.strokeStyle = col; g.fillStyle = col; g.beginPath(); g.moveTo(x, y(hh)); g.lineTo(x, y(l)); g.stroke();
+    g.fillRect(x - Math.max(1, bw*.35), y(Math.max(o, cl)), Math.max(2, bw*.7), Math.max(1, Math.abs(y(o) - y(cl)))); });
+  if (ch.ema) { g.strokeStyle = css('--ema'); g.lineWidth = 1.5; g.beginPath(); let s = false;
+    ch.ema.forEach((v, i) => { if (v == null) return; const x = i*bw + bw/2; s ? g.lineTo(x, y(v)) : (g.moveTo(x, y(v)), s = true); }); g.stroke(); }
+  g.lineWidth = 1.2; g.font = '600 11px system-ui, sans-serif';
+  const used = [];
+  lines.forEach(L => { g.strokeStyle = L.c; g.fillStyle = L.c; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(0, y(L.v)); g.lineTo(w, y(L.v)); g.stroke();
+    g.setLineDash([]); const ly = y(L.v) < 14 ? y(L.v) + 13 : y(L.v) - 3; let lx = 4;
+    while (used.some(u => Math.abs(u[1] - ly) < 12 && Math.abs(u[0] - lx) < 150)) lx += 155;   // labels side by side, not on top
+    used.push([lx, ly]); g.fillText(L.l + ' ' + px(L.v), lx, ly); });
+  const last = c[c.length - 1]; g.fillStyle = css('--ink'); g.font = '600 11px ui-monospace, monospace';
+  const txt = px(last[4]); g.fillText(txt, w - g.measureText(txt).width - 2, Math.max(11, Math.min(h - 2, y(last[4]) - 4)));
+}
+
+
+const dayfmt = new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',weekday:'short',day:'numeric',month:'short'});
+function inTxt(ts){ const m = Math.round((ts - Date.now()/1000)/60); if (m < 0) return m > -60 ? `${-m} min pehle` : 'ho gaya';
+  return m < 60 ? `${m} min mein` : `${Math.floor(m/60)}h ${m%60}m mein`; }
+function newsRow(e, i){
+  const past = e.time < Date.now()/1000 - 15*60;
+  const nums = [e.actual && `Actual <b>${esc(e.actual)}</b>`, e.forecast && `Umeed ${esc(e.forecast)}`, e.previous && `Pichhla ${esc(e.previous)}`].filter(Boolean).join(' · ');
+  return `<div class="ev ${past ? 'past' : ''} ${e.active ? 'on' : ''}" id="n-${i}"><span class="t">${nyT(e.time)}</span><span>
+    <span class="cur">${esc(e.currency)}</span> <span class="imp ${esc(e.impact)}">${esc(e.impact)}</span> <b>${esc(e.title)}</b>
+    <span class="small muted">· ${inTxt(e.time)}</span>
+    ${nums ? `<br><span class="small">${nums}</span>` : ''}
+    ${e.block ? `<br><span class="small ${e.active ? 'bad' : 'warn'}">${e.active ? '⛔ Abhi band' : 'Band rahega'}: ${nyT(e.from)}–${nyT(e.to)} NY · ${e.pairs.map(pair).join(', ')}</span>` : ''}
+  </span></div>`;
+}
+function newsMini(){
+  const N = S.news || [], now = Date.now()/1000;
+  const act = N.filter(e => e.active), nxt = N.filter(e => e.block && e.time > now).slice(0, 3);
+  return `<div class="card" id="c-news"><div class="row"><h2>📰 Bade news</h2><a href="#news" data-go="news" class="small">Poora calendar ›</a></div>
+    ${act.length ? `<div class="status lock" style="margin-bottom:6px"><span class="dot"></span><span>Abhi news ki wajah se ${esc(act.map(e => e.currency).join(', '))} pairs band</span></div>` : ''}
+    ${nxt.length ? nxt.map(e => newsRow(e, N.indexOf(e))).join('') : `<p class="empty">${S.news_error ? 'Calendar abhi nahi mila: ' + esc(S.news_error) : 'Aage koi bada news nahi.'}</p>`}</div>`;
+}
+function viewNews(){
+  const N = S.news || [];
+  const groups = {};
+  N.forEach((e, i) => { const d = dayfmt.format(new Date(e.time*1000)); (groups[d] = groups[d] || []).push([e, i]); });
+  const act = N.filter(e => e.active);
+  return `${pageHead('📰 News calendar', '', 'menu')}<div class="card"><h2>📰 Economic calendar (is hafte)</h2>
+    <p class="small muted" style="margin:0">Sirf aapke pairs ki currencies ke <b>High</b> aur <b>Medium</b> news. Time New York ka. <span class="imp High">High</span> news pe ${esc(aname('news'))} us currency ke naye trades 15 min pehle se 15 min baad tak band karta hai. Open trades ka SL/TP broker pe laga rehta hai.</p>
+    ${S.news_error ? `<div class="status open" style="margin-top:8px"><span class="dot"></span><span>Calendar update nahi hua: ${esc(S.news_error)}<small>Purana saved calendar use ho raha hai (agar hai). Bot trading rokta nahi.</small></span></div>` : ''}
+    ${act.length ? `<div class="status lock" style="margin-top:8px" id="c-news-now"><span class="dot"></span><span>Abhi band: ${esc(act.map(e => e.currency + ' ' + e.title).join(', '))}</span></div>` : ''}</div>
+  ${Object.entries(groups).map(([d, list]) => `<div class="card"><h2>${esc(d)}</h2>${list.map(([e, i]) => newsRow(e, i)).join('')}</div>`).join('')
+    || '<p class="empty">Calendar abhi khali hai. Bot har ghante update karta hai.</p>'}`;
+}
+
+
+function rcRow(label, c){ if (!c || !c.n) return `<div class="rc"><span>${label}</span><b class="muted">abhi koi trade nahi</b></div>`;
+  return `<div class="rc"><span>${label}</span><b class="${c.total_r >= 0 ? 'good' : 'bad'}">${c.total_r >= 0 ? '+' : ''}${c.total_r}R · ${c.n} trades · win ${c.win_pct}% · PF ${c.pf ?? '-'}</b></div>`; }
+function reportCard(card, st){
+  const live = `<div style="margin-top:8px">${rcRow('🌞 Session ke andar (30 din, live)', st.in_session)}${rcRow('🌙 Session ke bahar (30 din, live)', st.off_session)}</div>`;
+  if (!card) return `<div class="card" id="c-report"><h2>📋 Setup ka report card</h2><p class="empty">Ban raha hai: setup ko har pair ke ~7 mahine ke asli OANDA data pe test kiya ja raha hai. Kuch minute mein yahan dikhega.</p>${live}</div>`;
+  if (card.verdict === 'nodata') return `<div class="card" id="c-report"><h2>📋 Setup ka report card</h2><p class="empty">Purana data nahi mila (ya kaafi candles nahi thi). Agla try 5 PM NY ke review pe.</p>${live}</div>`;
+  const V = {pass:['ok','✅ Setup asli data pe plus mein hai'], weak:['lock','⚠️ Setup asli data pe kamzor hai. Live paisa mat lagao, rules badalne padenge.'], few:['open','⏳ Abhi trades kam hain, pakka nahi keh sakte']}[card.verdict] || ['open', ''];
+  const months = Math.round((card.to - card.from) / (30 * 86400));
+  return `<div class="card" id="c-report"><div class="row"><h2>📋 Setup ka report card</h2><span class="small muted">${nyDT(card.made)} NY</span></div>
+    <div class="status ${V[0]}"><span class="dot"></span><span>${V[1]}<small>Laagu rules ko pichhle ~${months} mahine ke asli OANDA candles pe chala ke dekha${card.spread_cost ? ', spread ka kharcha kaat ke' : ''} (har din 5 PM NY pe dobara).${(S.learning || {}).universe === 'liquid' ? ' Mode: sirf bade pairs.' : ''}</small></span></div>
+    <div style="margin-top:8px">${rcRow('📊 Sab (asli purana data)', card.all)}${rcRow('🌞 Entry window ke andar', card.in_session)}${rcRow('🌙 Window ke bahar', card.off_session)}
+      <div class="rc"><span>📉 Sabse bada girawat</span><b>${card.all.max_dd_r}R</b></div></div>
+    ${live}
+    <details style="margin-top:10px"><summary>Har pair ka result</summary><div style="margin-top:6px">${card.pairs.map(p => p.error ? `<div class="rc"><span>${esc(pair(p.pair))}</span><b class="muted">data nahi mila</b></div>` : rcRow(esc(pair(p.pair)), {n:p.n, win_pct:p.win_pct, total_r:p.total_r, pf:p.pf})).join('')}</div></details>
+    <p class="small muted" style="margin:8px 0 0">1R = ek trade pe jitna risk. PF (profit factor) 1 se upar = jitna haara usse zyada kamaya. Purana result aage ki guarantee nahi.</p></div>`;
+}
+
+let kfilter = 'all', kperiod = 'week';
+function viewClosed(){
+  const all = S.closed || [], st = (S.closed_stats || {})[kperiod] || {}, ccy = (S.status || {}).currency || '';
+  const since = {day: (S.today || {}).since || Date.now()/1000 - 86400, week: Date.now()/1000 - 7*86400, all: 0}[kperiod];
+  const list = all.filter(c => (c.closed || 0) >= since).filter(c => kfilter === 'all' || (kfilter === 'win' ? c.r > 0.05 : kfilter === 'loss' ? c.r < -0.05 : Math.abs(c.r) <= 0.05));
+  const b = (k, t, v, cur) => `<button class="${cur === k ? 'on' : ''}" onclick="${v}='${k}';render()">${t}</button>`;
+  const n = f => all.filter(c => (c.closed || 0) >= since).filter(f).length;
+  return `${pageHead('📒 Band trades', '', 'trades')}<div class="card"><h2>📒 Band hue trades</h2>
+    <p class="small muted" style="margin:0 0 8px">Bot ke asli (demo) trades jo SL, TP, breakeven ya trailing SL pe band hue. Paisa aapke account currency mein, OANDA ke hisaab se.</p>
+    <div class="seg" style="margin-bottom:8px">${b('day','Aaj (5PM se)','kperiod',kperiod)}${b('week','7 din','kperiod',kperiod)}${b('all','Shuru se','kperiod',kperiod)}</div>
+    <div class="daybar">
+      <div><span class="lbl">Trades</span><b>${st.n || 0}</b></div>
+      <div><span class="lbl">Jeete / Haare</span><b><span class="good">${st.wins || 0}</span> / <span class="bad">${st.losses || 0}</span></b></div>
+      <div><span class="lbl">Kul R</span><b class="${(st.total_r || 0) >= 0 ? 'good' : 'bad'}">${(st.total_r || 0) >= 0 ? '+' : ''}${(st.total_r || 0).toFixed(2)}R</b></div>
+      <div><span class="lbl">Kul P&amp;L</span><b class="${(st.pl || 0) >= 0 ? 'good' : 'bad'}">${(st.pl || 0) >= 0 ? '+' : ''}${money(st.pl || 0)} ${ccy}</b></div>
+    </div>
+    <div class="seg" style="margin-top:8px">${b('all','Sab '+n(() => true),'kfilter',kfilter)}${b('win','✅ Jeete '+n(c => c.r > 0.05),'kfilter',kfilter)}${b('loss','❌ Haare '+n(c => c.r < -0.05),'kfilter',kfilter)}${b('be','➖ Breakeven '+n(c => Math.abs(c.r) <= 0.05),'kfilter',kfilter)}</div></div>
+  ${list.length ? `<div class="card">${list.map(c => { const id = esc(c.instrument);
+    return `<div class="otr"><div class="row"><b>${esc(pair(c.instrument))} ${c.side > 0 ? '<span class="good">▲ BUY</span>' : '<span class="bad">▼ SELL</span>'}</b>
+        <b class="num ${c.r > 0.05 ? 'good' : c.r < -0.05 ? 'bad' : ''}">${c.r >= 0 ? '+' : ''}${Number(c.r).toFixed(2)}R${c.pl != null ? ` · ${c.pl >= 0 ? '+' : ''}${money(c.pl)} ${ccy}` : ''}</b></div>
+      <div class="small">${esc(c.how || '')} · Entry ${px(c.entry)} → Exit ${px(c.exit)}</div>
+      <div class="small muted">${c.opened ? 'Khula ' + nyDT(c.opened) + ' · ' : ''}Band ${nyDT(c.closed)} NY</div>
+      <div class="small"><a href="#chart/${id}" data-go="chart/${id}">🔍 Chart</a>${c.ref ? ` · <a href="#journeys" data-ref="${esc(c.ref)}">🧭 Safar</a>` : ''}</div></div>`; }).join('')}</div>`
+    : `<p class="empty">${all.length ? 'Is filter mein koi trade nahi.' : 'Abhi tak koi trade band nahi hua. Jaise hi koi trade SL ya TP pe band hoga, yahan aa jayega.'}</p>`}`;
+}
+function dayName(d){ const [y, m, dd] = d.split('-').map(Number); return new Date(Date.UTC(y, m - 1, dd, 12)).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short', timeZone:'UTC'}); }
+const CSTATE = {active:['good','✅ LAAGU HAI'], next_review:['bad','🔜 AGLE REVIEW MEIN BANEGA'], watching:['info','👀 NAZAR MEIN'], collecting:['info','📥 DATA JAMA HO RAHA'], fine:['good','👍 THEEK HAI']};
+function experimentsCard(X){
+  if (!X) return `<div class="card" id="c-exp"><h2>🔬 Setup behtar karne ka experiment</h2><p class="empty">Chal raha hai: 6 versions asli data pe test ho rahe hain (5–15 minute). Phir yahan table aayegi.</p></div>`;
+  const cell = c => c && c.n ? `<b class="num ${c.total_r >= 0 ? 'good' : 'bad'}">${c.total_r >= 0 ? '+' : ''}${c.total_r}R</b><br><span class="small muted">${c.n} tr · PF ${c.pf ?? '-'}</span>` : '<span class="muted">-</span>';
+  return `<div class="card" id="c-exp"><div class="row"><h2>🔬 Setup behtar karne ka experiment</h2><span class="small muted">${nyDT(X.made)} NY</span></div>
+    <p class="small muted" style="margin:0 0 8px">Wahi asli data, 6 tareeke. Spread ka kharcha har trade pe kata hai. "Naya data" = aakhri 30% samay jo test ke liye alag rakha gaya. Koi version tabhi apnaya jaata hai jab woh naye data pe PF 1.2+ de aur abhi wale se saaf behtar ho.</p>
+    ${X.adopted ? `<div class="status ok"><span class="dot"></span><span>✅ Naya version apnaya: ${esc((X.table.find(v => v.id === X.adopted) || {}).name || X.adopted)}<small>Agle scan se laagu.</small></span></div>`
+                : `<div class="status open"><span class="dot"></span><span>Koi version pakka behtar nahi nikla, rules wahi rahe<small>Har din 5 PM NY pe naye data ke saath dobara test hoga.</small></span></div>`}
+    <div class="xt">${X.table.map(v => `<div class="xr ${v.id === X.adopted ? 'win' : ''}"><div class="xn">${esc(v.name)}${v.id === X.active_id ? ' <span class="pill info">LAAGU THA</span>' : ''}${v.id === X.adopted ? ' <span class="pill good">APNAYA</span>' : ''}</div>
+      <div class="xc"><span class="lbl">Sab data</span>${cell(v.all)}</div><div class="xc"><span class="lbl">Naya data</span>${cell(v.new)}</div></div>`).join('')}</div></div>`;
+}
+function emaCard(compact){
+  const M = S.mode || {}; if (M.strategy !== 'ema_break') return '';
+  const B = M.backtest, G = M.gate || {}, e = M.ema || {};
+  const row = (label, c) => c && c.n ? `<div class="rc"><span>${label}</span><b class="${c.total_r >= 0 ? 'good' : 'bad'}">${c.n} trades · win ${c.win_pct}% · PF ${c.pf ?? '-'} · ${c.total_r >= 0 ? '+' : ''}${c.total_r}R · max DD ${c.max_dd_r}R</b></div>` : `<div class="rc"><span>${label}</span><b class="muted">koi trade nahi</b></div>`;
+  const nList = ((S.learning || {}).trade_list || []).length;
+  const gate = M.trade_mode === 'all' ? `<div class="status ok"><span class="dot"></span><span>⚡ Har jagah trade mode: har chart pe, har time setup milte hi demo trade<small>Backtest sirf jaankari ke liye hai, trade nahi rokta. Risk limits (0.5%/trade, daily loss, max open trades, spread) chalu hain.</small></span></div>`
+    : !B ? `<div class="status open"><span class="dot"></span><span>⏳ Backtest chal raha hai (2 saal ka M5 data download ho raha hai, 5–15 min)<small>Tab tak saare charts shadow mein: record ho rahe hain, trade nahi.</small></span></div>`
+    : G.passed ? `<div class="status ok"><span class="dot"></span><span>✅ Gate PASS: demo pe trading chalu<small>Unseen data pe PF ${B.unseen.pf} aur ${B.unseen.n} trades.</small></span></div>`
+    : `<div class="status lock"><span class="dot"></span><span>🔒 XAU/USD gate band${nList ? ` · lekin ${nList} pair+ghanta trading list mein` : ': abhi sab shadow mein'}<small>Wajah: ${esc(G.reason || '')}. Shart: unseen pe ${B.need_trades}+ trades aur PF ${B.need_pf}+.</small></span></div>`;
+  if (compact) return `<div class="card" id="c-ema"><div class="row"><h2>🥇 EMA 9/15 · ${esc(pair((B && B.pairs || ['XAU_USD'])[0]))} · ${esc(M.timeframe)}</h2><span class="small muted">Aaj ${M.trades_today ?? 0}${e.max_trades_per_day ? '/' + e.max_trades_per_day : ''} trades</span></div>${gate}
+    ${(M.pending || []).map(o => `<div class="small" style="margin-top:6px">⏳ Stop order: ${o.side > 0 ? 'BUY' : 'SELL'} ${esc(pair(o.instrument))} jab price ${px(o.entry)} tode · SL ${px(o.stop)} · TP ${px(o.tp)} · ${nyT(o.expire)} NY tak</div>`).join('')}</div>`;
+  return `<div class="card" id="c-ema"><h2>🥇 Strategy: EMA 9/15 breakout</h2>
+    <ul class="plain small" style="margin-bottom:8px">
+      <li><b>${esc(M.timeframe)}</b> chart · sirf ${esc(((B && B.pairs) || ['XAU_USD']).map(pair).join(', '))}</li>
+      <li>EMA${e.ema_fast} &gt; EMA${e.ema_slow} = sirf BUY, neeche = sirf SELL</li>
+      <li>Alert candle: BUY ke liye green candle jiska low dono EMA ke upar (touch nahi). SELL ulta.</li>
+      <li>Entry: agli candle alert ka high tode (SELL: low). Na tode to setup cancel.</li>
+      <li>SL: alert candle ka low (SELL: high) · TP: ${e.reward_risk}R · SL ${e.min_stop_atr}–${e.max_stop_atr}×ATR ke beech na ho to skip</li>
+      <li>${M.trade_mode === 'all' ? '24 ghante, saare charts pe' : ((e.window_ny || [])[0] || []).join('–') === '00:00–24:00' ? '24 ghante (Mon–Fri)' : 'Sirf ' + (e.window_ny || []).map(w => w.join('–')).join(', ') + ' NY'} · ${e.max_trades_per_day ? 'din mein max ' + e.max_trades_per_day + ' trades' : 'din ki koi limit nahi'} · 0.5% risk · open trades ka risk bhi daily limit mein gina jaata hai</li>
+    </ul>
+    ${gate}
+    ${B ? `<div style="margin-top:8px">${row('🔧 Tuning (purana 70%)', B.tuning)}${row('🧪 Unseen (naya 30%)', B.unseen)}${row('📊 Sab', B.all)}</div>
+      <div class="kpis" style="margin-top:8px">
+        <div class="kpi"><span class="lbl">Max drawdown</span><b class="bad">${B.all.max_dd_r}R</b><span class="small muted">~${(B.all.max_dd_r * ((S.status || {}).risk || {}).risk_per_trade_pct || B.all.max_dd_r * 0.5).toFixed(1)}% account</span></div>
+        <div class="kpi"><span class="lbl">Sabse lambi haar</span><b class="bad">${B.longest_losing_streak ?? '-'}</b><span class="small muted">trade lagataar SL</span></div>
+        <div class="kpi"><span class="lbl">Time window</span><b style="font-size:15px">${esc(B.window || '-')}</b></div>
+        <div class="kpi"><span class="lbl">Timeframe · target</span><b style="font-size:15px">${esc(B.timeframe)} · 1:${B.reward_risk ?? e.reward_risk}</b></div>
+      </div>
+      ${(B.years || []).length ? `<div class="lbl" style="margin-top:10px">Saal ke hisaab se</div>${B.years.map(y => row('📅 ' + y.year, y)).join('')}` : ''}
+      <p class="small muted" style="margin:8px 0 0">${nyD(B.from)} se ${nyD(B.to)} tak (~${Math.round((B.to - B.from) / 86400 / 30.4)} mahine) ka asli OANDA ${esc(B.timeframe)} data, spread kaat ke${B.spread && B.spread[(B.pairs || [])[0]] != null ? ` (median spread ${px(B.spread[B.pairs[0]])}, pichhle ~1 hafte ke bid/ask se)` : ''}. 1:3 pe ~25% jeet = barabar; spread ke baad thoda zyada chahiye. Har din 5 PM NY pe naye data ke saath dobara test hota hai. Bana: ${nyDT(B.made)} NY.</p>` : ''}</div>`;
+}
+function shadowCard(){
+  const L = S.learning || {}, sh = L.shadow_30d || {}, re = L.real_30d || {}, ccy = (S.status || {}).currency || '';
+  const line = (c, money_) => c && c.n ? `<b class="num ${c.total_r >= 0 ? 'good' : 'bad'}">${c.total_r >= 0 ? '+' : ''}${Number(c.total_r).toFixed(1)}R</b><br><span class="small muted">${c.n} · win ${c.win_pct}% · PF ${c.pf ?? '∞'}${money_ != null ? ' · ' + (money_ >= 0 ? '+' : '') + money(money_) + ' ' + ccy : ''}</span>` : '<span class="muted">abhi kuch nahi</span>';
+  const since = L.setup_since;
+  return `<div class="card" id="c-shadow"><h2>🌙 Shadow vs 💰 Asli</h2><p class="small muted" style="margin:0 0 6px">Naye setup ke shuru se gina gaya${since ? ': ' + nyDT(since) + ' NY' : ''} (max 30 din). Strategy badalte hi yeh zero se shuru hota hai.</p>
+    <div class="xt sh"><div class="xr"><div class="xn">🌙 Shadow setups<br><span class="small muted">Saare charts, 24/7. Sirf record + chart pe follow, paisa nahi.</span></div><div class="xc" style="grid-column:span 2">${line(sh)}</div></div>
+    <div class="xr win"><div class="xn">💰 Asli demo trades<br><span class="small muted">Sirf trading list pe.</span></div><div class="xc" style="grid-column:span 2">${line(re, re.pl)}</div></div></div>
+    ${(L.shadow_by_pair || []).length ? `<details style="margin-top:8px"><summary>Shadow: pair ke hisaab se</summary><div style="margin-top:6px">${L.shadow_by_pair.map(p => `<div class="rc"><span>${esc(pair(p.pair))}</span><b class="${p.total_r >= 0 ? 'good' : 'bad'}">${p.total_r >= 0 ? '+' : ''}${p.total_r}R · ${p.n} setups · win ${p.win_pct}%</b></div>`).join('')}</div></details>` : ''}</div>`;
+}
+function researchCard(){
+  const L = S.learning || {}, R_ = L.research, list = L.trade_list || [], M = S.mode || {};
+  const bw = ((M.ema || {}).window_ny || [[]])[0].join('–'); const base = `<div class="rc"><span>🥇 ${esc(pair('XAU_USD'))} ${esc(M.timeframe)} · 1:${(M.ema || {}).reward_risk} · ${bw === '00:00–24:00' ? '24 ghante' : bw + ' NY'}</span><b class="${(M.gate || {}).passed ? 'good' : 'bad'}">${(M.gate || {}).passed ? '✅ chalu' : '🔒 gate band'}</b></div>`;
+  const listHtml = base + list.map(c => `<div class="rc"><span>${esc(pair(c.instrument))} · ${c.hour}:00–${c.hour + 1}:00 NY</span><b class="good">✅ unseen PF ${c.unseen_pf ?? '∞'} · ${c.unseen_n} trades</b></div>`).join('');
+  const P = M.research_progress;
+  const prog = P && P.current ? `<div class="status open"><span class="dot"></span><span>⏳ Research chal raha hai: ${P.done}/${P.total} charts ho gaye<small>Abhi: ${esc(pair(P.current))} · shuru ${nyDT(P.started)} NY. Har chart ka 1 saal ka M5 data aata hai.</small></span></div><div class="bar"><span style="width:${Math.round(100 * P.done / Math.max(1, P.total))}%"></span></div>` : '';
+  if (!R_) return `<div class="card" id="c-research"><h2>📋 Trading list</h2>${listHtml}${prog || `<p class="empty">Research abhi shuru nahi hua. Bot restart ke kuch minute baad ya 5 PM NY review pe shuru hota hai (${M.charts_watched || '?'} charts).</p>`}</div>`;
+  const T_ = R_.total || {};
+  const tot = T_.unseen ? `<div class="card"><h2>🌍 Saare charts: ${esc(R_.timeframe)} · 1:${R_.rr ?? '-'} (${R_.instruments.length} charts, ~${Math.round(R_.days / 30.4)} mahine)</h2>
+    ${[['🔧 Purana 70%', T_.tuning], ['🧪 Unseen 30%', T_.unseen], ['📊 Sab', T_.all]].map(([l, c]) => c && c.n ? `<div class="rc"><span>${l}</span><b class="${c.total_r >= 0 ? 'good' : 'bad'}">${c.n} trades · win ${c.win_pct}% · PF ${c.pf ?? '∞'} · ${c.total_r >= 0 ? '+' : ''}${c.total_r}R</b></div>` : '').join('')}</div>` : '';
+  return `${prog ? `<div class="card">${prog}</div>` : ''}${tot}<div class="card" id="c-research"><h2>📋 ${(S.mode || {}).trade_mode === 'all' ? 'Research: kaunse pair+ghante kaam karte hain' : 'Trading list (asli orders sirf yahan)'}</h2>${(S.mode || {}).trade_mode === 'all' ? '<p class="small muted" style="margin:0 0 6px">Abhi har jagah trade ho raha hai. Yeh list batati hai kahan strategy sach mein kaam karti hai, taaki baad mein sirf wahan trade karna ho to ek setting badlo.</p>' : ''}${listHtml}
+    <p class="small muted" style="margin:8px 0 0">Research ${nyDT(R_.made)} NY: ${R_.instruments.length} instruments, ${R_.cells_tested} pair+ghanta test hue, ${R_.passed.length} pass. Shart: unseen pe ${R_.rules.min_unseen_trades}+ trades aur PF ${R_.rules.min_unseen_pf}+, aur purane data pe bhi PF ${R_.rules.min_tuning_pf}+ (taaki luck se achhe dikhne wale na aayein). Har din 5 PM NY pe dobara.</p>
+    <details style="margin-top:8px"><summary>Har instrument ka result (unseen ke hisaab se)</summary><div class="xt">${R_.instruments.map(r => `<div class="xr"><div class="xn">${esc(pair(r.pair))}</div>
+      <div class="xc"><span class="lbl">Purana 70%</span><b class="num ${r.tuning.total_r >= 0 ? 'good' : 'bad'}">${r.tuning.total_r >= 0 ? '+' : ''}${r.tuning.total_r}R</b><br><span class="small muted">${r.tuning.n} · PF ${r.tuning.pf ?? '-'}</span></div>
+      <div class="xc"><span class="lbl">Unseen 30%</span><b class="num ${r.unseen.total_r >= 0 ? 'good' : 'bad'}">${r.unseen.total_r >= 0 ? '+' : ''}${r.unseen.total_r}R</b><br><span class="small muted">${r.unseen.n} · PF ${r.unseen.pf ?? '-'}</span></div></div>`).join('')}</div></details></div>`;
+}
+function viewLearn(){
+  const L = S.learning || {}, st = L.stats_30d || {}, ccy = (S.status || {}).currency || '';
+  const nr = S.next_review;
+  const mins = nr ? Math.max(0, Math.round((nr - Date.now() / 1000) / 60)) : null;
+  const days = S.closed_days || [], cands = S.candidates || [];
+  return `${pageHead('🧠 Seekhna', 'Bot kya seekh raha hai, aur har din ka hisaab', 'menu')}
+  ${sec('s-review', '⏰ Agla review aur kab kya hota hai', mins != null ? `${Math.floor(mins / 60)}h ${mins % 60}m mein` : '', `<div class="status open"><span class="dot"></span><span>⏰ Agla review: ${nr ? nyDT(nr) + ' NY' : '17:00 NY'}${mins != null ? ` (${Math.floor(mins / 60)}h ${mins % 60}m mein)` : ''}<small>Isi waqt naye rule bante/hatte hain aur report card dobara banta hai.</small></span></div>
+    <ul class="steps" style="margin-top:10px">
+      <li class="pass"><b>Har ghante</b> (candle close pe): naye setups record hote hain, purane setups ka chart pe result dekha jaata hai (SL lagta ya TP).</li>
+      <li class="info"><b>Roz 17:00 NY</b>: galtiyan gini jaati hain. Jo cheez ${cands[0]?.need || 20}+ setups mein baar-baar nuksaan de, uska naya rule banta hai; jo rule ab nuksaan nahi deta woh hat jaata hai. Ek setting ka bhi test hota hai.</li>
+      <li class="pass"><b>Laagu kab?</b> Naya rule review ke <b>turant baad agle signal se</b>, aur badli setting <b>agle scan se</b>. Har badlav neeche "Seekhe hue sabak" mein likha jaata hai.</li>
+    </ul>`, true)}
+  ${sec('c-days', '📅 Din ke hisaab se trades', days.length ? `${days[0].n} trade aaj · ${days[0].total_r >= 0 ? '+' : ''}${days[0].total_r.toFixed(1)}R` : 'abhi koi nahi', `${days.length ? days.map((d, i) => `<details ${i === 0 ? 'open' : ''} class="dayrow"><summary><span class="dname">${esc(dayName(d.day))}</span>
+        <span>${d.n} trade · <span class="good">${d.wins}✅</span> <span class="bad">${d.losses}❌</span></span>
+        <b class="num ${d.total_r >= 0 ? 'good' : 'bad'}">${d.total_r >= 0 ? '+' : ''}${d.total_r.toFixed(2)}R · ${d.pl >= 0 ? '+' : ''}${money(d.pl)} ${ccy}</b></summary>
+        ${d.trades.map(c => `<div class="otr"><div class="row"><span>${c.r > 0.05 ? '✅' : c.r < -0.05 ? '❌' : '➖'} <b>${esc(pair(c.instrument))}</b> ${c.side > 0 ? '<span class="good">BUY</span>' : '<span class="bad">SELL</span>'} <span class="small muted">${nyT(c.closed)} · ${esc(c.how || '')}</span></span>
+          <b class="num ${c.r > 0.05 ? 'good' : c.r < -0.05 ? 'bad' : ''}">${c.r >= 0 ? '+' : ''}${Number(c.r).toFixed(2)}R${c.pl != null ? ' · ' + (c.pl >= 0 ? '+' : '') + money(c.pl) : ''}</b></div>
+          <div class="small"><a href="#chart/${esc(c.instrument)}" data-go="chart/${esc(c.instrument)}">🔍 Chart</a>${c.ref ? ` · <a href="#journeys" data-ref="${esc(c.ref)}">🧭 Safar</a>` : ''}</div></div>`).join('')}
+      </details>`).join('') : '<p class="empty">Abhi tak koi trade band nahi hua. Band hote hi har din ka hisaab yahan aayega.</p>'}
+    <div class="small" style="margin-top:6px"><a href="#closed" data-go="closed" style="color:var(--gold);font-weight:600">📒 Saare band trades (filter ke saath) ›</a></div>`)}
+  ${sec('c-lessons', '📜 Seekhe hue sabak', `${(L.lessons || []).length}`, `${(L.lessons || []).length ? `<ul class="tl">${L.lessons.map(l => `<li><span class="t">${esc(l.day.slice(5))}</span><span>${esc(l.text)}</span></li>`).join('')}</ul>` : '<p class="empty">Abhi koi sabak nahi.</p>'}`)}
+  ${sec('c-mistakes', '⚠️ Sabse zyada galtiyan (30 din)', `${(L.mistakes_30d || []).length}`, `${(L.mistakes_30d || []).length ? `<ul class="plain">${L.mistakes_30d.map(m => `<li><b class="num">${m.count}×</b> ${esc(m.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi.</p>'}`)}
+  ${sec('c-cands', '🧪 Kaunse rule ban sakte hain', `${cands.length}`, `<p class="small muted" style="margin:0 0 6px">Bot har cheez pe nazar rakhta hai. Rule tab banta hai jab kam se kam ${cands[0]?.need || 20} setups ho jayein aur woh cheez baaki setups se saaf zyada nuksaan de.</p>
+    ${cands.length ? cands.map(c => { const [cls, lbl] = CSTATE[c.state] || ['info', c.state]; const pct = Math.min(100, Math.round(100 * c.n / c.need));
+      return `<div class="otr"><div class="row"><span>${esc(c.text)}</span><span class="pill ${cls}">${lbl}</span></div>
+        <div class="bar"><span style="width:${pct}%"></span></div>
+        <div class="small muted">${c.n}/${c.need} setups · inka average <b class="${c.avg_r >= 0 ? 'good' : 'bad'}">${c.avg_r >= 0 ? '+' : ''}${c.avg_r}R</b> vs baaki <b>${c.base_r >= 0 ? '+' : ''}${c.base_r}R</b></div></div>`; }).join('')
+      : '<p class="empty">Abhi data nahi hai. Setups follow hote hi yahan dikhega.</p>'}`)}
+  ${sec('c-rules', '🚫 Bot ke khud banaye rules', `${(L.filters || []).length}`, `${(L.filters || []).length ? `<ul class="plain">${L.filters.map(f => `<li>Bachna hai: ${esc(f.text)}</li>`).join('')}</ul>` : '<p class="empty">Abhi koi nahi. Upar "Kaunse rule ban sakte hain" mein dekho kaun sa kitna kareeb hai.</p>'}`)}`;
+}
+
+async function poll(){
+  try { const r = await fetch('/api/state', {cache:'no-store'}); if (r.ok) { S = await r.json(); if (S.ui_version) { if (window.UIV && window.UIV !== S.ui_version) { location.reload(); return; } window.UIV = S.ui_version; } if (!(route === 'ask' && document.activeElement && document.activeElement.id === 'q')) render(); botAfterPoll(); } } catch (e) {}
+  setTimeout(poll, 15000);
+}
+window.addEventListener('resize', () => { if (S) drawCharts(); });
+
+/* ================= Manager robot ================= */
+const BOT = {items:[], i:-1, auto:null, hl:null, started:false, guiding:false, mode:'brief', fresh:0};
+const robot = document.getElementById('robot'), bubble = document.getElementById('bubble');
+function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
+function applyHL(){ document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
+  if (BOT.hl) document.querySelector(BOT.hl)?.classList.add('hl'); }
+function robotTo(x, y){
+  const bh = bubble.hidden ? 0 : bubble.offsetHeight + 16;
+  x = Math.max(6, Math.min(innerWidth - 70, x)); y = Math.max(64, Math.min(innerHeight - bh - 84 - 70, y));
+  robot.style.transform = `translate(${x}px,${y}px)`;
+  robot.classList.add('walking'); clearTimeout(robotTo.t); robotTo.t = setTimeout(() => robot.classList.remove('walking'), 1150);
+}
+function robotHome(){ robotTo(innerWidth - 82, innerHeight); }
+function mood(m){ robot.dataset.mood = m || 'info'; }
+function jump(){ robot.classList.remove('jump'); void robot.offsetWidth; robot.classList.add('jump'); setTimeout(() => robot.classList.remove('jump'), 1400); }
+setInterval(() => { if (bubble.hidden && !BOT.guiding) robotTo(innerWidth - 82 - Math.random() * 40, innerHeight); }, 9000);   // stays in its corner, never over prices
+robot.addEventListener('click', () => startBriefing(true));
+window.addEventListener('resize', () => { if (bubble.hidden) robotHome(); });
+
+const IMPORTANT = {executor:['good','bad'], manager:['good','bad','info'], learner:['good'], budget:['good','bad']};
+function evItem(aid, e){
+  if (e.kind !== 'did' || !(IMPORTANT[aid] || []).includes(e.tone)) return null;
+  if (aid === 'learner' && !/rule|Setting|sabak|Report card/i.test(e.text)) return null;
+  if (aid === 'manager' && !/close/.test(e.text) && e.tone !== 'good') return null;
+  const head = {executor:'Naya trade laga', manager: /close/.test(e.text) ? 'Trade band hua' : 'Trade sambhala', learner:'Bot ne kuch seekha', budget:'Account ki khabar'}[aid];
+  const it = {key:`ev:${aid}:${e.t}:${e.text.length}`, t:e.t, tone: e.tone === 'bad' ? 'bad' : e.tone === 'good' ? 'good' : 'info', title: head, text: e.text, agent: aid};
+  if (e.ref) { it.go = 'journeys'; it.sel = '#j-' + CSS.escape(e.ref); it.prep = () => openJ.add(e.ref); }
+  else if (aid === 'learner') { it.go = 'learn'; it.sel = '#c-lessons'; }
+  else { it.go = 'agent/' + aid; it.sel = '.hero'; }
+  return it;
+}
+function briefItem(b){
+  const txt = String(b.text || '').replace(/[#*_`]/g, '').replace(/\s+/g, ' ');
+  return {key:'brief:' + b.slot, t:b.time, tone:'info', title:'🌍 Duniya ki market khabar', text: txt.length > 220 ? txt.slice(0, 220) + '…' : txt, go:'ask', sel:'#b-0'};
+}
+/* Everything the robot could mention right now. Each item has a stable key, so once you have
+   seen it the robot does not repeat it (the keys are saved on the bot server). */
+function buildBriefing(){
+  const st = S.status || {}, out = [], now = Date.now() / 1000, day = now - 86400;
+  const nb = st.no_new_trades;
+  if (nb && nb !== 'outside US session') out.push({key:'halt:' + nb, tone:'bad', title:'Naye trades band hain', text: nb, go:'agent/budget', sel:'.hero'});
+  (S.agents || []).forEach(a => (a.events || []).forEach(e => { if (e.t > day) { const it = evItem(a.id, e); if (it) out.push(it); } }));
+  const tr = st.open_trades || [];
+  if (tr.length) { const pl = tr.reduce((s, t) => s + (t.unrealized_pl || 0), 0);
+    out.push({key:'open:' + tr.map(t => t.id).sort().join(','), tone: pl >= 0 ? 'good' : 'bad', title: `${tr.length} trade open`, text: `Abhi ${pl >= 0 ? '+' : ''}${money(pl, st.currency)} · ` + tr.map(t => pair(t.instrument) + (t.units > 0 ? ' BUY' : ' SELL')).join(', '), go:'trades', sel:'#c-open-list'}); }
+  const blocked = (S.journeys || []).filter(j => j.created > day && !j.taken);
+  if (blocked.length) out.push({key:'blocked:' + blocked[0].ref, tone:'info', title:`${blocked.length} signal roke gaye (24 ghante)`, text: 'Kyun roke, har ek ka safar dekho. Time Machine inka result bhi follow kar raha hai.',
+    go:'journeys', sel:'#j-' + CSS.escape(blocked[0].ref), prep: () => { jfilter = 'blocked'; openJ.add(blocked[0].ref); }});
+  const forming = (S.charts || []).filter(c => c.state === 'forming');
+  if (forming.length) out.push({key:'forming:' + forming.map(c => c.instrument).sort().join(','), tone:'info', title:`${forming.length} chart pe setup ban raha hai`, text: forming.slice(0,4).map(c => pair(c.instrument) + (c.bias > 0 ? ' buy' : ' sell')).join(', ') + ' · price entry zone ki taraf aa raha',
+    go:'charts', sel:'#c-charts', prep: () => { cfilter = 'forming'; }});
+  const N = S.news || [];
+  const act = N.filter(e => e.active);
+  if (act.length) out.push({key:'nact:' + act.map(e => e.currency + e.time).join(','), tone:'bad', title:'News ki wajah se trades band', text: act.map(e => `${e.currency} ${e.title} ${nyT(e.time)} NY`).join(', ') + ' · in pairs pe abhi naya trade nahi',
+    go:'news', sel:'#c-news-now'});
+  const soon = N.filter(e => e.block && e.time > now && e.time < now + 24 * 3600);
+  if (soon.length) out.push({key:'nsoon:' + soon.map(e => e.currency + e.time).join(','), tone:'info', title:`Agle 24 ghante mein ${soon.length} bada news`, text: soon.slice(0, 3).map(e => `${e.currency} ${e.title} ${nyT(e.time)} NY (${inTxt(e.time)})`).join(' · '),
+    go:'news', sel:'#n-' + N.indexOf(soon[0])});
+  ((S.brain || {}).briefs || []).filter(b => b.time > day).slice(0, 1).forEach(b => out.push(briefItem(b)));
+  const rank = {bad:0, good:1, info:2};
+  out.sort((a, b) => rank[a.tone] - rank[b.tone] || (b.t || 0) - (a.t || 0));
+  return out;
+}
+let SEEN = new Set();
+function loadSeen(){ (S.seen || []).forEach(k => SEEN.add(k)); try { JSON.parse(lsGet('tb_seen') || '[]').forEach(k => SEEN.add(k)); } catch (e) {} }
+function markSeen(items){
+  const keys = items.map(i => i.key).filter(k => k && !SEEN.has(k)); if (!keys.length) return;
+  keys.forEach(k => SEEN.add(k)); lsSet('tb_seen', JSON.stringify([...SEEN].slice(-400)));
+  fetch('/api/seen', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({keys})}).catch(() => {});
+}
+const PILL = {good:'Achi khabar', bad:'Buri khabar', info:'Dhyan do'};
+function startBriefing(manual){
+  const all = buildBriefing();
+  const fresh = all.filter(i => !SEEN.has(i.key));
+  if (!manual && !fresh.length) { jump(); return; }          // nothing new: stay quiet
+  BOT.items = (manual ? all : fresh).slice(0, 7); BOT.mode = 'brief'; BOT.fresh = fresh.length;
+  markSeen(BOT.items);
+  showIntro(manual);
+}
+function showIntro(manual){
+  stopAuto(); BOT.i = -1; BOT.hl = null; applyHL();
+  const g = BOT.items.filter(x => x.tone === 'good').length, b = BOT.items.filter(x => x.tone === 'bad').length;
+  const hr = +tfmt.format(new Date()).slice(0, 2);
+  const hello = hr < 12 ? 'Good morning' : hr < 17 ? 'Namaste' : 'Good evening';
+  mood(b ? 'bad' : g ? 'good' : 'info');
+  const ask = (S.brain || {}).available ? '<button class="btn" data-b="ask">💬 Kuch pucho</button>' : '';
+  if (!BOT.items.length) {
+    bubble.innerHTML = `<div class="bhead"><b>🤖 Manager</b><button class="bx" data-b="close" aria-label="Band karo">×</button></div>
+      <div>${hello}! Koi nayi khabar nahi. Bot ${(S.charts || []).length} charts dekh raha hai.<br><span class="small muted">${esc(S.status?.session_text || '')}</span></div>
+      <div class="btns"><button class="btn pri" data-b="close">Theek hai</button>${ask}</div>`;
+  } else {
+    const head = manual ? (BOT.fresh ? `<b>${BOT.fresh} nayi</b> baat, baaki pehle dekhi hui (24 ghante):` : 'Koi nayi khabar nahi. Pichhle 24 ghante ki baatein phir se:')
+                        : `Aapke jaane ke baad <b>${BOT.items.length} nayi baatein</b>${g ? `, <span class="good">${g} achi</span>` : ''}${b ? `, <span class="bad">${b} buri</span>` : ''}:`;
+    bubble.innerHTML = `<div class="bhead"><b>🤖 Manager</b><button class="bx" data-b="close" aria-label="Band karo">×</button></div>
+      <div>${hello}! ${head}</div>
+      <ul class="news">${BOT.items.map((it, i) => `<li data-b="item" data-i="${i}"><span class="pill ${it.tone}">${PILL[it.tone]}</span><span><b>${esc(it.title)}</b><br><span class="small muted">${esc(it.text)}</span></span></li>`).join('')}</ul>
+      <div class="btns"><button class="btn pri" data-b="tour">▶ Mujhe khud dikhao</button>${ask}<button class="btn" data-b="close">Baad mein</button></div>`;
+  }
+  bubble.hidden = false; jump(); robotHome();
+}
+function showItem(i, auto, noGuide){
+  const it = BOT.items[i]; if (!it) return endTour();
+  BOT.i = i; mood(it.tone);
+  bubble.innerHTML = `<div class="bhead"><b>🤖 Manager <span class="small muted">${i + 1}/${BOT.items.length}</span></b><button class="bx" data-b="close" aria-label="Band karo">×</button></div>
+    <div><span class="pill ${it.tone}">${PILL[it.tone]}</span> ${it.t ? `<span class="small muted">${nyT(it.t)} NY</span>` : ''}</div>
+    <div style="margin-top:6px"><b>${esc(it.title)}</b><br>${esc(it.text)}</div>
+    <div class="btns">${BOT.auto ? '<button class="btn" data-b="stop">⏸ Ruko</button>' : ''}
+      ${i + 1 < BOT.items.length ? '<button class="btn pri" data-b="next">Agla →</button>' : '<button class="btn pri" data-b="close">Ho gaya ✓</button>'}
+      ${noGuide ? '<button class="btn" data-b="show">👀 Dikhao</button>' : ''}${BOT.mode === 'brief' ? '<button class="btn" data-b="list">Saari list</button>' : ''}${(S.brain || {}).available ? '<button class="btn" data-b="ask">💬 Pucho</button>' : ''}</div>`;
+  bubble.hidden = false;
+  if (noGuide) { robotHome(); return; }     // live pop-up: never yank the page away; the user taps "Dikhao"
+  guide(it);
+}
+function guide(it){
+  BOT.guiding = true; it.prep && it.prep(); BOT.hl = it.sel || null;
+  if (route !== it.go) go(it.go); else render();
+  setTimeout(() => {
+    const el = it.sel && document.querySelector(it.sel);
+    if (el) { const top = el.getBoundingClientRect().top + scrollY - 130; window.scrollTo({top: Math.max(0, top), behavior: 'smooth'}); }
+    setTimeout(() => { BOT.guiding = false; const r = el && el.getBoundingClientRect();
+      if (r) robotTo(r.right - 60, r.top - 62); else robotHome(); applyHL(); }, 500);
+  }, 120);
+}
+function stopAuto(){ clearInterval(BOT.auto); BOT.auto = null; }
+function endTour(){ stopAuto(); mood('good');
+  bubble.innerHTML = `<div class="bhead"><b>🤖 Manager</b><button class="bx" data-b="close">×</button></div><div>Bas itna hi! Kuch naya hua to main khud aa ke bataunga. 👋</div>`;
+  setTimeout(closeBot, 3500); }
+function closeBot(){ stopAuto(); bubble.hidden = true; BOT.hl = null; applyHL(); mood('info'); robotHome(); }
+bubble.addEventListener('click', e => {
+  const t = e.target.closest('[data-b]'); if (!t) return; const b = t.dataset.b;
+  if (b === 'close') closeBot();
+  else if (b === 'list') showIntro(true);
+  else if (b === 'ask') { closeBot(); go('ask'); setTimeout(() => document.getElementById('q')?.focus(), 200); }
+  else if (b === 'item') { stopAuto(); showItem(+t.dataset.i); }
+  else if (b === 'next') showItem(BOT.i + 1, false, BOT.mode === 'live');
+  else if (b === 'show') showItem(BOT.i);
+  else if (b === 'stop') { stopAuto(); showItem(BOT.i); }
+  else if (b === 'tour') { BOT.auto = setInterval(() => BOT.i + 1 < BOT.items.length ? showItem(BOT.i + 1) : endTour(), 6500); showItem(0); }
+});
+function botAfterPoll(){
+  if (!BOT.started) { BOT.started = true; loadSeen(); setTimeout(() => startBriefing(false), 600); return; }
+  if (!bubble.hidden || route === 'ask') return;
+  const now = Date.now() / 1000, N = S.news || [];
+  const e = N.find(e => e.block && e.time > now && e.time - now < 30 * 60 && !SEEN.has('nalert:' + e.currency + e.time));
+  let fresh = e ? [{key:'nalert:' + e.currency + e.time, tone:'bad', title:`${inTxt(e.time)}: ${e.currency} ${e.title}`, text:`Bada news aa raha hai. ${nyT(e.from)}–${nyT(e.to)} NY tak ${e.pairs.map(pair).join(', ')} pe naya trade nahi lagega.`, go:'news', sel:'#n-' + N.indexOf(e)}] : [];
+  if (!fresh.length) fresh = buildBriefing().filter(i => !SEEN.has(i.key) && (i.key.startsWith('ev:') || i.key.startsWith('brief:') || i.key.startsWith('halt:') || i.key.startsWith('nact:')));
+  if (!fresh.length) return;
+  BOT.items = fresh.slice(0, 5); BOT.mode = 'live'; markSeen(BOT.items);
+  jump(); showItem(0, false, true);
+}
+
+/* ================= 💬 Pucho (chat with the Manager's brain) ================= */
+let CHAT = []; try { CHAT = JSON.parse(lsGet('tb_chat') || '[]'); } catch (e) { CHAT = []; }
+let ASKING = false;
+const SUGGEST = ['Aaj forex market kaisa hai?', 'Bot ne aaj kya kiya aur kyun?', 'Is hafte ke bade news ka mere pairs pe kya asar hoga?', 'USD abhi strong hai ya weak? Kyun?', 'Bot ki sabse badi galti kya rahi?'];
+function md(t){ return esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/^#+\s*(.+)$/gm, '<b>$1</b>').replace(/^\s*[-*]\s+/gm, '• ').replace(/\n/g, '<br>'); }
+function srcList(s){ return (s || []).length ? `<div class="small" style="margin-top:6px">Sources: ${s.map((x, i) => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${i + 1}. ${esc((x.title || x.url).slice(0, 60))}</a>`).join(' · ')}</div>` : ''; }
+function viewAsk(){
+  const B = S.brain || {};
+  const off = !B.available ? `<div class="status open"><span class="dot"></span><span>Robot ka dimaag abhi band hai: ${esc(B.reason || '')}<small>Chalu karne ke liye Termius mein ek baar: bash ~/himanshubashambu08/trading-bot/deploy/enable-brain.sh (Anthropic API key chahiye, paid).</small></span></div>` : '';
+  const briefs = (B.briefs || []).slice(0, 2).map((b, i) => `<div class="card" id="b-${i}"><div class="row"><h2>🌍 World brief</h2><span class="small muted">${nyDT(b.time)} NY</span></div><div class="small">${md(b.text)}</div>${srcList(b.sources)}</div>`).join('');
+  const msgs = CHAT.map(m => `<div class="msg ${m.role}">${m.role === 'user' ? esc(m.text) : md(m.text) + srcList(m.sources)}</div>`).join('');
+  return `${pageHead('💬 Manager se pucho', '', 'menu')}<div class="card"><h2>💬 Manager se pucho</h2><p class="small muted" style="margin:0">Bot ke baare mein kuch bhi, ya market/duniya ki koi bhi latest baat. Manager bot ka poora data padhta hai aur internet pe khud dhoondhta hai. Woh trade nahi lagata aur settings nahi badalta, sirf jawab deta hai.</p>${off}</div>
+  ${briefs}
+  <div class="card wrap"><div class="chat" id="chat">${msgs || '<p class="empty">Neeche koi sawaal chuno ya likho.</p>'}${ASKING ? '<div class="msg assistant muted">🤖 Soch raha hai, internet pe dhoondh raha hai…</div>' : ''}</div>
+    <div class="chips">${SUGGEST.map(q => `<span class="chip to" data-q="${esc(q)}">${esc(q)}</span>`).join('')}</div>
+    <form id="askf" class="askrow"><textarea id="q" rows="2" placeholder="Kuch bhi pucho…" ${ASKING || !B.available ? 'disabled' : ''}></textarea><button class="btn pri" ${ASKING || !B.available ? 'disabled' : ''}>Bhejo</button></form>
+    ${CHAT.length ? '<button class="btn" data-clear="1" style="align-self:flex-start">Chat saaf karo</button>' : ''}</div>`;
+}
+async function ask(q){
+  q = (q || '').trim(); if (!q || ASKING || !(S.brain || {}).available) return;
+  const history = CHAT.slice(-12).map(m => ({role: m.role, text: m.text}));
+  CHAT.push({role:'user', text:q}); ASKING = true; render(); mood('info'); robot.classList.add('walking');
+  try {
+    const r = await fetch('/api/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question:q, history})});
+    const a = await r.json(); CHAT.push({role:'assistant', text:a.text, sources:a.sources}); mood(a.error ? 'bad' : 'good');
+  } catch (e) { CHAT.push({role:'assistant', text:'Bot server se baat nahi ho payi. Internet/Tailscale check karo.'}); mood('bad'); }
+  ASKING = false; robot.classList.remove('walking'); jump();
+  CHAT = CHAT.slice(-30); lsSet('tb_chat', JSON.stringify(CHAT)); render();
+  setTimeout(() => document.getElementById('chat')?.lastElementChild?.scrollIntoView({block:'start', behavior:'smooth'}), 100);
+}
+document.addEventListener('submit', e => { if (e.target.id === 'askf') { e.preventDefault(); ask(document.getElementById('q').value); } });
+document.addEventListener('keydown', e => { if (e.target.id === 'q' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(e.target.value); } });
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-q]'); if (c) ask(c.dataset.q);
+  if (e.target.closest('[data-clear]')) { CHAT = []; lsSet('tb_chat', '[]'); render(); }
+});
+robotHome();
+/* ---- live prices: move the last candle with the real price every 3 s ---- */
+const LIVE = {data:null, busy:false};
+const TF_S = {M1:60, M5:300, M15:900, M30:1800, H1:3600, H4:14400, D:86400};
+function applyLive(redraw){
+  const L = LIVE.data; if (!L || !S) return;
+  const tf = TF_S[(S.status?.timeframes || ['H1'])[0]] || 3600;
+  (S.charts || []).forEach(c => {
+    const p = (L.prices || {})[c.instrument]; const k = c.candles; if (!p || !k || !k.length) return;
+    const mid = p.mid; let last = k[k.length - 1];
+    if (p.open && L.t >= last[0] + tf) {                     // a new candle started since the last board refresh
+      const t0 = Math.floor(L.t / tf) * tf; k.push([t0, last[4], Math.max(last[4], mid), Math.min(last[4], mid), mid]); k.shift();
+      if (c.ema) { c.ema.push(c.ema[c.ema.length - 1]); c.ema.shift(); }
+    } else { last[4] = mid; last[2] = Math.max(last[2], mid); last[3] = Math.min(last[3], mid); }
+    c.price = mid; c.live = p.open;
+  });
+  document.querySelectorAll('[data-px]').forEach(el => { const c = (S.charts || []).find(x => x.instrument === el.dataset.px); if (c) el.textContent = px(c.price); });
+  document.querySelectorAll('[data-live]').forEach(el => { const p = (L.prices || {})[el.dataset.live]; el.classList.toggle('on', !!(p && p.open)); el.title = p && p.open ? 'Live' : 'Market band'; });
+  const ln = document.getElementById('livenote'); if (ln) ln.innerHTML = liveNote();
+  ((S.status || {}).open_trades || []).forEach(t => { const el = document.querySelector(`[data-trr="${CSS.escape(String(t.id))}"]`); const p = (L.prices || {})[t.instrument];
+    if (!el || !p) return; const r = liveR(t, p.mid); if (r == null) return; el.textContent = (r >= 0 ? '+' : '') + r.toFixed(2) + 'R'; el.className = 'num ' + (r >= 0 ? 'good' : 'bad'); });
+  if (redraw) drawCharts();
+}
+async function tickLive(){
+  if (!document.hidden && S && document.querySelector('canvas[data-inst], [data-trr]') && !LIVE.busy) {
+    LIVE.busy = true;
+    try { const r = await fetch('/api/prices', {cache:'no-store'}); if (r.ok) { LIVE.data = await r.json(); applyLive(true); } } catch (e) {}
+    LIVE.busy = false;
+  }
+  setTimeout(tickLive, 3000);
+}
+render(); poll(); tickLive();
+</script>
+</body>
+</html>

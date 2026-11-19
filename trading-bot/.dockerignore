@@ -1,0 +1,12 @@
+.env
+config.json
+state-*.json
+journal-*.csv
+bot.log
+__pycache__/
+memory-*.db
+reports/
+agents-*.json
+news-cache.json
+brain-*.json
+seen-*.json
