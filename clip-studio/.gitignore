@@ -1,0 +1,6 @@
+.env
+tokens.json
+output/
+__pycache__/
+*.pyc
+.venv/
