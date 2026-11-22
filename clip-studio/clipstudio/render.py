@@ -1,6 +1,7 @@
 """Step 6: cut, reframe to 1080x1920, burn captions, normalise audio -> H.264 MP4."""
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -17,7 +18,7 @@ def probe(video: Path) -> dict:
 
 
 def render_clip(src: Path, out: Path, start: float, end: float, plan: dict,
-                ass_name: str | None, info: dict) -> None:
+                ass_name: str | None, info: dict, on_progress=lambda f: None) -> None:
     w, h = info["width"], info["height"]
     subs = f",ass={ass_name}" if ass_name else ""
 
@@ -38,7 +39,7 @@ def render_clip(src: Path, out: Path, start: float, end: float, plan: dict,
         )
 
     cmd = [
-        "ffmpeg", "-y", "-v", "error",
+        "ffmpeg", "-y", "-v", "error", "-nostats", "-progress", "pipe:1",
         "-ss", f"{start:.2f}", "-t", f"{end - start:.2f}", "-i", str(src.resolve()),
         "-filter_complex", graph, "-map", "[v]", "-map", "0:a?",
         "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
@@ -47,6 +48,13 @@ def render_clip(src: Path, out: Path, start: float, end: float, plan: dict,
         "-movflags", "+faststart", out.name,
     ]
     # run inside the clip folder so the .ass path needs no escaping
-    result = subprocess.run(cmd, cwd=out.parent, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed: {result.stderr.strip()[-600:]}")
+    # stderr goes to a temp file so a chatty error can't fill the pipe and block ffmpeg
+    with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as err:
+        proc = subprocess.Popen(cmd, cwd=out.parent, stdout=subprocess.PIPE, stderr=err,
+                                text=True, encoding="utf-8", errors="replace")
+        for line in proc.stdout:  # "-progress" prints key=value lines, out_time_us is position
+            if line.startswith("out_time_us=") and line[12:].strip().isdigit():
+                on_progress(min(int(line[12:]) / 1e6 / (end - start), 1))
+        if proc.wait() != 0:
+            err.seek(0)
+            raise RuntimeError(f"ffmpeg failed: {err.read().strip()[-600:]}")

@@ -29,10 +29,15 @@ def worker(job_id: str, url: str, post_to: list[str]) -> None:
     def log(msg: str) -> None:
         job["log"].append(f"{time.strftime('%H:%M:%S')}  {msg}")
 
+    def progress(pct: float, stage: str) -> None:
+        job["progress"], job["stage"] = round(pct, 1), stage
+
+    if LOCK.locked():
+        job["stage"] = "Waiting for the previous video to finish"
     with LOCK:
-        job["status"] = "running"
+        job["status"], job["started"] = "running", time.time()
         try:
-            result = pipeline.run(url, post_to, log)
+            result = pipeline.run(url, post_to, log, progress)
             job["clips"] = [
                 {"name": Path(c["file"]).name,
                  "url": f"/media/{Path(c['file']).parent.name}/{Path(c['file']).name}",
@@ -53,7 +58,7 @@ def create_job():
     if not url:
         return jsonify({"error": "Paste a YouTube link"}), 400
     job_id = uuid.uuid4().hex[:8]
-    JOBS[job_id] = {"status": "queued", "log": [], "clips": []}
+    JOBS[job_id] = {"status": "queued", "log": [], "clips": [], "progress": 0, "stage": "Starting"}
     threading.Thread(target=worker, args=(job_id, url, body.get("post_to") or []), daemon=True).start()
     return jsonify({"id": job_id})
 
@@ -61,7 +66,7 @@ def create_job():
 @app.get("/api/jobs/<job_id>")
 def job_status(job_id):
     job = JOBS.get(job_id) or abort(404)
-    return jsonify(job)
+    return jsonify({**job, "elapsed": time.time() - job["started"] if "started" in job else 0})
 
 
 @app.get("/api/status")
@@ -100,6 +105,9 @@ label.chk{display:flex;gap:8px;align-items:center;cursor:pointer}
 .pill.on{color:var(--ok);border-color:var(--ok)}
 button{width:100%;padding:18px;border:0;border-radius:12px;background:var(--pink);color:#fff;font-size:18px;font-weight:800;cursor:pointer}
 button:disabled{opacity:.5;cursor:wait}
+.bar{height:10px;background:#0b0710;border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:20px}
+.bar i{display:block;height:100%;width:0;background:var(--pink);transition:width .6s}
+.stage{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:14px}.stage span:last-child{color:var(--muted);white-space:nowrap}
 pre{background:#0b0710;border:1px solid var(--line);border-radius:12px;padding:14px;font-size:13px;white-space:pre-wrap;max-height:280px;overflow:auto;margin:20px 0 0}
 .clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;margin-top:20px}
 .clip{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
@@ -117,6 +125,8 @@ pre{background:#0b0710;border:1px solid var(--line);border-radius:12px;padding:1
     <span class="pill" id="s-ai">heuristic picks</span>
   </div>
   <button id="go">✂️ Clip &amp; Post</button>
+  <div id="prog" hidden><div class="bar"><i id="fill"></i></div>
+    <div class="stage"><span id="stage">Starting…</span><span id="eta"></span></div></div>
   <pre id="log" hidden></pre>
 </div>
 <div class="clips" id="clips"></div>
@@ -129,15 +139,20 @@ fetch('/api/status').then(r=>r.json()).then(s=>{
 });
 $('go').onclick=async()=>{
   const post_to=[...($('ig').checked?['instagram']:[]),...($('tt').checked?['tiktok']:[])];
-  $('go').disabled=true;$('log').hidden=false;$('log').textContent='Starting…';$('clips').innerHTML='';
+  $('go').disabled=true;$('log').hidden=false;$('prog').hidden=false;$('fill').style.width='0';$('eta').textContent='';$('log').textContent='Starting…';$('clips').innerHTML='';
   const r=await fetch('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:$('url').value,post_to})});
   const j=await r.json();if(!r.ok){$('log').textContent=j.error;$('go').disabled=false;return}
   const tick=async()=>{
     const s=await (await fetch('/api/jobs/'+j.id)).json();
     $('log').textContent=s.log.join('\\n')||'Waiting…';$('log').scrollTop=1e9;
+    const p=s.progress||0;$('fill').style.width=p+'%';
+    $('stage').textContent=(s.status==='failed'?'Failed':s.stage)+' · '+Math.floor(p)+'%';
+    // rough ETA from average speed so far; needs a few % of progress to be meaningful
+    $('eta').textContent=s.status==='done'?'done in '+fmt(s.elapsed):s.status==='failed'?'':p>=3?'~'+fmt(s.elapsed*(100-p)/p)+' left':fmt(s.elapsed)+' elapsed';
     if(s.status==='done'||s.status==='failed'){$('go').disabled=false;render(s.clips);return}
     setTimeout(tick,1500)};tick();
 };
+function fmt(s){s=Math.round(s);return s<60?s+'s':Math.floor(s/60)+'m '+(s%60)+'s'}
 function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
 function render(clips){
   $('clips').innerHTML=clips.map(c=>`<div class="clip"><video src="${c.url}" controls playsinline preload="metadata"></video>

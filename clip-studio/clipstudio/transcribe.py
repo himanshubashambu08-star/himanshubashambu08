@@ -5,7 +5,7 @@ from pathlib import Path
 from .config import env
 
 
-def transcribe(video: Path, cache: Path, log=print) -> list[dict]:
+def transcribe(video: Path, cache: Path, log=print, on_progress=lambda f: None) -> list[dict]:
     if cache.exists():
         return json.loads(cache.read_text(encoding="utf-8"))
 
@@ -17,6 +17,8 @@ def transcribe(video: Path, cache: Path, log=print) -> list[dict]:
     segments, info = model.transcribe(str(video), word_timestamps=True, vad_filter=True)
     out = []
     for seg in segments:
+        if info.duration:
+            on_progress(min(seg.end / info.duration, 1))
         out.append(
             {
                 "start": round(seg.start, 2),

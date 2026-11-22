@@ -1,4 +1,4 @@
-yt-dlp>=2025.1.1
+yt-dlp[default]>=2025.1.1
 faster-whisper>=1.1.0
 av<19  # PyAV 19 dropped av.open(metadata_errors=), which faster-whisper 1.2.x passes
 opencv-python-headless>=4.9,<5
