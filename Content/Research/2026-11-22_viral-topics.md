@@ -23,7 +23,7 @@ No per-video view counts were retrieved this run, so every metric reads "unknown
 | 5 | **Immigrant / new-in-Canada stories** (EN · हिंदी · ਪੰਜਾਬੀ) | "I arrived in London, Ontario with two suitcases and one spreadsheet." | Raw personal stories (Adobe); multilingual = wider reach. Metric: unknown | 7 |
 | 6 | **POV stories** — "POV: you're a café owner and the phone won't stop" | "POV: it's 7 pm and you've missed 12 calls today." | POV listed as winning format (Revid). Metric: unknown | 7 |
 | 7 | **Reddit-style business confessions** narrated faceless | "My accountant found $4,000 I didn't know I could claim…" | Most-viewed faceless format (easyviral). Metric: unknown | 6 |
-| 8 | **History of a everyday thing** (receipts, the phone call, the postman) | "Receipts are 5,000 years old. Here's why they still get lost." | History = evergreen (OutlierKit). Metric: unknown | 6 |
+| 8 | **History of an everyday thing** (receipts, the phone call, the postman) | "Receipts are 5,000 years old. Here's why they still get lost." | History = evergreen (OutlierKit). Metric: unknown | 6 |
 | 9 | **Stoic lessons for small-business owners** | "Marcus Aurelius never had to chase an invoice. You do." | Stoicism repeat pick (Fliki). Metric: unknown | 5 |
 | 10 | **Cozy bedtime-style stories** about calm work | "Close your eyes. The shop is quiet. The lighthouse is still on." | Sleep stories evergreen (OutlierKit). Metric: unknown | 5 |
 
