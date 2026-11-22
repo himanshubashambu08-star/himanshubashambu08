@@ -25,7 +25,7 @@
   },
   "background": {
     "service_worker": "src/background.js",
-    "scripts": ["src/lang.js", "src/background.js"]
+    "scripts": ["src/lang.js", "src/services.js", "src/background.js"]
   },
   "permissions": ["storage", "activeTab", "tabCapture", "offscreen"],
   "host_permissions": ["<all_urls>"],

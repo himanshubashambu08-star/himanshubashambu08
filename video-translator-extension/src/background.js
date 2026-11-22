@@ -1,7 +1,7 @@
 /* Background: speech-to-text calls, translation fallback, tab-audio (Chrome) orchestration. */
 
 if (typeof VT_DEFAULTS === "undefined" && typeof importScripts === "function") {
-  importScripts("lang.js");
+  importScripts("lang.js", "services.js");
 }
 
 const api = typeof browser !== "undefined" && browser.runtime ? browser : chrome;
@@ -14,87 +14,6 @@ async function getSettings() {
 api.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") api.runtime.openOptionsPage();
 });
-
-/* ---------- Speech to text (OpenAI-compatible Whisper endpoint) ---------- */
-
-// Phrases Whisper tends to invent on silence / music.
-const HALLUCINATIONS = [
-  /^thank(s| you)( so much)? for watching[.!]*$/i,
-  /^thanks for watching[.!]*$/i,
-  /subtitles? by/i,
-  /amara\.org/i,
-  /^please subscribe/i,
-  /^\[?(music|applause|silence|no speech)\]?\.?$/i,
-  /^you$/i,
-  /^\.+$/
-];
-
-function base64ToBytes(b64) {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-async function transcribe({ audio, mime }) {
-  const s = await getSettings();
-  if (!s.apiKey) return { error: "NO_KEY" };
-  const base = (s.sttBaseUrl || "").replace(/\/+$/, "");
-  if (!base) return { error: "NO_BASE_URL" };
-
-  const type = (mime || "audio/webm").split(";")[0];
-  const ext = type.includes("ogg") ? "ogg" : type.includes("mp4") ? "mp4" : "webm";
-  const fd = new FormData();
-  fd.append("file", new Blob([base64ToBytes(audio)], { type }), "chunk." + ext);
-  fd.append("model", s.sttModel || "whisper-1");
-  fd.append("response_format", "verbose_json");
-  fd.append("temperature", "0");
-
-  let res;
-  try {
-    res = await fetch(base + "/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + s.apiKey },
-      body: fd
-    });
-  } catch (e) {
-    return { error: "NETWORK: " + e.message };
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    return { error: `HTTP ${res.status}: ${body.slice(0, 200)}` };
-  }
-  const j = await res.json();
-  let text = (j.text || "").trim();
-
-  // Drop chunks that are mostly silence / music.
-  if (Array.isArray(j.segments) && j.segments.length) {
-    const speech = j.segments.filter((seg) => !(seg.no_speech_prob > 0.6 && seg.avg_logprob < -0.7));
-    text = speech.map((seg) => seg.text).join(" ").replace(/\s+/g, " ").trim();
-  }
-  if (!text || HALLUCINATIONS.some((re) => re.test(text))) text = "";
-
-  return { text, lang: vtNormLang(j.language) };
-}
-
-/* ---------- Free translation fallback (Google Translate web endpoint) ---------- */
-
-async function gtxTranslate({ text, from, to }) {
-  const url =
-    "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t" +
-    "&sl=" + encodeURIComponent(from || "auto") +
-    "&tl=" + encodeURIComponent(to) +
-    "&q=" + encodeURIComponent(text);
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return { error: "HTTP " + res.status };
-    const data = await res.json();
-    const out = (data[0] || []).map((p) => p[0]).join("");
-    return { text: out, detected: vtNormLang(data[2]) };
-  } catch (e) {
-    return { error: e.message };
-  }
-}
 
 async function testKey() {
   const s = await getSettings();
@@ -177,8 +96,8 @@ api.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.target === "offscreen") return false;
 
   const handlers = {
-    transcribe: () => transcribe(msg),
-    gtx: () => gtxTranslate(msg),
+    transcribe: async () => vtTranscribe(await getSettings(), msg),
+    gtx: () => vtGtxTranslate(msg),
     "test-key": () => testKey(),
     "start-tab-audio": () => startTabAudio(msg.tabId, msg.streamId),
     "stop-tab-audio": () => stopTabAudio(),

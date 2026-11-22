@@ -15,6 +15,12 @@
   const api = chrome;
   const HOST = location.hostname;
   const IS_TOP = window === window.top;
+  // iPhone/iPad play video in Apple's native full-screen player, where page
+  // elements (our overlay) are invisible. There we write the translation into a
+  // real TextTrack instead, which the native player renders itself.
+  const IS_IOS =
+    /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
   let settings = { ...VT_DEFAULTS };
   let tabAudioActive = false;
@@ -52,11 +58,14 @@
     try {
       let t = builtinTranslators.get(key);
       if (t === undefined) {
-        const avail = await self.Translator.availability({ sourceLanguage: from, targetLanguage: to });
-        t = avail === "available" ? await self.Translator.create({ sourceLanguage: from, targetLanguage: to }) : null;
+        // Some builds never settle these promises — don't let that block subtitles.
+        const timeout = (p) => Promise.race([p, sleep(1500).then(() => { throw new Error("timeout"); })]);
+        builtinTranslators.set(key, null); // concurrent callers use the fallback meanwhile
+        const avail = await timeout(self.Translator.availability({ sourceLanguage: from, targetLanguage: to }));
+        t = avail === "available" ? await timeout(self.Translator.create({ sourceLanguage: from, targetLanguage: to })) : null;
         builtinTranslators.set(key, t);
       }
-      return t ? await t.translate(text) : null;
+      return t ? await Promise.race([t.translate(text), sleep(3000).then(() => null)]) : null;
     } catch (_) {
       builtinTranslators.set(key, null);
       return null;
@@ -330,12 +339,14 @@
 
     newSource() {
       this.stop();
+      this.nativeTrack = null;
       this.reset();
       this.stream = null;
     }
 
     onSkip() {
       // Restore the site's own captions and stop spending API calls.
+      if (this.nativeTrack) this.nativeTrack.mode = "disabled";
       if (this.track) {
         this.track.removeEventListener("cuechange", this.onCue);
         this.track.mode = "showing";
@@ -360,6 +371,7 @@
 
     stop() {
       this.recording = false;
+      if (this.nativeTrack) this.nativeTrack.mode = "disabled";
       if (this.track) {
         this.track.removeEventListener("cuechange", this.onCue);
         if (this.track.mode === "hidden") this.track.mode = "showing";
@@ -406,6 +418,25 @@
         .trim();
     }
 
+    // iOS: put a translated cue into our own track (rendered by the native player).
+    addNativeCue(cue, text) {
+      if (!IS_IOS || !text || settings.outputMode === "dub" || typeof VTTCue === "undefined") return;
+      if (!this.nativeTrack || this.nativeTrack.language !== settings.targetLang) {
+        this.nativeTrack = this.el.addTextTrack(
+          "subtitles",
+          vtLangName(settings.targetLang) + " (auto-translated)",
+          settings.targetLang
+        );
+        this.nativeCues = new WeakSet();
+      }
+      this.nativeTrack.mode = "showing";
+      if (this.nativeCues.has(cue)) return;
+      this.nativeCues.add(cue);
+      try {
+        this.nativeTrack.addCue(new VTTCue(cue.startTime, cue.endTime, text));
+      } catch (_) {}
+    }
+
     async handleCue() {
       const t = this.track;
       if (!t || this.skip) return;
@@ -423,15 +454,18 @@
       const r = await translate(text, this.lang);
       if (this.currentCue !== stamp || !r.text) return;
       const mode = settings.outputMode;
-      if (mode !== "dub") overlay.subtitle(r.text, text);
+      if (IS_IOS) active.forEach((c) => this.addNativeCue(c, r.text));
+      else if (mode !== "dub") overlay.subtitle(r.text, text);
       if (mode !== "subtitles") dubber.speak(r.text, this.el);
 
       // Prefetch upcoming cues so they're ready exactly on time.
       const now = this.el.currentTime;
       Array.from(t.cues || [])
         .filter((c) => c.startTime > now)
-        .slice(0, 4)
-        .forEach((c) => translate(this.cueText(c), this.lang));
+        .slice(0, IS_IOS ? 8 : 4)
+        .forEach((c) =>
+          translate(this.cueText(c), this.lang).then((x) => this.track === t && this.addNativeCue(c, x.text))
+        );
     }
 
     /* ---- 2. audio -> speech-to-text ---- */
@@ -459,6 +493,20 @@
     }
 
     startAudio() {
+      if (!this.el.captureStream && !this.el.mozCaptureStream) {
+        // Safari (iPhone, iPad, Mac) never hands a video's audio to extensions.
+        if (!this.warnedKey) {
+          this.warnedKey = true;
+          overlay.setAnchor(this.el);
+          overlay.notice(
+            IS_IOS
+              ? "ℹ️ Is video mein captions nahi hain. iPhone Safari video ki awaaz extension ko nahi deta, isliye sirf captions wali videos translate hoti hain."
+              : "ℹ️ Is video mein captions nahi hain, aur ye browser video ka audio nahi deta. Chrome/Edge/Firefox mein audio mode chalta hai.",
+            7000
+          );
+        }
+        return;
+      }
       if (!settings.apiKey) {
         if (!this.warnedKey) {
           this.warnedKey = true;

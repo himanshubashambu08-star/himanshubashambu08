@@ -46,8 +46,11 @@ Video play hua
    (Firefox MV3 mein ye by default off hota hai).
 3. Permanent install ke liye `./scripts/build.sh` se zip banakar addons.mozilla.org par sign karwana padta hai.
 
-### Safari (Mac / iPhone / iPad)
-Safari ko extension ek Xcode app ke andar chahiye. Mac par:
+### Safari — iPhone / iPad
+👉 **[iphone/README.md](iphone/README.md)** dekhein. Bina Mac ke bhi chalta hai (free "Userscripts" app se,
+file: `iphone/video-auto-translator.user.js`), ya Mac + Xcode se asli Safari extension.
+
+### Safari — Mac
 ```bash
 xcrun safari-web-extension-converter video-translator-extension --app-name "Video Auto Translator"
 ```
@@ -71,7 +74,7 @@ Settings → *Speech-to-text* mein key daalein → **Test** dabayein. Key sirf a
 
 | Feature | Chrome / Edge / Brave | Firefox | Safari |
 |---|---|---|---|
-| Captions wali videos ka translation | ✅ | ✅ | ✅ |
+| Captions wali videos ka translation | ✅ | ✅ | ✅ (iPhone full-screen mein bhi) |
 | Bina captions — video ka audio → AI | ✅ | ✅ | ❌ (Safari video audio capture nahi karne deta) |
 | "Tab audio se translate" (protected / iframe videos) | ✅ | ❌ | ❌ |
 | On-device translator (offline, private) | ✅ Chrome 138+ | — (Google Translate) | — (Google Translate) |
@@ -98,11 +101,14 @@ manifest.json          MV3 manifest (Chrome + Firefox + Safari)
 src/lang.js            languages list, default settings, helpers
 src/content.js         video detection, language decision, subtitles overlay, dubbing
 src/content.css        subtitle / notice styling
-src/background.js      Whisper calls, Google Translate fallback, tab-audio control
+src/services.js        Whisper + Google Translate calls (shared with the userscript)
+src/background.js      message router, tab-audio control
 src/offscreen.*        Chrome tab-audio capture
 src/popup.*            toolbar popup
 src/options.*          settings page
 scripts/build.sh       store-ready zip in dist/
+scripts/build-userscript.js   builds iphone/video-auto-translator.user.js (run after editing src/)
+iphone/                iPhone/iPad guide + ready-made userscript
 ```
 
 ## Privacy
