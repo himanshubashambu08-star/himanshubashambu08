@@ -17,7 +17,7 @@
   const USER_SETTINGS = {
     targetLang: "hi",          // video kis language mein dekhni hai: hi, en, bn, ta, te, mr, gu, kn, ml, pa, ur ...
     knownLangs: ["hi", "en"],  // ye languages aati hain -> translate mat karo
-    outputMode: "subtitles",   // "subtitles" | "dub" | "both"
+    outputMode: "both",        // "subtitles" | "dub" (sirf awaaz) | "both" (subtitles + awaaz)
     showOriginal: false,       // translation ke neeche original line bhi
     fontSize: 20,
     // Sirf desktop (Tampermonkey) ke audio mode ke liye — iPhone par zarurat nahi:
@@ -331,10 +331,11 @@ async function vtGtxTranslate({ text, from, to }, getJson) {
     if (tCache.has(key)) return tCache.get(key);
     const p = (async () => {
       const local = await builtinTranslate(text, from, to);
-      if (local) return { text: local, detected: from };
+      const clean = (t) => t.replace(/^\s*[-–—]\s*/, "").trim();
+      if (local) return { text: clean(local), detected: from };
       const r = await send({ type: "gtx", text, from: from || "auto", to });
       if (r.error || !r.text) return { text: "", detected: from, error: r.error || "empty" };
-      return { text: r.text, detected: from || r.detected };
+      return { text: clean(r.text), detected: from || r.detected };
     })();
     tCache.set(key, p);
     if (tCache.size > 500) tCache.delete(tCache.keys().next().value);
@@ -438,51 +439,87 @@ async function vtGtxTranslate({ text, from, to }, getJson) {
   /* ------------------------------------------------------------------ */
 
   const dubber = (() => {
+    // iPhone/iPad ignore video.volume (it is read-only there), so the original
+    // audio is muted while the translated voice speaks instead of turned down.
     let duckedVideo = null;
     let savedVolume = 1;
+    let savedMuted = false;
+    let usedMute = false;
+    const hasTTS = typeof speechSynthesis !== "undefined";
 
     function voiceFor(lang) {
       const voices = speechSynthesis.getVoices();
+      const ok = (v) => v.lang.toLowerCase().replace("_", "-").startsWith(lang);
       return (
-        voices.find((v) => v.lang.toLowerCase().startsWith(lang) && /google|natural|neural|online/i.test(v.name)) ||
-        voices.find((v) => v.lang.toLowerCase().startsWith(lang)) ||
+        voices.find((v) => ok(v) && /google|natural|neural|online|premium|enhanced|siri/i.test(v.name)) ||
+        voices.find(ok) ||
         null
       );
     }
 
-    function unduck() {
-      if (duckedVideo && !speechSynthesis.speaking && !speechSynthesis.pending) {
-        // Only restore if the user didn't change the volume meanwhile.
-        if (Math.abs(duckedVideo.volume - settings.duckVolume * savedVolume) < 0.02) {
-          duckedVideo.volume = savedVolume;
-        }
-        duckedVideo = null;
+    function duck(video) {
+      if (!video || duckedVideo === video) return;
+      duckedVideo = video;
+      usedMute = IS_IOS || settings.duckVolume === 0;
+      if (usedMute) {
+        savedMuted = video.muted;
+        video.muted = true;
+      } else {
+        savedVolume = video.volume;
+        video.volume = settings.duckVolume * savedVolume;
       }
     }
 
-    if (typeof speechSynthesis !== "undefined") speechSynthesis.getVoices();
+    function unduck() {
+      if (!duckedVideo || speechSynthesis.speaking || speechSynthesis.pending) return;
+      if (usedMute) {
+        duckedVideo.muted = savedMuted;
+      } else if (Math.abs(duckedVideo.volume - settings.duckVolume * savedVolume) < 0.02) {
+        // Only restore if the user didn't change the volume meanwhile.
+        duckedVideo.volume = savedVolume;
+      }
+      duckedVideo = null;
+    }
+
+    if (hasTTS) {
+      speechSynthesis.getVoices();
+      // iOS Safari only lets a page talk after a tap; unlock speech on the first one.
+      let unlocked = false;
+      const unlock = () => {
+        if (unlocked) return;
+        unlocked = true;
+        const u = new SpeechSynthesisUtterance(" ");
+        u.volume = 0;
+        speechSynthesis.speak(u);
+      };
+      ["touchend", "click", "keydown"].forEach((ev) => document.addEventListener(ev, unlock, { capture: true, once: true }));
+    }
 
     return {
-      speak(text, video) {
-        if (typeof speechSynthesis === "undefined" || !text) return;
-        // Falling behind? Drop the backlog and speak faster so we stay close to the video.
-        const behind = speechSynthesis.pending;
-        if (behind) speechSynthesis.cancel();
+      // durationSec: how long the line is on screen; the voice speeds up to fit it.
+      speak(text, video, durationSec) {
+        if (!hasTTS || !text) return;
+        // Falling behind? Drop the backlog so we stay close to the video.
+        const behind = speechSynthesis.pending || speechSynthesis.speaking;
+        if (speechSynthesis.pending) speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.lang = settings.targetLang;
         const v = voiceFor(settings.targetLang);
         if (v) u.voice = v;
-        u.rate = behind || speechSynthesis.speaking ? 1.3 : 1.1;
-        if (video && duckedVideo !== video) {
-          savedVolume = video.volume;
-          video.volume = settings.duckVolume * savedVolume;
-          duckedVideo = video;
+        let rate = 1.05;
+        if (durationSec > 0.3) {
+          const words = text.split(/\s+/).filter(Boolean).length;
+          const needed = (words * 0.42) / durationSec; // ~2.4 words/s at rate 1
+          rate = Math.max(rate, needed);
         }
-        u.onend = u.onerror = () => setTimeout(unduck, 250);
+        if (behind) rate += 0.2;
+        u.rate = Math.min(rate, 1.7);
+        duck(video);
+        u.onend = u.onerror = () => setTimeout(unduck, 300);
         speechSynthesis.speak(u);
       },
       stop() {
-        if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+        if (hasTTS) speechSynthesis.cancel();
         setTimeout(unduck, 50);
       }
     };
@@ -707,7 +744,10 @@ async function vtGtxTranslate({ text, from, to }, getJson) {
       const mode = settings.outputMode;
       if (IS_IOS) active.forEach((c) => this.addNativeCue(c, r.text));
       else if (mode !== "dub") overlay.subtitle(r.text, text);
-      if (mode !== "subtitles") dubber.speak(r.text, this.el);
+      if (mode !== "subtitles") {
+        const endAt = Math.max(...active.map((c) => c.endTime));
+        dubber.speak(r.text, this.el, (endAt - this.el.currentTime) / (this.el.playbackRate || 1));
+      }
 
       // Prefetch upcoming cues so they're ready exactly on time.
       const now = this.el.currentTime;

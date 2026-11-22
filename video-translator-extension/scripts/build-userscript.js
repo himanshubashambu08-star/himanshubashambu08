@@ -28,7 +28,7 @@ const userSettings = `
   const USER_SETTINGS = {
     targetLang: "hi",          // video kis language mein dekhni hai: hi, en, bn, ta, te, mr, gu, kn, ml, pa, ur ...
     knownLangs: ["hi", "en"],  // ye languages aati hain -> translate mat karo
-    outputMode: "subtitles",   // "subtitles" | "dub" | "both"
+    outputMode: "both",        // "subtitles" | "dub" (sirf awaaz) | "both" (subtitles + awaaz)
     showOriginal: false,       // translation ke neeche original line bhi
     fontSize: 20,
     // Sirf desktop (Tampermonkey) ke audio mode ke liye — iPhone par zarurat nahi:
