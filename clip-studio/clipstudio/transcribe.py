@@ -7,7 +7,7 @@ from .config import env
 
 def transcribe(video: Path, cache: Path, log=print) -> list[dict]:
     if cache.exists():
-        return json.loads(cache.read_text())
+        return json.loads(cache.read_text(encoding="utf-8"))
 
     from faster_whisper import WhisperModel
 
@@ -30,5 +30,5 @@ def transcribe(video: Path, cache: Path, log=print) -> list[dict]:
             }
         )
     log(f"Transcript: {len(out)} lines, language '{info.language}'")
-    cache.write_text(json.dumps(out, ensure_ascii=False))
+    cache.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     return out

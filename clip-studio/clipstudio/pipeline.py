@@ -67,6 +67,6 @@ def run(source: str, post_to: list[str] | None = None, log=print) -> dict:
                 log(f"✗ {Path(clip['file']).name} → {platform}: {e}")
 
     summary = {"source": source, "meta": meta, "folder": str(job_dir), "clips": clips}
-    (job_dir / "clips.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+    (job_dir / "clips.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     log(f"Done. Files are in {job_dir}")
     return summary

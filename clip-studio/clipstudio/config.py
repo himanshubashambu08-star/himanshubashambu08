@@ -27,7 +27,7 @@ def env_int(name: str, default: int) -> int:
 
 def load_tokens() -> dict:
     try:
-        return json.loads(TOKENS_FILE.read_text())
+        return json.loads(TOKENS_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
@@ -35,7 +35,7 @@ def load_tokens() -> dict:
 def save_tokens(update: dict) -> None:
     tokens = load_tokens()
     tokens.update(update)
-    TOKENS_FILE.write_text(json.dumps(tokens, indent=2))
+    TOKENS_FILE.write_text(json.dumps(tokens, indent=2), encoding="utf-8")
     try:
         TOKENS_FILE.chmod(0o600)
     except OSError:
