@@ -196,6 +196,25 @@
     let usedMute = false;
     const hasTTS = typeof speechSynthesis !== "undefined";
 
+    // iOS pauses a page's video whenever the page starts or stops speaking.
+    // A pause right around a speech start/end is treated as that interruption
+    // and the video is resumed; a pause at any other moment is the user's.
+    let lastSpeechEvent = 0;
+    let lastAutoResume = 0;
+    const guarded = new WeakSet();
+    function guard(video) {
+      if (!video || guarded.has(video)) return;
+      guarded.add(video);
+      video.addEventListener("pause", () => {
+        if (video.ended || Date.now() - lastSpeechEvent > 1200) return;
+        if (Date.now() - lastAutoResume < 1500) return; // paused again right away: the user means it
+        lastAutoResume = Date.now();
+        setTimeout(() => {
+          if (video.paused && !video.ended) video.play().catch(() => {});
+        }, 60);
+      });
+    }
+
     function voiceFor(lang) {
       const voices = speechSynthesis.getVoices();
       const ok = (v) => v.lang.toLowerCase().replace("_", "-").startsWith(lang);
@@ -263,8 +282,13 @@
         }
         if (behind) rate += 0.2;
         u.rate = Math.min(rate, 1.7);
+        guard(video);
         duck(video);
-        u.onend = u.onerror = () => setTimeout(unduck, 300);
+        u.onend = u.onerror = () => {
+          lastSpeechEvent = Date.now();
+          setTimeout(unduck, 300);
+        };
+        lastSpeechEvent = Date.now();
         speechSynthesis.speak(u);
       },
       stop() {
