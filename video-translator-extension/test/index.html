@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Translator Test Video</title>
+<style>
+  body { margin: 0; background: #f6f6fb; color: #17172a; font: 17px/1.5 system-ui, -apple-system, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 14px; }
+  h1 { font-size: 1.4rem; margin: 0; } p { margin: 0; }
+  video { width: 100%; border-radius: 12px; background: #000; }
+  ul { margin: 0; padding-left: 20px; color: #5d5d76; }
+  @media (prefers-color-scheme: dark) { body { background: #121220; color: #ececf6; } ul { color: #a3a3bd; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Test video (Spanish captions)</h1>
+  <p>Play dabao. Captions Spanish mein hain — script unhe Hindi mein dikhayegi.</p>
+  <video controls playsinline preload="auto" src="test.mp4">
+    <track kind="subtitles" label="Original" src="es.vtt" default>
+  </video>
+  <ul>
+    <li>Upar-right mein “Spanish → Hindi translation ON” aana chahiye.</li>
+    <li>💬 button → Languages mein “Hindi (auto-translated)” chuno.</li>
+  </ul>
+</main>
+</body>
+</html>
