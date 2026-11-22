@@ -101,7 +101,18 @@ const out =
   read("src/content.js") +
   "\n})();\n";
 
+// Ready-made variants per language. They share one @name, so installing one
+// replaces the other in the Userscripts app.
+const variants = {
+  "video-auto-translator.user.js": { targetLang: "hi", knownLangs: ["hi"] },
+  "video-auto-translator-english.user.js": { targetLang: "en", knownLangs: ["hi"] }
+};
 fs.mkdirSync(path.join(root, "iphone"), { recursive: true });
-const file = path.join(root, "iphone", "video-auto-translator.user.js");
-fs.writeFileSync(file, out);
-console.log("Built " + path.relative(root, file));
+for (const [name, v] of Object.entries(variants)) {
+  const text = out
+    .replace('targetLang: "hi",', `targetLang: "${v.targetLang}",`)
+    .replace('knownLangs: ["hi"],', `knownLangs: ${JSON.stringify(v.knownLangs).replace(",", ", ")},`);
+  const file = path.join(root, "iphone", name);
+  fs.writeFileSync(file, text);
+  console.log("Built " + path.relative(root, file));
+}

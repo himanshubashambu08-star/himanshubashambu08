@@ -19,7 +19,12 @@ iPhone Safari mein extension lagane ke 2 tareeke hain:
 2. App kholein → **Set Userscripts Directory** → Files mein koi folder chunein (jaise *On My iPhone → Userscripts*).
 3. iPhone **Settings → Apps → Safari → Extensions → Userscripts** → ON karein,
    aur **All Websites → Allow** karein.
-4. Script install karein — inmein se koi ek:
+4. Script install karein. Do version hain — jo chahiye wahi lo (ek install karne par doosra replace ho jaata hai):
+   - `video-auto-translator.user.js` — video **Hindi** mein (subtitles + awaaz)
+   - `video-auto-translator-english.user.js` — video **English** mein; jin videos ke captions English mein hain
+     unki awaaz bhi English mein dub hoti hai
+
+   Inmein se koi ek tareeka:
    - **Link se:** Safari mein `video-auto-translator.user.js` ka *raw* link kholein
      (GitHub par file kholein → **Raw**). Address bar ke **ᴀA / 🧩** button → **Userscripts** → **Install**.
      *(Repo private hai to link nahi khulega — neeche wala tareeka use karein.)*

@@ -558,7 +558,12 @@ async function vtGtxTranslate({ text, from, to }, getJson) {
           overlay.notice(`🎬 Video ki language: ${vtLangName(this.lang)} — translation ki zarurat nahi.`);
           this.onSkip();
         } else {
-          overlay.notice(`🌐 ${vtLangName(this.lang)} → ${vtLangName(settings.targetLang)} translation ON`, 3500);
+          overlay.notice(
+            this.lang === settings.targetLang
+              ? `🔊 ${vtLangName(this.lang)} captions → ${vtLangName(this.lang)} awaaz ON`
+              : `🌐 ${vtLangName(this.lang)} → ${vtLangName(settings.targetLang)} translation ON`,
+            3500
+          );
         }
         return !this.skip;
       }
