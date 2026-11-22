@@ -27,7 +27,7 @@ const userSettings = `
   /* ============ APNI SETTINGS YAHAN BADLEIN ============ */
   const USER_SETTINGS = {
     targetLang: "hi",          // video kis language mein dekhni hai: hi, en, bn, ta, te, mr, gu, kn, ml, pa, ur ...
-    knownLangs: ["hi", "en"],  // ye languages aati hain -> translate mat karo
+    knownLangs: ["hi"],        // ye languages aati hain -> translate mat karo (English bhi skip karni ho to ["hi", "en"])
     outputMode: "both",        // "subtitles" | "dub" (sirf awaaz) | "both" (subtitles + awaaz)
     showOriginal: false,       // translation ke neeche original line bhi
     fontSize: 20,
