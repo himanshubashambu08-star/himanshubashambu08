@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Auto Translator – Settings</title>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body class="options">
+<main>
+  <header>
+    <img src="../icons/icon48.png" alt="" width="40" height="40">
+    <div>
+      <h1>Video Auto Translator</h1>
+      <div class="hint">Har website par video aapki language mein — bina download kiye.</div>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>1. Meri language</h2>
+    <label class="field">
+      <span>Video kis language mein dekhni hai (default)</span>
+      <select id="targetLang"></select>
+    </label>
+    <div class="field">
+      <span>Ye languages mujhe samajh aati hain — inhe translate mat karo</span>
+      <div class="langs" id="knownLangs"></div>
+      <p class="hint">Video ki language auto-detect hoti hai. Agar wo in mein se hai, extension kuch nahi karega.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Kaise dikhaye / sunaye</h2>
+    <div class="grid2">
+      <label class="field">
+        <span>Output</span>
+        <select id="outputMode">
+          <option value="subtitles">Sirf subtitles</option>
+          <option value="dub">Sirf awaaz (dub)</option>
+          <option value="both">Subtitles + awaaz</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Subtitle size (px)</span>
+        <input type="number" id="fontSize" min="12" max="48">
+      </label>
+      <label class="field">
+        <span>Dub ke time original video ki volume</span>
+        <select id="duckVolume">
+          <option value="0">Mute</option>
+          <option value="0.1">10%</option>
+          <option value="0.2">20%</option>
+          <option value="0.35">35%</option>
+          <option value="0.5">50%</option>
+          <option value="1">Poori (100%)</option>
+        </select>
+      </label>
+      <label class="field row" style="align-self:end">
+        <span>Translation ke neeche original line bhi dikhao</span>
+        <input type="checkbox" id="showOriginal">
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>3. Speech-to-text (bina captions wali videos ke liye)</h2>
+    <p class="hint" style="margin-top:0">
+      Jis video mein captions hain, wo bina key ke free chalti hai. Baaki videos ka audio AI (Whisper) se text banta hai —
+      uske liye ek API key chahiye. <b>Groq</b> ki key free tier ke saath milti hai: console.groq.com → API Keys.
+    </p>
+    <div class="grid2">
+      <label class="field">
+        <span>Provider</span>
+        <select id="sttProvider">
+          <option value="groq">Groq (Whisper large v3 turbo — fast, free tier)</option>
+          <option value="openai">OpenAI (whisper-1)</option>
+          <option value="custom">Custom (OpenAI-compatible)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Audio piece ki length (seconds)</span>
+        <select id="chunkSeconds">
+          <option value="3">3 s — kam delay</option>
+          <option value="4">4 s — balanced</option>
+          <option value="6">6 s — behtar accuracy</option>
+        </select>
+      </label>
+    </div>
+    <label class="field">
+      <span>API key</span>
+      <div class="inline">
+        <input type="password" id="apiKey" placeholder="gsk_… ya sk-…" autocomplete="off">
+        <button id="testKey" class="secondary">Test</button>
+      </div>
+      <div class="msg" id="keyMsg"></div>
+    </label>
+    <div class="grid2">
+      <label class="field">
+        <span>Base URL</span>
+        <input type="text" id="sttBaseUrl">
+      </label>
+      <label class="field">
+        <span>Model</span>
+        <input type="text" id="sttModel">
+      </label>
+    </div>
+    <p class="hint">Key sirf aapke browser mein save hoti hai aur sirf upar wale provider ko bheji jaati hai.</p>
+  </section>
+
+  <section class="card">
+    <h2>4. Websites</h2>
+    <label class="row">
+      <span>Extension ON (sab sites par)</span>
+      <input type="checkbox" id="enabled">
+    </label>
+    <label class="field">
+      <span>In sites par band rakho (ek line mein ek)</span>
+      <textarea id="disabledSites" rows="4" placeholder="example.com"></textarea>
+    </label>
+  </section>
+</main>
+<div id="saved">Saved ✔</div>
+<script src="lang.js"></script>
+<script src="options.js"></script>
+</body>
+</html>
