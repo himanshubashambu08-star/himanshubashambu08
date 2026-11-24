@@ -1,0 +1,1877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ghar Design Studio</title>
+<meta name="description" content="Design your home's interior and exterior in live 3D: layouts, styles, colours, furniture and endless new design ideas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f3ee; --panel:#ffffff; --ink:#1f1d1a; --muted:#6f6a62; --line:#e6e0d6;
+  --accent:#c2643a; --accent-ink:#ffffff; --chip:#f1ece4; --chip-on:#1f1d1a; --chip-on-ink:#fff;
+  --shadow:0 6px 24px rgba(40,30,20,.10); --warn:#a4461d;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15161a; --panel:#1e2026; --ink:#f1eee9; --muted:#a39d94; --line:#2e3038;
+    --accent:#e07a4c; --accent-ink:#15161a; --chip:#2a2c33; --chip-on:#f1eee9; --chip-on-ink:#15161a;
+    --shadow:0 6px 24px rgba(0,0,0,.4); color-scheme:dark; --warn:#f0a070;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15161a; --panel:#1e2026; --ink:#f1eee9; --muted:#a39d94; --line:#2e3038;
+  --accent:#e07a4c; --accent-ink:#15161a; --chip:#2a2c33; --chip-on:#f1eee9; --chip-on-ink:#15161a;
+  --shadow:0 6px 24px rgba(0,0,0,.4); color-scheme:dark; --warn:#f0a070;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.4 Inter,system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.brand{font-weight:700;font-size:16px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.brand i{font-style:normal;display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;background:var(--accent);color:var(--accent-ink)}
+.tabs{display:flex;background:var(--chip);border-radius:10px;padding:3px;margin-left:auto}
+.tabs button{border:0;background:transparent;padding:7px 14px;border-radius:8px;font-weight:600}
+.tabs button.on{background:var(--panel);box-shadow:var(--shadow)}
+.hbtn{border:1px solid var(--line);background:var(--panel);padding:7px 12px;border-radius:10px;font-weight:500}
+.hbtn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+main{flex:1;display:flex;min-height:0}
+#panel{width:320px;flex:none;overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:6px 16px 24px}
+#stage{flex:1;position:relative;min-width:0;display:flex;flex-direction:column}
+#viewer{flex:1;position:relative;min-height:0;touch-action:none}
+#viewer canvas{display:block;width:100%;height:100%}
+.viewbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:4px;background:var(--panel);padding:4px;border-radius:12px;box-shadow:var(--shadow);z-index:2}
+.viewbar button{border:0;background:transparent;padding:6px 10px;border-radius:8px;font-weight:500;white-space:nowrap}
+.viewbar button.on{background:var(--chip-on);color:var(--chip-on-ink)}
+#hint{position:absolute;bottom:10px;left:12px;font-size:12px;color:var(--muted);background:var(--panel);padding:5px 9px;border-radius:8px;opacity:.92;pointer-events:none;max-width:calc(100% - 24px)}
+#selBox{position:absolute;top:64px;right:12px;width:220px;background:var(--panel);border-radius:14px;box-shadow:var(--shadow);padding:12px;z-index:3}
+#selBox h5{margin:0 0 8px;font-size:14px}
+#selBox .btns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+#selBox .btns button{border:1px solid var(--line);background:var(--chip);border-radius:8px;padding:6px 0}
+#ideas{background:var(--panel);border-top:1px solid var(--line);padding:10px 16px 12px;flex:none}
+.ideas-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ideas-head h3{margin:0;font-size:14px}
+.ideas-head span{color:var(--muted);font-size:12px}
+.ideas-head .hbtn{margin-left:auto}
+#ideaGrid{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;min-height:40px}
+.idea{flex:none;width:168px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--chip);padding:0;text-align:left}
+.idea img{display:block;width:100%;height:100px;object-fit:cover;background:#ccc}
+.idea div{padding:6px 8px;font-size:12px;line-height:1.3}
+.idea b{display:block;font-size:12px}
+.idea:hover{outline:2px solid var(--accent)}
+.empty{color:var(--muted);font-size:12px;align-self:center}
+.sec{padding:12px 0;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.sec h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:0;background:var(--chip);padding:6px 10px;border-radius:999px;font-size:13px}
+.chip.on{background:var(--chip-on);color:var(--chip-on-ink)}
+.sws{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sw{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);padding:0}
+.sw.on{outline:2px solid var(--accent);outline-offset:2px}
+input[type=color]{width:30px;height:30px;border:0;padding:0;background:none;cursor:pointer}
+.row{display:flex;align-items:center;gap:10px;margin:6px 0}
+.row span:first-child{width:62px;color:var(--muted);font-size:13px}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.row output{width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.tog{display:flex;align-items:center;justify-content:space-between;margin:6px 0}
+.tog input{width:18px;height:18px;accent-color:var(--accent)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.grid button{border:1px solid var(--line);background:var(--chip);border-radius:10px;padding:8px 4px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.grid button span{font-size:18px}
+.saved{display:flex;align-items:center;gap:8px;margin:6px 0}
+.saved img{width:56px;height:36px;object-fit:cover;border-radius:6px}
+.saved button{border:1px solid var(--line);background:var(--chip);border-radius:8px;padding:4px 8px;font-size:12px}
+.saved .nm{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap}
+.btnrow .hbtn{flex:1}
+#shot{position:fixed;inset:0;background:rgba(10,10,12,.72);display:grid;place-items:center;z-index:20;padding:16px}
+#shot .card{background:var(--panel);border-radius:16px;padding:12px;max-width:min(900px,100%);display:flex;flex-direction:column;gap:10px}
+#shot img{width:100%;border-radius:10px;display:block}
+#shot .row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#shot .row2 span{color:var(--muted);font-size:12px;flex:1;min-width:160px}
+#info{position:absolute;top:60px;left:12px;font-size:12px;background:var(--panel);color:var(--ink);padding:6px 10px;border-radius:10px;box-shadow:var(--shadow);max-width:calc(100% - 260px);z-index:2}
+#refCard{position:absolute;right:12px;bottom:44px;width:180px;background:var(--panel);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:2}
+#refCard img{display:block;width:100%;border-radius:8px}
+#refCard span{font-size:11px;color:var(--muted);display:block;padding:4px 2px 0}
+#refCard button{position:absolute;top:10px;right:10px;border:0;background:var(--panel);border-radius:50%;width:24px;height:24px;font-size:12px}
+.note{color:var(--muted);font-size:12px;margin:0 0 8px;line-height:1.45}
+.warn{color:var(--warn);font-size:12px;margin:8px 0 0}
+.rg{font-size:11px;color:var(--muted);margin:8px 0 4px;font-weight:600}
+.rg:first-child{margin-top:0}
+.roomrow{display:flex;gap:6px;margin-top:8px}
+.roomrow input,.roomrow select,.plotin input{flex:1;min-width:0;font:inherit;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:7px 10px}
+.hbtn.wide{width:100%;margin-top:8px}
+.upl{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.upl.dis{opacity:.6;pointer-events:none}
+.vh{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.refimg{width:100%;border-radius:10px;margin-top:4px;display:block}
+.plotin{display:flex;align-items:center;gap:8px;margin:10px 0}
+.plotin input{width:80px;flex:0 1 90px;font-variant-numeric:tabular-nums}
+.plotin span{color:var(--muted)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 8px}
+.stat{background:var(--chip);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.stat span{font-size:11px;color:var(--muted)}
+.stat b{font-size:15px;font-variant-numeric:tabular-nums}
+.stat small{font-size:11px;color:var(--muted)}
+#loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;pointer-events:none}
+@media (max-width:820px){
+  body{overflow:auto;height:auto}
+  main{display:contents}
+  #stage{order:1} #ideas{order:2;border-bottom:1px solid var(--line)} #panel{order:3}
+  #hint{font-size:11px}
+  #panel{width:100%;border-right:0;border-top:1px solid var(--line);max-height:none;overflow:visible}
+  #viewer{height:58vh;flex:none}
+  #selBox{top:auto;bottom:44px;right:8px;width:200px}
+  #info{top:52px;left:8px;max-width:calc(100% - 16px);font-size:11px}
+  #refCard{width:110px;bottom:auto;top:92px;right:8px}
+  .ideas-head span{display:none}
+  .viewbar{top:8px}
+  .viewbar button{padding:6px 8px;font-size:12px}
+  header{padding:8px 16px}
+  .tabs{margin-left:0}
+}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<header>
+  <div class="brand"><i>⌂</i> Ghar Design Studio</div>
+  <nav class="tabs" id="tabs">
+    <button data-mode="interior" class="on">🛋️ Interior</button>
+    <button data-mode="exterior">🏡 Exterior</button>
+  </nav>
+  <button class="hbtn" id="btnSave">💾 Save</button>
+  <button class="hbtn" id="btnShot">📸 Photo</button>
+</header>
+<main>
+  <aside id="panel"></aside>
+  <section id="stage">
+    <div id="viewer"><div id="loading">Loading 3D…</div></div>
+    <div class="viewbar" id="viewbar">
+      <button data-view="orbit" class="on">🧊 3D</button>
+      <button data-view="top">📐 Plan</button>
+      <button data-view="walk">🚶 Walk</button>
+      <button data-view="tour">🔄 Tour</button>
+    </div>
+    <div id="info"></div>
+    <div id="refCard" hidden><img id="refImg" alt="Your reference photo"><button id="refClose" aria-label="Hide reference photo">✕</button><span>Your photo</span></div>
+    <div id="selBox" hidden></div>
+    <div id="shot" hidden></div>
+    <div id="hint"></div>
+  </section>
+</main>
+<section id="ideas">
+  <div class="ideas-head">
+    <h3>✨ Design ideas</h3><span id="ideasSub">Tap “Show new options” for fresh designs. Tap any card to apply it.</span>
+    <button class="hbtn primary" id="btnIdeas">✨ Show new options</button>
+  </div>
+  <div id="ideaGrid"><div class="empty">No ideas yet.</div></div>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+const $ = s => document.querySelector(s);
+
+/* ---------------- Renderer / scene ---------------- */
+const viewer = $('#viewer');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+viewer.appendChild(renderer.domElement);
+$('#loading').remove();
+
+const thumbR = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+thumbR.setSize(336, 200, false);
+thumbR.shadowMap.enabled = true;
+thumbR.outputColorSpace = THREE.SRGBColorSpace;
+thumbR.toneMapping = THREE.ACESFilmicToneMapping;
+
+const scene = new THREE.Scene();
+let world = new THREE.Group();
+scene.add(world);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 400);
+const thumbCam = new THREE.PerspectiveCamera(50, 336 / 200, 0.05, 400);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+function resize() {
+  const r = viewer.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / Math.max(1, r.height);
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(viewer);
+
+/* ---------------- Helpers ---------------- */
+function rng(seed) { let s = (seed >>> 0) || 1; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296; }
+const pick = (r, a) => a[Math.floor(r() * a.length)];
+const shade = (c, d) => new THREE.Color(c).offsetHSL(0, 0, d).getStyle();
+const G = () => new THREE.Group();
+
+function M(color, o = {}) {
+  return new THREE.MeshStandardMaterial({ color, roughness: o.r ?? 0.7, metalness: o.m ?? 0, ...(o.x || {}) });
+}
+function glow(color, intensity) {
+  return new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: intensity, roughness: 0.5 });
+}
+function mesh(g, geo, mat, x, y, z, cast = true) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = true; g.add(m); return m;
+}
+const box = (g, w, h, d, mat, x = 0, y = 0, z = 0, cast) => mesh(g, new THREE.BoxGeometry(w, h, d), mat, x, y + h / 2, z, cast);
+const rbox = (g, w, h, d, mat, x = 0, y = 0, z = 0, r = 0.04) =>
+  mesh(g, new RoundedBoxGeometry(w, h, d, 3, Math.min(r, w / 2.01, h / 2.01, d / 2.01)), mat, x, y + h / 2, z);
+const cyl = (g, rt, rb, h, mat, x = 0, y = 0, z = 0, seg = 24) => mesh(g, new THREE.CylinderGeometry(rt, rb, h, seg), mat, x, y + h / 2, z);
+const sph = (g, r, mat, x, y, z) => mesh(g, new THREE.SphereGeometry(r, 20, 14), mat, x, y, z);
+
+/* ---------------- Procedural textures ---------------- */
+const texCache = {};
+function baseTex(key, draw, n = 512) {
+  if (texCache[key]) return texCache[key];
+  const c = document.createElement('canvas'); c.width = c.height = n;
+  draw(c.getContext('2d'), n);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  t.userData.cached = true;
+  return (texCache[key] = t);
+}
+function useTex(base, rx, ry) { const t = base.clone(); t.userData.cached = false; t.repeat.set(rx, ry); t.needsUpdate = true; return t; }
+function noise(ctx, n, count, alpha, light) {
+  for (let i = 0; i < count; i++) {
+    ctx.fillStyle = `rgba(${light ? '255,255,255' : '0,0,0'},${Math.random() * alpha})`;
+    ctx.fillRect(Math.random() * n, Math.random() * n, 2, 2);
+  }
+}
+const DRAW = {
+  wood: c => (ctx, n) => {
+    const ph = n / 8;
+    for (let row = 0; row < 8; row++) {
+      const off = (row % 2) * n / 3;
+      for (let x = -off; x < n; x += n * 2 / 3) {
+        ctx.fillStyle = shade(c, (Math.random() - 0.5) * 0.08);
+        ctx.fillRect(x, row * ph, n * 2 / 3, ph);
+        for (let k = 0; k < 7; k++) {
+          ctx.strokeStyle = `rgba(0,0,0,${0.04 + Math.random() * 0.06})`; ctx.lineWidth = 1;
+          ctx.beginPath(); const yy = row * ph + Math.random() * ph;
+          ctx.moveTo(x, yy); ctx.bezierCurveTo(x + n * .2, yy + 3, x + n * .4, yy - 3, x + n * 2 / 3, yy + 1); ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(0,0,0,.28)'; ctx.strokeRect(x, row * ph, n * 2 / 3, ph);
+      }
+    }
+  },
+  marble: c => (ctx, n) => {
+    ctx.fillStyle = c; ctx.fillRect(0, 0, n, n);
+    for (let v = 0; v < 16; v++) {
+      ctx.strokeStyle = `rgba(110,110,120,${0.08 + Math.random() * 0.2})`; ctx.lineWidth = 0.5 + Math.random() * 2;
+      let x = Math.random() * n, y = Math.random() * n; ctx.beginPath(); ctx.moveTo(x, y);
+      for (let s = 0; s < 30; s++) { x += (Math.random() - 0.3) * 30; y += (Math.random() - 0.5) * 30; ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.lineWidth = 2;
+    ctx.strokeRect(0, 0, n / 2, n / 2); ctx.strokeRect(n / 2, n / 2, n / 2, n / 2);
+  },
+  tile: c => (ctx, n) => {
+    const t = n / 4;
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { ctx.fillStyle = shade(c, (Math.random() - 0.5) * 0.04); ctx.fillRect(i * t, j * t, t, t); }
+    noise(ctx, n, 3000, 0.05);
+    ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 3;
+    for (let i = 0; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(i * t, 0); ctx.lineTo(i * t, n); ctx.moveTo(0, i * t); ctx.lineTo(n, i * t); ctx.stroke(); }
+  },
+  concrete: c => (ctx, n) => { ctx.fillStyle = c; ctx.fillRect(0, 0, n, n); noise(ctx, n, 9000, 0.12); noise(ctx, n, 4000, 0.1, true); },
+  carpet: c => (ctx, n) => { ctx.fillStyle = c; ctx.fillRect(0, 0, n, n); noise(ctx, n, 16000, 0.15); noise(ctx, n, 8000, 0.08, true); },
+  brick: c => (ctx, n) => {
+    ctx.fillStyle = '#cfc6bb'; ctx.fillRect(0, 0, n, n);
+    const bh = n / 16, bw = n / 4;
+    for (let r = 0; r < 16; r++) for (let x = -(r % 2) * bw / 2; x < n; x += bw) {
+      ctx.fillStyle = shade(c, (Math.random() - 0.5) * 0.12); ctx.fillRect(x + 2, r * bh + 2, bw - 4, bh - 4);
+    }
+    noise(ctx, n, 5000, 0.12);
+  },
+  grass: () => (ctx, n) => {
+    ctx.fillStyle = '#5f8a3e'; ctx.fillRect(0, 0, n, n);
+    for (let i = 0; i < 14000; i++) {
+      ctx.strokeStyle = shade('#6b9b45', (Math.random() - 0.5) * 0.2); ctx.lineWidth = 1;
+      const x = Math.random() * n, y = Math.random() * n; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.random() * 3 - 1.5, y - 4 - Math.random() * 4); ctx.stroke();
+    }
+  },
+  paving: () => (ctx, n) => {
+    const t = n / 6;
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { ctx.fillStyle = shade('#b9b2a6', (Math.random() - 0.5) * 0.1); ctx.fillRect(i * t + 2, j * t + 2, t - 4, t - 4); }
+    noise(ctx, n, 4000, 0.1);
+  },
+  gravel: () => (ctx, n) => {
+    ctx.fillStyle = '#d8d2c6'; ctx.fillRect(0, 0, n, n);
+    for (let i = 0; i < 9000; i++) { ctx.fillStyle = shade('#cfc8ba', (Math.random() - 0.5) * 0.3); ctx.beginPath(); ctx.arc(Math.random() * n, Math.random() * n, 1 + Math.random() * 2, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(0,0,0,.08)';
+    for (let y = 0; y < n; y += 12) { ctx.beginPath(); ctx.moveTo(0, y); for (let x = 0; x < n; x += 16) ctx.lineTo(x, y + Math.sin(x / 30) * 3); ctx.stroke(); }
+  },
+  asphalt: () => (ctx, n) => { ctx.fillStyle = '#3b3d42'; ctx.fillRect(0, 0, n, n); noise(ctx, n, 12000, 0.2, true); },
+  roof: c => (ctx, n) => {
+    const rh = n / 12;
+    for (let r = 0; r < 12; r++) for (let x = -(r % 2) * 16; x < n; x += 32) {
+      ctx.fillStyle = shade(c, (Math.random() - 0.5) * 0.08 - (r % 2) * 0.02); ctx.fillRect(x, r * rh, 31, rh);
+      ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x, r * rh + rh - 4, 31, 4);
+    }
+  },
+  slats: c => (ctx, n) => {
+    for (let x = 0; x < n; x += 32) { ctx.fillStyle = shade(c, (Math.random() - 0.5) * 0.08); ctx.fillRect(x, 0, 28, n); ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(x + 28, 0, 4, n); }
+  },
+};
+const tex = (kind, color = '') => baseTex(kind + color, DRAW[kind](color));
+
+function paintingTex(seed, colors) {
+  const r = rng(seed); const c = document.createElement('canvas'); c.width = 256; c.height = 180;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = pick(r, ['#f3efe7', '#efe6d8', '#e9ecef', '#1f2a33']); ctx.fillRect(0, 0, 256, 180);
+  const kind = Math.floor(r() * 3);
+  for (let i = 0; i < 7; i++) {
+    ctx.fillStyle = pick(r, colors); ctx.globalAlpha = 0.6 + r() * 0.4;
+    if (kind === 0) { ctx.beginPath(); ctx.arc(r() * 256, r() * 180, 15 + r() * 55, 0, 7); ctx.fill(); }
+    else if (kind === 1) ctx.fillRect(r() * 200, r() * 140, 30 + r() * 90, 20 + r() * 70);
+    else { ctx.beginPath(); ctx.moveTo(0, 120 + i * 8); for (let x = 0; x <= 256; x += 16) ctx.lineTo(x, 100 + i * 10 + Math.sin(x / 30 + i) * 18 - r() * 10); ctx.lineTo(256, 180); ctx.lineTo(0, 180); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+/* ---------------- Data ---------------- */
+const STYLES = {
+  modern:      { name: 'Modern',          flag: '🌐', region: 'Global',      wall: '#e9e6e1', accent: '#2f3e46', floor: 'wood',     floorColor: '#a47551', fabric: '#5c6b73', cushion: '#d8cfc4', wood: '#3b2f2f', metal: '#222222', rug: '#c9bfb4', pot: '#e8e3db', cabinet: '#2f3e46', counter: '#e9e9e9' },
+  minimal:     { name: 'Minimal',         flag: '🌐', region: 'Global',      wall: '#ffffff', accent: '#d9d9d9', floor: 'tile',     floorColor: '#ecebe8', fabric: '#e4e2dd', cushion: '#bdbab3', wood: '#cfc6b8', metal: '#9a9a9a', rug: '#f2f2f2', pot: '#ffffff', cabinet: '#ffffff', counter: '#dcdcdc' },
+  luxury:      { name: 'Luxury',          flag: '🌐', region: 'Global',      wall: '#efe9df', accent: '#1b263b', floor: 'marble',   floorColor: '#f7f5f2', fabric: '#14213d', cushion: '#d4af37', wood: '#2b2118', metal: '#d4af37', rug: '#e0d5c1', pot: '#111111', cabinet: '#1b263b', counter: '#f3f1ee' },
+  boho:        { name: 'Boho',            flag: '🌐', region: 'Global',      wall: '#f2e3d5', accent: '#c96f4a', floor: 'wood',     floorColor: '#b88b5a', fabric: '#d4a373', cushion: '#6b705c', wood: '#a07850', metal: '#8b6f47', rug: '#bc6c25', pot: '#c96f4a', cabinet: '#a07850', counter: '#e7dccb' },
+  artdeco:     { name: 'Art Deco',        flag: '🌐', region: 'Global',      wall: '#e9e2d3', accent: '#0f4c3a', floor: 'marble',   floorColor: '#ece8e1', fabric: '#0f4c3a', cushion: '#c9a227', wood: '#1e1e1e', metal: '#c9a227', rug: '#e5dccb', pot: '#111111', cabinet: '#0f4c3a', counter: '#ffffff' },
+  indian:      { name: 'Indian Royal',    flag: '🇮🇳', region: 'India',       wall: '#f3e0c0', accent: '#9b2226', floor: 'marble',   floorColor: '#f4efe6', fabric: '#ae2012', cushion: '#e9c46a', wood: '#6f3b1a', metal: '#c9a227', rug: '#bb3e03', pot: '#c06b3e', cabinet: '#7a4421', counter: '#2b2b2b' },
+  rajasthani:  { name: 'Rajasthani Haveli', flag: '🇮🇳', region: 'India',     wall: '#f0c987', accent: '#b5446e', floor: 'marble',   floorColor: '#f2ece2', fabric: '#2e6f95', cushion: '#e9a23b', wood: '#5a3218', metal: '#c9a227', rug: '#a83232', pot: '#2e6f95', cabinet: '#5a3218', counter: '#f2ece2' },
+  keralaTrad:  { name: 'Kerala Traditional', flag: '🇮🇳', region: 'India',    wall: '#f6efe1', accent: '#7a3b1d', floor: 'tile',     floorColor: '#9c3b25', fabric: '#f3e9d2', cushion: '#c9a227', wood: '#4a2a14', metal: '#b08d2a', rug: '#d9c9a8', pot: '#7a3b1d', cabinet: '#4a2a14', counter: '#3a3a3a' },
+  japanese:    { name: 'Japandi',         flag: '🇯🇵', region: 'Asia',        wall: '#efe9df', accent: '#3d3a35', floor: 'wood',     floorColor: '#c9a97c', fabric: '#d8d0c2', cushion: '#6b6459', wood: '#8c6a48', metal: '#2b2b2b', rug: '#d9cfbf', pot: '#3a3a3a', cabinet: '#c9b08c', counter: '#e7e2d8' },
+  chinese:     { name: 'Chinese Classic', flag: '🇨🇳', region: 'Asia',        wall: '#f3e6cf', accent: '#8b1e1e', floor: 'wood',     floorColor: '#5a3420', fabric: '#a52a2a', cushion: '#d4a017', wood: '#3a1f14', metal: '#c9a227', rug: '#7a1515', pot: '#1d4e89', cabinet: '#5a2a1a', counter: '#2a2a2a' },
+  bali:        { name: 'Bali Tropical',   flag: '🇮🇩', region: 'Asia',        wall: '#efe6d6', accent: '#5b7553', floor: 'wood',     floorColor: '#8a6a46', fabric: '#e6dccb', cushion: '#5b7553', wood: '#6e5135', metal: '#4a3b2a', rug: '#c8b59a', pot: '#8a6a46', cabinet: '#8a6a46', counter: '#d8cdb8' },
+  scandi:      { name: 'Scandinavian',    flag: '🇸🇪', region: 'Europe',      wall: '#f4f1ec', accent: '#a3b18a', floor: 'wood',     floorColor: '#d9c3a0', fabric: '#d6d3cd', cushion: '#a3b18a', wood: '#c8a97e', metal: '#d8d8d8', rug: '#ece6da', pot: '#ffffff', cabinet: '#f2efe9', counter: '#cbbfa9' },
+  french:      { name: 'French Parisian', flag: '🇫🇷', region: 'Europe',      wall: '#f3eee8', accent: '#b9a7a0', floor: 'wood',     floorColor: '#b08b5e', fabric: '#d9c5bd', cushion: '#8a9a8e', wood: '#efe6da', metal: '#c5a253', rug: '#cdbfb4', pot: '#ffffff', cabinet: '#e9e2d6', counter: '#ffffff' },
+  english:     { name: 'English Cottage', flag: '🇬🇧', region: 'Europe',      wall: '#e8e1d0', accent: '#4a6741', floor: 'wood',     floorColor: '#8b6240', fabric: '#9c7a6a', cushion: '#c9a46a', wood: '#6b4a2f', metal: '#8b7355', rug: '#7d3b3b', pot: '#a89f91', cabinet: '#4a6741', counter: '#d9d0c0' },
+  mediterranean: { name: 'Mediterranean', flag: '🇬🇷', region: 'Europe',      wall: '#fbfaf6', accent: '#2c5d8f', floor: 'tile',     floorColor: '#e7d8c0', fabric: '#f2efe8', cushion: '#2c5d8f', wood: '#a67c52', metal: '#4a4a4a', rug: '#d7e3ef', pot: '#c46a3c', cabinet: '#ffffff', counter: '#f0e6d6' },
+  moroccan:    { name: 'Moroccan',        flag: '🇲🇦', region: 'Middle East & Africa', wall: '#f1dcc0', accent: '#1f6f8b', floor: 'tile', floorColor: '#c4703f', fabric: '#b5442c', cushion: '#e0a32e', wood: '#5b3a22', metal: '#b8892b', rug: '#9c2f2f', pot: '#1f6f8b', cabinet: '#1f6f8b', counter: '#e8dcc6' },
+  arabic:      { name: 'Arabian Majlis',  flag: '🇦🇪', region: 'Middle East & Africa', wall: '#efe4d2', accent: '#7a5c3e', floor: 'marble', floorColor: '#efe7da', fabric: '#e9dcc6', cushion: '#a0782c', wood: '#4a3424', metal: '#c9a227', rug: '#6d2e46', pot: '#c9a227', cabinet: '#4a3424', counter: '#f3efe8' },
+  industrial:  { name: 'Industrial Loft', flag: '🇺🇸', region: 'Americas',    wall: '#9a9792', accent: '#a0522d', floor: 'concrete', floorColor: '#8f8c87', fabric: '#4a4440', cushion: '#b5651d', wood: '#5b4636', metal: '#151515', rug: '#7f5539', pot: '#3a3a3a', cabinet: '#2a2a2a', counter: '#8a8a8a', brick: true },
+  midcentury:  { name: 'Mid-Century',     flag: '🇺🇸', region: 'Americas',    wall: '#f2efe9', accent: '#d88c3a', floor: 'wood',     floorColor: '#9c6b3f', fabric: '#2f6f6a', cushion: '#e3a33b', wood: '#7a4a2a', metal: '#c9a227', rug: '#e8dcc6', pot: '#ffffff', cabinet: '#7a4a2a', counter: '#ffffff' },
+  coastal:     { name: 'Coastal',         flag: '🇺🇸', region: 'Americas',    wall: '#eef4f6', accent: '#457b9d', floor: 'wood',     floorColor: '#d8c8ae', fabric: '#f1faee', cushion: '#457b9d', wood: '#e0cfb1', metal: '#b5b5b5', rug: '#a8dadc', pot: '#f1faee', cabinet: '#dfe9ee', counter: '#ffffff' },
+  mexican:     { name: 'Mexican Hacienda', flag: '🇲🇽', region: 'Americas',   wall: '#f2d8b6', accent: '#d1495b', floor: 'tile',     floorColor: '#b5653a', fabric: '#2a9d8f', cushion: '#e9c46a', wood: '#6b3f1f', metal: '#3a3a3a', rug: '#e76f51', pot: '#e76f51', cabinet: '#2a9d8f', counter: '#f4e3c3' },
+};
+const REGIONS = ['Global', 'India', 'Asia', 'Europe', 'Middle East & Africa', 'Americas'];
+const WALLS = ['#ffffff', '#f4f1ec', '#e9e6e1', '#f3e0c0', '#dfe7e2', '#e4dccf', '#d8e2ea', '#f2e3d5', '#ece4f0', '#c9d5c0', '#d9cbb7', '#b7c4cf'];
+const ACCENTS = ['#2f3e46', '#9b2226', '#a3b18a', '#c96f4a', '#1b263b', '#606c38', '#bc6c25', '#6d597a', '#264653', '#e9c46a', '#457b9d', '#8d6e63'];
+const FLOORS = { wood: ['#a47551', '#d9c3a0', '#6f4e37', '#b88b5a', '#c8b08a'], marble: ['#f4efe6', '#f7f5f2', '#e6e2dc', '#d9d4ce'], tile: ['#ecebe8', '#d9d2c5', '#cfd6d8', '#b9a48c'], carpet: ['#cfc3b0', '#9aa5a0', '#b8a9c9', '#d9cfc1'], concrete: ['#8f8c87', '#a9a6a0', '#6e6c68'] };
+const FURN_COLORS = ['#5c6b73', '#d6d3cd', '#ae2012', '#14213d', '#d4a373', '#a3b18a', '#457b9d', '#e9c46a', '#3b2f2f', '#f1faee', '#6d597a', '#2a9d8f'];
+
+const EXT_STYLES = {
+  modern:       { name: 'Modern Box',       flag: '🌐', region: 'Global',   roof: 'flat',  wall: '#f5f5f2', trim: '#2b2b2b', roofColor: '#4a4a4a', cladding: true, bigGlass: true },
+  contemporary: { name: 'Contemporary',     flag: '🌐', region: 'Global',   roof: 'flat',  wall: '#e8e4dc', trim: '#3d405b', roofColor: '#3d405b', cladding: true, cantilever: true, bigGlass: true },
+  kerala:       { name: 'Kerala Sloped',    flag: '🇮🇳', region: 'India',    roof: 'gable', wall: '#f2e8cf', trim: '#6b3e26', roofColor: '#9c3a1c', columns: true, pitch: 0.5 },
+  villa:        { name: 'Indian Villa',     flag: '🇮🇳', region: 'India',    roof: 'hip',   wall: '#f6e7d8', trim: '#ffffff', roofColor: '#6b3e26', columns: true },
+  haveli:       { name: 'Rajasthani Haveli', flag: '🇮🇳', region: 'India',   roof: 'flat',  wall: '#d9a066', trim: '#8b4a2b', roofColor: '#8b4a2b', arches: true, domes: 'corners', crenel: true, jharokha: true },
+  japanese:     { name: 'Japanese',         flag: '🇯🇵', region: 'Asia',     roof: 'gable', wall: '#f4f1ea', trim: '#3a2e25', roofColor: '#2f3337', cladding: true, eaves: true, pitch: 0.3 },
+  chinese:      { name: 'Chinese Courtyard', flag: '🇨🇳', region: 'Asia',    roof: 'hip',   wall: '#f1e6d2', trim: '#8b1e1e', roofColor: '#2f3e3a', columns: true, hipH: 1.6 },
+  bali:         { name: 'Bali Villa',       flag: '🇮🇩', region: 'Asia',     roof: 'hip',   wall: '#efe2cc', trim: '#5c4033', roofColor: '#7a5a32', columns: true, cladding: true, hipH: 2.0 },
+  tudor:        { name: 'English Tudor',    flag: '🇬🇧', region: 'Europe',   roof: 'gable', wall: '#f3efe6', trim: '#3b2a1e', roofColor: '#5a4a42', timber: true, pitch: 0.65 },
+  mediterranean:{ name: 'Greek Santorini',  flag: '🇬🇷', region: 'Europe',   roof: 'flat',  wall: '#ffffff', trim: '#2c5d8f', roofColor: '#2c5d8f', arches: true, domes: 'one' },
+  spanish:      { name: 'Spanish Villa',    flag: '🇪🇸', region: 'Europe',   roof: 'hip',   wall: '#f3e3c3', trim: '#7a4a2a', roofColor: '#b5562d', arches: true, hipH: 0.8 },
+  swiss:        { name: 'Swiss Chalet',     flag: '🇨🇭', region: 'Europe',   roof: 'gable', wall: '#e8dcc6', trim: '#5a3b22', roofColor: '#4a4a4a', cladding: true, eaves: true, pitch: 0.45 },
+  nordic:       { name: 'Nordic Red House', flag: '🇳🇴', region: 'Europe',   roof: 'gable', wall: '#8b2e23', trim: '#ffffff', roofColor: '#2b2b2b', pitch: 0.6 },
+  arabic:       { name: 'Arabian',          flag: '🇦🇪', region: 'Middle East & Africa', roof: 'flat', wall: '#e6cfa7', trim: '#8b6b47', roofColor: '#8b6b47', arches: true, crenel: true },
+  dubai:        { name: 'Dubai Modern',     flag: '🇦🇪', region: 'Middle East & Africa', roof: 'flat', wall: '#f3f1ec', trim: '#1f1f1f', roofColor: '#1f1f1f', bigGlass: true, cantilever: true, cladding: true },
+  colonial:     { name: 'Colonial',         flag: '🇺🇸', region: 'Americas', roof: 'gable', wall: '#ffffff', trim: '#2f3e46', roofColor: '#2f3e46', columns: true, shutters: true, pitch: 0.38 },
+  suburban:     { name: 'American Suburban', flag: '🇺🇸', region: 'Americas', roof: 'gable', wall: '#c9d6df', trim: '#ffffff', roofColor: '#4a4a4a', shutters: true, pitch: 0.42 },
+  farmhouse:    { name: 'Farmhouse',        flag: '🇺🇸', region: 'Americas', roof: 'gable', wall: '#e7d3c1', trim: '#5c4033', roofColor: '#4a4a4a', cladding: true, pitch: 0.42 },
+};
+const EXT_WALLS = ['#ffffff', '#f5f0e6', '#e8dcc8', '#d9d4cc', '#c9b79c', '#f2e8cf', '#b8c4bb', '#e7d3c1', '#dcdcdc', '#f6e7d8', '#cfd8dc', '#efd9c3'];
+const EXT_TRIMS = ['#2b2b2b', '#ffffff', '#8b5e3c', '#5c4033', '#2f3e46', '#b08968', '#3d405b', '#6b705c'];
+const ROOFS = ['#9c3a1c', '#4a4a4a', '#2f3e46', '#6b3e26', '#3d405b', '#7f5539', '#264653'];
+
+const ROOM_TYPES = [['living', '🛋️ Living'], ['bedroom', '🛏️ Bedroom'], ['kitchen', '🍳 Kitchen'], ['dining', '🍽️ Dining'], ['office', '💻 Office']];
+
+/* ---------------- Furniture library ---------------- */
+const F = {};
+function def(type, name, icon, main, build) { F[type] = { name, icon, main, build }; }
+
+function sofaBuild(P, it, m) {
+  const g = G(), w = it.w || 2.2;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(g, 0.025, 0.02, 0.1, P.metal, sx * (w / 2 - 0.12), 0, sz * 0.33);
+  rbox(g, w, 0.3, 0.9, m, 0, 0.1, 0);
+  rbox(g, w, 0.5, 0.22, m, 0, 0.32, -0.34, 0.07);
+  for (const s of [-1, 1]) rbox(g, 0.2, 0.26, 0.9, m, s * (w / 2 - 0.1), 0.4, 0, 0.06);
+  const n = w > 1.6 ? 3 : w > 1.1 ? 2 : 1, cw = (w - 0.4) / n;
+  for (let i = 0; i < n; i++) rbox(g, cw - 0.02, 0.14, 0.66, m, -w / 2 + 0.2 + cw * (i + 0.5), 0.4, 0.09, 0.06);
+  if (w > 1.2) {
+    const p1 = rbox(g, 0.42, 0.38, 0.12, P.cushion, -w / 2 + 0.48, 0.52, -0.16, 0.05); p1.rotation.x = -0.25;
+    const p2 = rbox(g, 0.42, 0.38, 0.12, P.cushion, w / 2 - 0.48, 0.52, -0.16, 0.05); p2.rotation.x = -0.25;
+  }
+  return g;
+}
+def('sofa', 'Sofa', '🛋️', 'fabric', sofaBuild);
+def('lsofa', 'L-Sofa', '🛋️', 'fabric', (P, it, m) => {
+  const g = sofaBuild(P, { w: 2.4 }, m);
+  rbox(g, 0.86, 0.3, 0.9, m, 0.75, 0.1, 0.88);
+  rbox(g, 0.84, 0.14, 0.88, m, 0.75, 0.4, 0.88, 0.06);
+  rbox(g, 0.2, 0.26, 0.9, m, 1.1, 0.4, 0.88, 0.06);
+  return g;
+});
+def('armchair', 'Armchair', '💺', 'fabric', (P, it, m) => sofaBuild(P, { w: 0.95 }, m));
+def('coffeeTable', 'Coffee table', '☕', 'wood', (P, it, m) => {
+  const g = G();
+  rbox(g, 1.1, 0.05, 0.6, m, 0, 0.38, 0, 0.02);
+  rbox(g, 1.0, 0.03, 0.5, m, 0, 0.12, 0, 0.01);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(g, 0.02, 0.02, 0.38, P.metal, sx * 0.48, 0, sz * 0.24, 8);
+  cyl(g, 0.07, 0.05, 0.14, P.accent, 0.25, 0.43, 0.05); rbox(g, 0.3, 0.04, 0.22, P.cushion, -0.25, 0.43, 0, 0.01);
+  return g;
+});
+def('tvUnit', 'TV unit', '📺', 'wood', (P, it, m) => {
+  const g = G();
+  rbox(g, 1.9, 0.42, 0.42, m, 0, 0.1, 0, 0.02);
+  for (const sx of [-1, 1]) box(g, 0.04, 0.1, 0.3, P.metal, sx * 0.85, 0, 0);
+  box(g, 1.46, 0.84, 0.05, P.screen, 0, 0.95, -0.15);
+  box(g, 1.4, 0.78, 0.01, P.tvGlow, 0, 0.98, -0.12, false);
+  cyl(g, 0.06, 0.09, 0.25, P.accent, -0.7, 0.52, 0.05);
+  box(g, 0.3, 0.05, 0.2, P.cushion, 0.6, 0.52, 0);
+  return g;
+});
+def('rug', 'Rug', '🟫', 'rug', (P, it, m) => {
+  const g = G(), w = it.w || 2.6, d = it.d || 1.8;
+  box(g, w, 0.012, d, m, 0, 0.001, 0, false);
+  box(g, w - 0.25, 0.014, d - 0.25, P.rugInner, 0, 0.001, 0, false);
+  box(g, w - 0.4, 0.016, d - 0.4, m, 0, 0.001, 0, false);
+  return g;
+});
+def('plant', 'Plant', '🪴', 'pot', (P, it, m) => {
+  const g = G(), r = rng(Math.floor((it.x + 10) * 97 + (it.z + 10) * 31));
+  cyl(g, 0.18, 0.14, 0.42, m, 0, 0, 0);
+  cyl(g, 0.17, 0.17, 0.02, P.soil, 0, 0.4, 0);
+  for (let i = 0; i < 6; i++) {
+    const s = sph(g, 0.16 + r() * 0.12, r() > 0.5 ? P.leaf : P.leaf2, (r() - 0.5) * 0.35, 0.65 + r() * 0.75, (r() - 0.5) * 0.35);
+    s.scale.y = 1.3;
+  }
+  return g;
+});
+def('floorLamp', 'Floor lamp', '💡', 'metal', (P, it, m, ctx) => {
+  const g = G();
+  cyl(g, 0.16, 0.17, 0.03, m, 0, 0, 0); cyl(g, 0.012, 0.012, 1.4, m, 0, 0.03, 0, 8);
+  cyl(g, 0.17, 0.24, 0.3, P.shade, 0, 1.35, 0);
+  addLamp(g, ctx, 0, 1.45, 0, 1);
+  return g;
+});
+def('bookshelf', 'Bookshelf', '📚', 'wood', (P, it, m) => {
+  const g = G(), w = 1.0, h = 2.0, d = 0.35, r = rng(Math.floor((it.x + 10) * 53 + (it.z + 10) * 17));
+  for (const sx of [-1, 1]) box(g, 0.04, h, d, m, sx * (w / 2 - 0.02), 0, 0);
+  box(g, w, 0.04, d, m, 0, h - 0.04, 0); box(g, w, 0.04, d, m, 0, 0, 0); box(g, w, h, 0.02, m, 0, 0, -d / 2 + 0.01);
+  for (let s = 1; s < 5; s++) box(g, w - 0.08, 0.03, d - 0.02, m, 0, s * 0.4, 0);
+  for (let s = 0; s < 5; s++) {
+    let x = -w / 2 + 0.06;
+    while (x < w / 2 - 0.12) {
+      if (r() < 0.15) { x += 0.12; continue; }
+      const bw = 0.03 + r() * 0.04, bh = 0.2 + r() * 0.13;
+      box(g, bw, bh, 0.22, pick(r, P.books), x + bw / 2, s * 0.4 + 0.04, 0.02); x += bw + 0.005;
+    }
+  }
+  return g;
+});
+def('bed', 'Bed', '🛏️', 'fabric', (P, it, m) => {
+  const g = G(), w = it.w || 1.8;
+  rbox(g, w + 0.1, 0.28, 2.1, P.wood, 0, 0.08, 0, 0.03);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, 0.06, 0.08, 0.06, P.wood, sx * w / 2, 0, sz * 0.98);
+  rbox(g, w, 0.25, 2.0, P.white, 0, 0.36, 0.03, 0.06);
+  rbox(g, w + 0.06, 0.07, 1.35, m, 0, 0.58, 0.36, 0.04);
+  rbox(g, w + 0.24, 1.15, 0.12, m, 0, 0.05, -1.05, 0.05);
+  for (const sx of [-1, 1]) { const p = rbox(g, w / 2 - 0.12, 0.16, 0.38, P.white2, sx * w / 4, 0.6, -0.74, 0.07); p.rotation.x = -0.2; }
+  rbox(g, 0.45, 0.32, 0.12, P.cushion, 0, 0.64, -0.55, 0.05);
+  return g;
+});
+def('nightstand', 'Nightstand', '🗄️', 'wood', (P, it, m, ctx) => {
+  const g = G();
+  rbox(g, 0.5, 0.45, 0.42, m, 0, 0.08, 0, 0.02);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, 0.03, 0.08, 0.03, P.metal, sx * 0.22, 0, sz * 0.18);
+  box(g, 0.44, 0.005, 0.01, P.dark, 0, 0.32, 0.21);
+  cyl(g, 0.06, 0.08, 0.2, P.accent, 0, 0.53, 0);
+  cyl(g, 0.1, 0.14, 0.18, P.shade, 0, 0.72, 0);
+  addLamp(g, ctx, 0, 0.8, 0, 0.45);
+  return g;
+});
+def('wardrobe', 'Wardrobe', '🚪', 'wood', (P, it, m) => {
+  const g = G();
+  rbox(g, 1.8, 2.2, 0.6, m, 0, 0, 0, 0.02);
+  for (const x of [-0.3, 0.3]) box(g, 0.01, 2.1, 0.01, P.dark, x, 0.05, 0.3);
+  for (const x of [-0.36, -0.24, 0.24, 0.36]) box(g, 0.02, 0.35, 0.03, P.metal, x, 0.95, 0.31);
+  return g;
+});
+def('dresser', 'Dresser', '🪞', 'wood', (P, it, m) => {
+  const g = G();
+  rbox(g, 1.2, 0.8, 0.45, m, 0, 0.06, 0, 0.02);
+  for (let i = 1; i < 3; i++) box(g, 1.14, 0.008, 0.01, P.dark, 0, 0.06 + i * 0.27, 0.225);
+  box(g, 0.86, 0.96, 0.03, P.metal, 0, 0.92, -0.2); box(g, 0.78, 0.88, 0.02, P.mirror, 0, 0.96, -0.185);
+  cyl(g, 0.05, 0.05, 0.16, P.accent, 0.4, 0.86, 0.05);
+  return g;
+});
+function chair(g, P, m, x, z, rot) {
+  const c = G(); c.position.set(x, 0, z); c.rotation.y = rot;
+  rbox(c, 0.46, 0.06, 0.46, m, 0, 0.44, 0, 0.02);
+  rbox(c, 0.44, 0.48, 0.05, m, 0, 0.5, -0.21, 0.02);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(c, 0.018, 0.015, 0.44, P.wood, sx * 0.19, 0, sz * 0.19, 8);
+  g.add(c);
+}
+def('diningSet', 'Dining set', '🍽️', 'wood', (P, it, m) => {
+  const g = G(), seats = it.seats || 6, L = seats > 4 ? 2.0 : 1.5;
+  rbox(g, L, 0.05, 0.95, m, 0, 0.72, 0, 0.02);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, 0.06, 0.72, 0.06, m, sx * (L / 2 - 0.1), 0, sz * 0.38);
+  const per = seats > 4 ? 2 : 2;
+  for (let i = 0; i < per; i++) {
+    const x = -L / 2 + L / per * (i + 0.5);
+    chair(g, P, P.fabric, x, -0.72, 0); chair(g, P, P.fabric, x, 0.72, Math.PI);
+  }
+  if (seats > 4) { chair(g, P, P.fabric, -L / 2 - 0.4, 0, Math.PI / 2); chair(g, P, P.fabric, L / 2 + 0.4, 0, -Math.PI / 2); }
+  cyl(g, 0.16, 0.1, 0.08, P.accent, 0, 0.77, 0);
+  for (let i = 0; i < 3; i++) sph(g, 0.05, P.fruit, -0.05 + i * 0.05, 0.85, (i - 1) * 0.04);
+  return g;
+});
+def('chair', 'Chair', '🪑', 'fabric', (P, it, m) => { const g = G(); chair(g, P, m, 0, 0, 0); return g; });
+def('sideboard', 'Sideboard', '🗃️', 'wood', (P, it, m) => {
+  const g = G();
+  rbox(g, 1.7, 0.7, 0.45, m, 0, 0.12, 0, 0.02);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(g, 0.02, 0.015, 0.12, P.metal, sx * 0.78, 0, sz * 0.18, 8);
+  for (const x of [-0.42, 0, 0.42]) box(g, 0.01, 0.62, 0.01, P.dark, x, 0.16, 0.226);
+  cyl(g, 0.08, 0.05, 0.4, P.accent, -0.55, 0.82, 0); cyl(g, 0.15, 0.08, 0.08, P.cushion, 0.45, 0.82, 0);
+  return g;
+});
+def('pendant', 'Pendant light', '🔆', 'metal', (P, it, m, ctx) => {
+  const g = G(), H = ctx.H;
+  cyl(g, 0.006, 0.006, H - 1.95, P.dark, 0, 1.95, 0, 6);
+  const s = mesh(g, new THREE.SphereGeometry(0.2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), m, 0, 1.75, 0);
+  s.material = s.material.clone(); s.material.side = THREE.DoubleSide;
+  sph(g, 0.06, P.bulb, 0, 1.75, 0);
+  addLamp(g, ctx, 0, 1.7, 0, 1.2);
+  return g;
+});
+def('kitchenCounter', 'Kitchen counter', '🧑‍🍳', 'cabinet', (P, it, m) => {
+  const g = G(), w = it.w || 3;
+  box(g, w, 0.08, 0.56, P.dark, 0, 0, 0.02);
+  box(g, w, 0.82, 0.6, m, 0, 0.08, 0);
+  box(g, w + 0.04, 0.04, 0.64, P.stone, 0, 0.9, 0.01);
+  box(g, w, 0.6, 0.02, P.backsplash, 0, 0.94, -0.29);
+  box(g, w, 0.72, 0.35, m, 0, 1.54, -0.125);
+  for (let x = -w / 2 + 0.6; x < w / 2 - 0.1; x += 0.6) { box(g, 0.008, 0.78, 0.01, P.dark, x, 0.1, 0.301); box(g, 0.008, 0.68, 0.01, P.dark, x, 1.56, 0.051); }
+  box(g, 0.6, 0.012, 0.5, P.screen, w / 4, 0.94, 0);
+  for (const dx of [-0.13, 0.13]) for (const dz of [-0.1, 0.1]) cyl(g, 0.07, 0.07, 0.005, P.dark, w / 4 + dx, 0.953, dz, 16);
+  box(g, 0.55, 0.01, 0.4, P.steel, -w / 4, 0.935, 0);
+  cyl(g, 0.015, 0.015, 0.28, P.steel, -w / 4, 0.94, -0.22, 8);
+  return g;
+});
+def('island', 'Kitchen island', '🏝️', 'cabinet', (P, it, m) => {
+  const g = G();
+  box(g, 1.8, 0.88, 0.9, m, 0, 0, -0.1);
+  box(g, 2.0, 0.04, 1.15, P.stone, 0, 0.88, 0);
+  cyl(g, 0.14, 0.1, 0.1, P.accent, 0.4, 0.92, -0.1);
+  return g;
+});
+def('barStool', 'Bar stool', '🪑', 'fabric', (P, it, m) => {
+  const g = G();
+  cyl(g, 0.19, 0.19, 0.06, m, 0, 0.72, 0);
+  cyl(g, 0.025, 0.025, 0.72, P.metal, 0, 0, 0, 8); cyl(g, 0.2, 0.2, 0.02, P.metal, 0, 0, 0);
+  const ring = mesh(g, new THREE.TorusGeometry(0.15, 0.012, 6, 24), P.metal, 0, 0.3, 0); ring.rotation.x = Math.PI / 2;
+  return g;
+});
+def('fridge', 'Fridge', '🧊', 'steel', (P, it, m) => {
+  const g = G();
+  rbox(g, 0.8, 1.9, 0.7, m, 0, 0, 0, 0.03);
+  box(g, 0.78, 0.01, 0.01, P.dark, 0, 1.25, 0.351);
+  for (const y of [0.7, 1.45]) box(g, 0.03, 0.35, 0.04, P.dark, -0.32, y, 0.37);
+  return g;
+});
+def('desk', 'Desk', '🖥️', 'wood', (P, it, m, ctx) => {
+  const g = G();
+  rbox(g, 1.4, 0.04, 0.7, m, 0, 0.72, 0, 0.01);
+  for (const sx of [-1, 1]) { box(g, 0.04, 0.72, 0.6, P.metal, sx * 0.66, 0, 0); }
+  box(g, 0.62, 0.37, 0.03, P.screen, 0, 0.98, -0.2); box(g, 0.58, 0.33, 0.005, P.tvGlow, 0, 1.0, -0.183, false);
+  box(g, 0.05, 0.22, 0.03, P.metal, 0, 0.76, -0.22); box(g, 0.22, 0.01, 0.16, P.metal, 0, 0.76, -0.22);
+  box(g, 0.42, 0.015, 0.14, P.dark, 0, 0.76, 0.08);
+  cyl(g, 0.07, 0.08, 0.02, P.metal, 0.55, 0.76, -0.2); cyl(g, 0.008, 0.008, 0.35, P.metal, 0.55, 0.76, -0.2, 6);
+  cyl(g, 0.05, 0.09, 0.1, P.shade, 0.55, 1.1, -0.2);
+  addLamp(g, ctx, 0.55, 1.05, -0.1, 0.4);
+  return g;
+});
+def('officeChair', 'Office chair', '💺', 'fabric', (P, it, m) => {
+  const g = G();
+  for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; const leg = box(g, 0.3, 0.03, 0.04, P.dark, Math.cos(a) * 0.15, 0.04, Math.sin(a) * 0.15); leg.rotation.y = -a; }
+  cyl(g, 0.025, 0.025, 0.35, P.metal, 0, 0.07, 0, 8);
+  rbox(g, 0.52, 0.09, 0.5, m, 0, 0.42, 0, 0.04);
+  const b = rbox(g, 0.48, 0.62, 0.07, m, 0, 0.55, -0.25, 0.04); b.rotation.x = -0.1;
+  return g;
+});
+def('wallArt', 'Wall art', '🖼️', 'dark', (P, it, m) => {
+  const g = G(), y = it.y || 1.45, w = it.w || 1.0;
+  box(g, w, 0.7, 0.03, m, 0, y, 0.015);
+  const pm = new THREE.MeshStandardMaterial({ map: paintingTex(it.seed || 7, P.artColors), roughness: 0.8 });
+  box(g, w - 0.08, 0.62, 0.035, pm, 0, y + 0.04, 0.02, false);
+  return g;
+});
+def('sideTable', 'Side table', '⚪', 'wood', (P, it, m) => {
+  const g = G();
+  cyl(g, 0.25, 0.25, 0.03, m, 0, 0.52, 0, 28); cyl(g, 0.02, 0.02, 0.52, P.metal, 0, 0, 0, 8); cyl(g, 0.16, 0.18, 0.02, P.metal, 0, 0, 0);
+  sph(g, 0.06, P.accent, 0.05, 0.61, 0);
+  return g;
+});
+def('swing', 'Jhoola swing', '🪢', 'wood', (P, it, m, ctx) => {
+  const g = G(), H = ctx.H;
+  rbox(g, 1.3, 0.06, 0.55, m, 0, 0.45, 0, 0.02);
+  rbox(g, 1.3, 0.35, 0.05, m, 0, 0.5, -0.25, 0.02);
+  for (const sx of [-0.6, 0.6]) for (const sz of [-0.22, 0.22]) cyl(g, 0.008, 0.008, H - 0.5, P.metal, sx, 0.5, sz, 6);
+  rbox(g, 1.1, 0.08, 0.4, P.cushion, 0, 0.51, 0.04, 0.03);
+  return g;
+});
+
+def('toilet', 'Toilet', '🚽', 'white', (P, it, m) => {
+  const g = G();
+  cyl(g, 0.17, 0.2, 0.38, m, 0, 0, 0.05);
+  rbox(g, 0.4, 0.06, 0.5, m, 0, 0.38, 0.04, 0.03);
+  rbox(g, 0.44, 0.4, 0.18, m, 0, 0.36, -0.24, 0.03);
+  box(g, 0.08, 0.02, 0.03, P.steel, 0.12, 0.77, -0.2);
+  return g;
+});
+def('vanity', 'Wash basin', '🚰', 'wood', (P, it, m) => {
+  const g = G();
+  rbox(g, 0.95, 0.55, 0.5, m, 0, 0.3, 0, 0.02);
+  box(g, 0.99, 0.04, 0.52, P.stone, 0, 0.85, 0);
+  const bowl = cyl(g, 0.2, 0.15, 0.12, P.white2, 0, 0.89, 0.02, 28);
+  cyl(g, 0.015, 0.015, 0.2, P.steel, 0, 0.89, -0.2, 8);
+  box(g, 0.02, 0.02, 0.12, P.steel, 0, 1.07, -0.15);
+  box(g, 0.8, 0.9, 0.03, P.metal, 0, 1.15, -0.24); box(g, 0.74, 0.84, 0.02, P.mirror, 0, 1.18, -0.225);
+  return g;
+});
+def('shower', 'Shower', '🚿', 'steel', (P, it, m) => {
+  const g = G();
+  box(g, 0.95, 0.06, 0.95, P.white2, 0, 0, 0);
+  const gl = new THREE.MeshStandardMaterial({ color: '#cfe6f2', transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.2 });
+  box(g, 0.95, 2.0, 0.02, gl, 0, 0.06, 0.47, false);
+  box(g, 0.02, 2.0, 0.95, gl, 0.47, 0.06, 0, false);
+  cyl(g, 0.015, 0.015, 1.9, m, -0.4, 0.06, -0.42, 8);
+  const hd = cyl(g, 0.12, 0.12, 0.02, m, -0.25, 2.0, -0.3, 20);
+  return g;
+});
+def('bathtub', 'Bathtub', '🛁', 'white', (P, it, m) => {
+  const g = G();
+  rbox(g, 1.7, 0.56, 0.78, m, 0, 0, 0, 0.12);
+  rbox(g, 1.5, 0.05, 0.6, new THREE.MeshStandardMaterial({ color: '#9fd3e6', roughness: 0.05, transparent: true, opacity: 0.85 }), 0, 0.5, 0, 0.02);
+  cyl(g, 0.015, 0.015, 0.2, P.steel, -0.75, 0.5, 0, 8);
+  return g;
+});
+def('mandir', 'Mandir', '🛕', 'wood', (P, it, m, ctx) => {
+  const g = G();
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(g, 0.05, 0.15, 0.05, m, sx * 0.48, 0, sz * 0.2);
+  rbox(g, 1.05, 0.75, 0.5, m, 0, 0.15, 0, 0.02);
+  box(g, 0.95, 0.02, 0.4, P.metal, 0, 0.9, 0);
+  box(g, 1.0, 1.0, 0.06, m, 0, 0.9, -0.22);
+  for (const sx of [-1, 1]) cyl(g, 0.04, 0.05, 1.0, P.metal, sx * 0.45, 0.9, 0.18, 12);
+  box(g, 1.1, 0.12, 0.55, m, 0, 1.9, 0);
+  const dome = mesh(g, new THREE.SphereGeometry(0.32, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), P.metal, 0, 2.02, 0); dome.scale.y = 1.3;
+  cyl(g, 0.01, 0.05, 0.25, P.metal, 0, 2.42, 0, 10);
+  cyl(g, 0.12, 0.14, 0.08, P.metal, 0, 0.92, -0.05); sph(g, 0.11, P.metal, 0, 1.12, -0.05);
+  for (const sx of [-0.3, 0.3]) { cyl(g, 0.04, 0.03, 0.03, P.metal, sx, 0.92, 0.12, 12); sph(g, 0.025, glow('#ffb347', 3), sx, 0.97, 0.12); }
+  const garland = M('#f4a300', { r: 0.9 });
+  for (let i = 0; i < 9; i++) sph(g, 0.03, garland, -0.4 + i * 0.1, 1.8 - Math.sin(i / 8 * Math.PI) * 0.15, 0.25);
+  addLamp(g, ctx, 0, 1.1, 0.3, 0.6);
+  return g;
+});
+def('floorCushion', 'Floor cushion', '🟠', 'fabric', (P, it, m) => {
+  const g = G(); rbox(g, 0.6, 0.12, 0.6, m, 0, 0, 0, 0.05); return g;
+});
+const CATALOG = {
+  living: ['sofa', 'lsofa', 'armchair', 'coffeeTable', 'tvUnit', 'rug', 'plant', 'floorLamp', 'bookshelf', 'sideTable', 'wallArt', 'swing', 'floorCushion'],
+  bedroom: ['bed', 'nightstand', 'wardrobe', 'dresser', 'armchair', 'rug', 'plant', 'floorLamp', 'bookshelf', 'wallArt', 'desk', 'officeChair'],
+  kitchen: ['kitchenCounter', 'island', 'barStool', 'fridge', 'diningSet', 'chair', 'pendant', 'plant', 'rug', 'wallArt'],
+  dining: ['diningSet', 'sideboard', 'pendant', 'chair', 'rug', 'plant', 'wallArt', 'bookshelf', 'armchair'],
+  office: ['desk', 'officeChair', 'bookshelf', 'armchair', 'sofa', 'plant', 'floorLamp', 'rug', 'wallArt', 'sideTable'],
+  bathroom: ['vanity', 'toilet', 'shower', 'bathtub', 'plant', 'rug', 'wallArt'],
+  pooja: ['mandir', 'floorCushion', 'rug', 'plant', 'floorLamp', 'wallArt', 'swing', 'sideTable'],
+};
+
+/* ---------------- Layout generator ---------------- */
+function generateLayout(type, W, D, seed) {
+  const r = rng(seed), mir = r() < 0.5 ? -1 : 1, P = Math.PI, I = [];
+  const add = (t, x, z, rot = 0, extra = {}) => I.push({ type: t, x, z, rot, ...extra });
+  const art = (x, z, rot, y, w) => add('wallArt', x, z, rot, { y, w, seed: Math.floor(r() * 1e6) });
+  if (type === 'living') {
+    add('rug', 0, 0.15, 0, { w: Math.min(3, W - 1.6), d: Math.min(2.2, D - 2) });
+    add('tvUnit', 0, -D / 2 + 0.24, 0);
+    add(r() < 0.5 ? 'sofa' : 'lsofa', 0, D / 2 - 0.62, P);
+    add('coffeeTable', 0, 0.25, r() < 0.5 ? 0 : 0);
+    add('armchair', mir * (W / 2 - 0.75), -0.1, -mir * P / 2);
+    if (r() < 0.6) add('sideTable', mir * (W / 2 - 0.6), 0.75, 0);
+    add('plant', -W / 2 + 0.4, -D / 2 + 0.4); add('plant', mir * (W / 2 - 0.4), D / 2 - 0.4);
+    add('floorLamp', -mir * (W / 2 - 0.45), D / 2 - 0.45);
+    if (W > 4.5) add('bookshelf', mir * (W / 2 - 0.19), -D / 2 + 0.9, -mir * P / 2);
+    art(mir * (W / 2 - 0.02), 0.5, -mir * P / 2, 1.4, 1.0);
+    if (r() < 0.4 && D > 4.5) add('swing', -mir * (W / 2 - 1.1), -D / 2 + 1.0, mir * P / 2);
+  } else if (type === 'bedroom') {
+    const bx = -mir * 0.45;
+    add('rug', bx, -D / 2 + 1.7, 0, { w: 2.8, d: 2.0 });
+    add('bed', bx, -D / 2 + 1.12, 0);
+    add('nightstand', bx - 1.25, -D / 2 + 0.28); add('nightstand', bx + 1.25, -D / 2 + 0.28);
+    add('wardrobe', mir * (W / 2 - 0.32), D / 2 - 1.15, -mir * P / 2);
+    add('dresser', mir * (W / 2 - 0.75), -D / 2 + 0.24, 0);
+    add('plant', -mir * (W / 2 - 0.4), D / 2 - 0.4);
+    if (r() < 0.6) add('armchair', mir * (W / 2 - 0.7), -D / 2 + 0.8, -mir * P / 2 - mir * 0.4);
+    art(bx, -D / 2 + 0.02, 0, 1.6, 1.3);
+  } else if (type === 'kitchen') {
+    const cw = W - 1.6;
+    add('kitchenCounter', -0.45, -D / 2 + 0.3, 0, { w: cw });
+    add('fridge', W / 2 - 0.45, -D / 2 + 0.4);
+    if (r() < 0.55) add('kitchenCounter', -W / 2 + 0.3, 0.2, P / 2, { w: Math.max(1.2, D - 2.6) });
+    if (D >= 4) {
+      add('island', 0.3, 0.35, 0);
+      for (let i = -1; i <= 1; i++) add('barStool', 0.3 + i * 0.6, 1.25, P);
+      for (let i = -1; i <= 1; i++) add('pendant', 0.3 + i * 0.6, 0.35, 0);
+    }
+    add('plant', W / 2 - 0.4, D / 2 - 0.4);
+  } else if (type === 'dining') {
+    const seats = W >= 4.2 ? 6 : 4;
+    add('rug', 0, 0, 0, { w: Math.min(3.4, W - 1), d: Math.min(2.6, D - 1) });
+    add('diningSet', 0, 0, 0, { seats });
+    add('sideboard', 0, -D / 2 + 0.24, 0);
+    add('pendant', 0, 0, 0);
+    add('plant', -W / 2 + 0.4, -D / 2 + 0.4); add('plant', W / 2 - 0.4, D / 2 - 0.4);
+    art(0, -D / 2 + 0.02, 0, 1.45, 1.2);
+    if (W > 4.8) add('bookshelf', mir * (W / 2 - 0.19), D / 2 - 1.0, -mir * P / 2);
+  } else if (type === 'office') {
+    add('rug', 0, 0, 0, { w: 2.4, d: 1.8 });
+    add('desk', mir * 0.4, -D / 2 + 0.4, 0);
+    add('officeChair', mir * 0.4, -D / 2 + 1.05, P + 0.3);
+    add('bookshelf', -mir * (W / 2 - 0.19), -0.6, mir * P / 2);
+    if (D > 3.8) add('bookshelf', -mir * (W / 2 - 0.19), 0.5, mir * P / 2);
+    add('sofa', 0, D / 2 - 0.55, P, { w: 1.7 });
+    add('plant', mir * (W / 2 - 0.4), -D / 2 + 0.4);
+    add('floorLamp', mir * (W / 2 - 0.45), D / 2 - 0.45);
+    art(-mir * 1.2, -D / 2 + 0.02, 0, 1.5, 1.0);
+  } else if (type === 'bathroom') {
+    add('vanity', -W / 2 + 0.75, -D / 2 + 0.26, 0);
+    add('toilet', W / 2 - 0.55, -D / 2 + 0.36, 0);
+    add('shower', -W / 2 + 0.5, D / 2 - 0.5, 0);
+    if (W >= 3 && D >= 2.8) add('bathtub', W / 2 - 0.42, D / 2 - 0.95, Math.PI / 2);
+    add('rug', 0, 0.1, 0, { w: 0.9, d: 0.55 });
+    if (W >= 3.2) add('plant', -W / 2 + 0.35 + 1.2, -D / 2 + 0.3);
+  } else if (type === 'pooja') {
+    add('rug', 0, 0.25, 0, { w: Math.min(2.4, W - 0.8), d: Math.min(1.8, D - 1.2) });
+    add('mandir', 0, -D / 2 + 0.28, 0);
+    add('floorCushion', -0.45, 0.4, 0); add('floorCushion', 0.45, 0.4, 0);
+    add('plant', -W / 2 + 0.4, -D / 2 + 0.4); add('plant', W / 2 - 0.4, -D / 2 + 0.4);
+    art(mir * (W / 2 - 0.02), 0.3, -mir * P / 2, 1.45, 0.9);
+    if (D > 3.2) add('floorLamp', -mir * (W / 2 - 0.45), D / 2 - 0.45);
+  }
+  return I;
+}
+
+/* ---------------- State ---------------- */
+const FT = 0.3048, SQM_TO_SQFT = 10.7639;
+const toFt = m => Math.round(m / FT);
+const fmtN = (n, d = 0) => Number(n).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d });
+const ROOM_DEFAULTS = { living: [5.5, 4.6], bedroom: [4.6, 4.2], kitchen: [4.4, 4.0], dining: [4.4, 3.8], office: [3.8, 3.4], bathroom: [3.0, 2.6], pooja: [3.0, 2.8] };
+const ROOM_LABEL = { living: 'Living Room', bedroom: 'Bedroom', kitchen: 'Kitchen', dining: 'Dining Room', office: 'Home Office', bathroom: 'Bathroom', pooja: 'Pooja Room' };
+const ROOM_ICON = { living: '🛋️', bedroom: '🛏️', kitchen: '🍳', dining: '🍽️', office: '💻', bathroom: '🛁', pooja: '🪔' };
+const EXT_DEFAULT = { style: 'modern', floors: 2, plotW: 40, plotL: 60, roof: 'flat', wall: '#f5f5f2', trim: '#2b2b2b', roofColor: '#4a4a4a', balcony: true, porch: true, pool: false, fence: true, columns: false, garden: 'lawn', trees: 7, time: 'day', seed: 11 };
+const state = { mode: 'interior', rooms: [], activeRoom: 0, interior: null, exterior: { ...EXT_DEFAULT } };
+let roomSeq = 0;
+function newInterior(roomType = 'living', styleKey = 'modern', name) {
+  const st = STYLES[styleKey], [W, D] = ROOM_DEFAULTS[roomType], bath = roomType === 'bathroom';
+  const s = {
+    id: 'r' + (++roomSeq) + Date.now().toString(36), name: name || ROOM_LABEL[roomType], roomType, style: styleKey, W, D, H: 2.8,
+    wall: bath ? '#e9e6e1' : st.wall, accentWall: !bath, accent: st.accent, floor: bath ? 'tile' : st.floor, floorColor: bath ? '#d9d2c5' : st.floorColor, lighting: 'warm', seed: 3,
+  };
+  s.items = generateLayout(roomType, s.W, s.D, s.seed);
+  return s;
+}
+state.rooms = [newInterior('living', 'modern'), newInterior('bedroom', 'scandi', 'Master Bedroom'), newInterior('kitchen', 'modern'), newInterior('pooja', 'indian')];
+state.interior = state.rooms[0];
+function replaceInterior(s) {
+  s.id = state.interior.id; s.name = state.interior.name;
+  state.rooms[state.activeRoom] = s; state.interior = s;
+}
+let view = 'orbit', selectedIdx = -1, walls = [], itemObjs = [], selHelper = null;
+
+/* ---------------- Lights ---------------- */
+const LIGHT = {
+  day:     { bg: '#e6e1d8', hemi: ['#ffffff', '#b8a68e', 1.5], sun: 2.4, lamp: 0.5, ceil: 2, glass: 1.4, glassColor: '#e8f4ff', lampColor: '#fff1dc' },
+  warm:    { bg: '#d8cec1', hemi: ['#ffe9cf', '#8a7560', 0.9], sun: 0.9, lamp: 4, ceil: 6, glass: 0.8, glassColor: '#ffe4c4', lampColor: '#ffcf8f' },
+  evening: { bg: '#1c1f26', hemi: ['#4a4f63', '#2a2420', 0.35], sun: 0, lamp: 7, ceil: 3, glass: 0.25, glassColor: '#33406a', lampColor: '#ffbf70' },
+  cool:    { bg: '#dfe5ea', hemi: ['#eef6ff', '#9aa5ad', 1.3], sun: 1.2, lamp: 2, ceil: 9, glass: 1.1, glassColor: '#e4f0ff', lampColor: '#eef4ff' },
+};
+function addLamp(g, ctx, x, y, z, k) {
+  if (!ctx || ctx.lights >= 6) return;
+  const L = ctx.light; if (L.lamp * k < 0.3) return;
+  const p = new THREE.PointLight(L.lampColor, L.lamp * k, 5, 2); p.position.set(x, y, z); g.add(p); ctx.lights++;
+}
+
+/* ---------------- Build: interior ---------------- */
+function clearWorld() {
+  world.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if (m.map && !m.map.userData.cached) m.map.dispose(); m.dispose(); });
+  });
+  scene.remove(world); world = new THREE.Group(); scene.add(world);
+  walls = []; itemObjs = []; selHelper = null;
+}
+
+function palette(s) {
+  const st = STYLES[s.style], L = LIGHT[s.lighting];
+  return {
+    fabric: M(st.fabric, { r: 0.95 }), cushion: M(st.cushion, { r: 0.95 }), wood: M(st.wood, { r: 0.55 }),
+    metal: M(st.metal, { r: 0.3, m: 0.85 }), accent: M(s.accent, { r: 0.6 }), white: M('#f7f5f1', { r: 0.9 }), white2: M('#ffffff', { r: 0.9 }),
+    dark: M('#1d1d1f', { r: 0.5 }), screen: M('#0b0b0d', { r: 0.15, m: 0.4 }), tvGlow: glow('#1c2a3a', 0.4),
+    mirror: M('#dfe7ee', { r: 0.02, m: 1 }), steel: M('#c9ccd0', { r: 0.25, m: 0.9 }),
+    leaf: M('#4f7942', { r: 0.8 }), leaf2: M('#6a994e', { r: 0.8 }), pot: M(st.pot, { r: 0.6 }), soil: M('#3b2a1e'),
+    stone: M(st.counter, { r: 0.25 }), cabinet: M(st.cabinet, { r: 0.5 }), backsplash: new THREE.MeshStandardMaterial({ map: useTex(tex('tile', shade(st.counter, -0.05)), 3, 1), roughness: 0.3 }),
+    rug: M(st.rug, { r: 1 }), rugInner: M(shade(st.rug, 0.1), { r: 1 }),
+    shade: glow(L.lampColor, s.lighting === 'day' ? 0.25 : 0.9), bulb: glow(L.lampColor, 2), fruit: M('#d62828', { r: 0.5 }),
+    books: ['#9b2226', '#264653', '#e9c46a', '#2a9d8f', '#f4a261', '#3d405b', '#f1faee'].map(c => M(c, { r: 0.8 })),
+    artColors: [s.accent, st.cushion, st.fabric, '#e9c46a', '#264653', '#f4a261'],
+  };
+}
+
+function buildInterior(s = state.interior) {
+  clearWorld();
+  const { W, D, H } = s, L = LIGHT[s.lighting], st = STYLES[s.style];
+  scene.background = new THREE.Color(L.bg); scene.fog = null; renderer.toneMappingExposure = 1.0;
+  const P = palette(s), ctx = { H, light: L, lights: 0 };
+  const TALL = ['bookshelf', 'wardrobe', 'dresser', 'wallArt', 'kitchenCounter', 'swing', 'vanity', 'shower', 'mandir'];
+  const score = sx => s.items.filter(i => TALL.includes(i.type) && sx * i.x > W / 2 - 1.0).length;
+  const winSide = score(-1) <= score(1) ? 'left' : 'right';
+
+  // light rig
+  const hemi = new THREE.HemisphereLight(L.hemi[0], L.hemi[1], L.hemi[2]); world.add(hemi);
+  if (L.sun > 0) {
+    const sun = new THREE.DirectionalLight('#fff3df', L.sun);
+    const sx = winSide === 'left' ? -1 : 1;
+    sun.position.set(sx * (W / 2 + 3), H + 3, 1.5); sun.target.position.set(-sx * 0.5, 0, 0);
+    sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+    const sc = sun.shadow.camera; sc.left = -8; sc.right = 8; sc.top = 8; sc.bottom = -8; sc.near = 0.5; sc.far = 30; sc.updateProjectionMatrix();
+    world.add(sun, sun.target);
+  }
+  const ceilColor = s.lighting === 'cool' ? '#eaf2ff' : '#ffd9a8';
+  const cl = new THREE.PointLight(ceilColor, L.ceil, Math.max(W, D) * 2, 1.6); cl.position.set(0, H - 0.3, 0); world.add(cl);
+
+  // floor
+  const fm = new THREE.MeshStandardMaterial({ map: useTex(tex(s.floor, s.floorColor), W / 2.2, D / 2.2), roughness: s.floor === 'marble' ? 0.18 : s.floor === 'tile' ? 0.35 : 0.75, metalness: 0 });
+  const floor = mesh(world, new THREE.PlaneGeometry(W, D), fm, 0, 0, 0, false); floor.rotation.x = -Math.PI / 2;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(W + 0.2, 0.2, D + 0.2), M('#8a847a')); base.position.y = -0.101; world.add(base);
+
+  // walls
+  const wallMat = s.roomType === 'bathroom' ? new THREE.MeshStandardMaterial({ map: useTex(tex('tile', s.wall), Math.max(W, D) / 1.2, H / 1.2), roughness: 0.35 }) : M(s.wall, { r: 0.92 });
+  const accentMat = st.brick && s.accentWall
+    ? new THREE.MeshStandardMaterial({ map: useTex(tex('brick', s.accent), W / 2.5, H / 2.5), roughness: 0.95 })
+    : M(s.accent, { r: 0.9 });
+  const defs = [
+    { key: 'back', pos: [0, 0, -D / 2], rot: 0, len: W + 0.2 },
+    { key: 'front', pos: [0, 0, D / 2], rot: Math.PI, len: W + 0.2 },
+    { key: 'left', pos: [-W / 2, 0, 0], rot: Math.PI / 2, len: D },
+    { key: 'right', pos: [W / 2, 0, 0], rot: -Math.PI / 2, len: D },
+  ];
+  for (const d of defs) {
+    const g = G(); g.position.set(...d.pos); g.rotation.y = d.rot;
+    const mat = d.key === 'back' && s.accentWall ? accentMat : wallMat;
+    const wm = box(g, d.len, H, 0.1, mat, 0, 0, -0.05, false);
+    box(g, d.len - 0.2, 0.09, 0.02, P.white, 0, 0, 0.01, false);
+    if (d.key === winSide) buildWindow(g, P, L, Math.min(2.2, D - 1.6), s);
+    if (d.key === 'front') {
+      const dx = W / 2 - 0.85;
+      box(g, 1.0, 2.18, 0.04, P.white, dx, 0, 0.02, false);
+      box(g, 0.9, 2.1, 0.05, P.wood, dx, 0, 0.03, false);
+      cyl(g, 0.025, 0.025, 0.04, P.metal, dx - 0.35, 1.0, 0.07, 10).rotation.x = Math.PI / 2;
+    }
+    world.add(g);
+    walls.push({ g, n: new THREE.Vector3(Math.sin(d.rot), 0, Math.cos(d.rot)), key: d.key });
+  }
+  // ceiling (visible in walk mode)
+  const ceil = G();
+  const cm = mesh(ceil, new THREE.PlaneGeometry(W, D), M('#fbfaf7', { r: 1 }), 0, H, 0, false); cm.rotation.x = Math.PI / 2;
+  const disc = cyl(ceil, 0.3, 0.3, 0.04, glow(ceilColor, 1.2), 0, H - 0.04, 0); disc.castShadow = false;
+  ceil.visible = view === 'walk'; ceil.userData.ceiling = true; world.add(ceil);
+  walls.ceiling = ceil;
+
+  // furniture
+  const fg = G(); world.add(fg);
+  s.items.forEach((it, i) => {
+    const def = F[it.type]; if (!def) return;
+    const main = it.color ? M(it.color, { r: def.main === 'metal' ? 0.3 : 0.85, m: def.main === 'metal' ? 0.8 : 0 }) : P[def.main] || P.fabric;
+    const o = def.build(P, it, main, ctx);
+    o.position.set(it.x, 0, it.z); o.rotation.y = it.rot || 0;
+    o.userData = { idx: i, isItem: true };
+    fg.add(o); itemObjs[i] = o;
+  });
+  world.userData.furn = fg;
+  if (selectedIdx >= 0 && itemObjs[selectedIdx]) select(selectedIdx); else select(-1);
+  updateInfo();
+}
+
+function buildWindow(g, P, L, w, s) {
+  const h = 1.55, y = 0.85, x = 0;
+  const glass = glow(L.glassColor, L.glass);
+  box(g, w + 0.14, h + 0.14, 0.08, P.white, x, y - 0.07, 0.0, false);
+  box(g, w, h, 0.03, glass, x, y, 0.03, false);
+  box(g, 0.05, h, 0.06, P.white, x, y, 0.06, false);
+  box(g, w, 0.05, 0.06, P.white, x, y + h * 0.62, 0.06, false);
+  box(g, w + 0.3, 0.04, 0.18, P.white, x, y - 0.1, 0.08, false);
+  // curtains
+  const cMat = M(shade(STYLES[s.style].cushion, 0.12), { r: 1 });
+  const rod = cyl(g, 0.015, 0.015, w + 1.0, P.metal, x - (w + 1.0) / 2, y + h + 0.2, 0.18, 8); rod.rotation.z = Math.PI / 2; rod.position.x = x; rod.position.y = y + h + 0.2;
+  for (const sx of [-1, 1]) {
+    for (let k = 0; k < 4; k++) cyl(g, 0.05, 0.06, y + h + 0.18, cMat, x + sx * (w / 2 + 0.12 + k * 0.08), 0.02, 0.16 + (k % 2) * 0.03, 10);
+  }
+}
+
+/* ---------------- Build: exterior ---------------- */
+const TIME = {
+  day:    { bg: '#a9d3ff', hemi: ['#dbeeff', '#6b8e4e', 1.3], sun: ['#fff4e0', 3.0, [18, 28, 14]], night: false, exp: 1.0 },
+  sunset: { bg: '#f2a97a', hemi: ['#ffd7b0', '#5a4a3a', 0.9], sun: ['#ff9a4d', 2.6, [-28, 9, 16]], night: false, exp: 1.05 },
+  night:  { bg: '#0c1830', hemi: ['#3a4a6c', '#121212', 0.45], sun: ['#9fb4ff', 0.5, [-12, 22, 10]], night: true, exp: 1.15 },
+};
+
+/* Plot → house footprint. Plot sizes are in feet (Indian style 30×50 etc.), the 3D world is in metres. */
+function extLayout(s) {
+  const PWm = s.plotW * FT, PLm = s.plotL * FT;
+  const side = PWm >= 12 ? 1.5 : PWm >= 8 ? 0.9 : 0.6;
+  const rear = PLm >= 15 ? 1.5 : 0.9;
+  let front = Math.min(9, Math.max(3, PLm * 0.2));
+  let porch = 'none', leftM = side;
+  if (s.porch) {
+    if (PWm - 2 * side - 4.1 >= 6.5) { porch = 'side'; leftM = 4.1; }
+    else if (PLm - 6 - rear >= 5) { porch = 'front'; front = Math.max(front, 6); }
+  }
+  // big plots keep a garden around the house instead of building wall to wall
+  const W = Math.max(4, Math.min(22, PWm - leftM - side, Math.max(9, PWm * 0.62)));
+  const D = Math.max(5, Math.min(16, PLm - front - rear, Math.max(8, PLm * 0.55)));
+  const x0 = -W / 2 - leftM, x1 = x0 + PWm, z1 = D / 2 + front, z0 = z1 - PLm;
+  let pool = null;
+  if (s.pool) {
+    const rs = x1 - W / 2, bs = -D / 2 - z0;
+    if (rs >= 4.6) { const sz = Math.min(6.4, PLm - 3); pool = { cx: W / 2 + rs / 2, cz: THREE.MathUtils.clamp(D / 2 - sz / 2 + 1, z0 + sz / 2 + 0.6, z1 - sz / 2 - 0.6), sx: 3, sz }; }
+    else if (bs >= 4.4) pool = { cx: (Math.max(x0, -W / 2) + Math.min(x1, W / 2)) / 2, cz: -D / 2 - bs / 2, sx: Math.min(6.4, W - 1), sz: 3 };
+    else if (front >= 8 && W / 2 - 3.3 >= 1) pool = { cx: W / 2 - 1.8, cz: D / 2 + front / 2, sx: 3, sz: Math.min(5, front - 2.5) };
+  }
+  return { PWm, PLm, W, D, x0, x1, z0, z1, front, side, rear, porch, pool };
+}
+function plotStats(s) {
+  const L = extLayout(s), plotSqft = s.plotW * s.plotL, floorSqm = L.W * L.D;
+  return { L, plotSqft, plotGaj: plotSqft / 9, plotSqm: plotSqft * FT * FT, floorSqft: floorSqm * SQM_TO_SQFT, totalSqft: floorSqm * SQM_TO_SQFT * s.floors };
+}
+function label3d(text, x, y, z, k = 1) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(24,24,28,0.82)'; ctx.beginPath(); ctx.roundRect(8, 16, 496, 96, 40); ctx.fill();
+  ctx.fillStyle = '#ffffff'; ctx.font = '600 52px Inter, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 66);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+  sp.scale.set(4 * k, 1 * k, 1); sp.position.set(x, y, z); sp.renderOrder = 10; world.add(sp); return sp;
+}
+function chhatri(g, x, y, z, k, pillarM, domeM) {
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) cyl(g, 0.06 * k, 0.07 * k, 1.1 * k, pillarM, x + sx * 0.55 * k, y, z + sz * 0.55 * k, 10);
+  box(g, 1.5 * k, 0.12 * k, 1.5 * k, pillarM, x, y + 1.1 * k, z);
+  const d = mesh(g, new THREE.SphereGeometry(0.72 * k, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), domeM, x, y + 1.22 * k, z);
+  cyl(g, 0.02 * k, 0.07 * k, 0.4 * k, domeM, x, y + 1.9 * k, z, 10);
+}
+
+function buildExterior(s = state.exterior) {
+  clearWorld();
+  const T = TIME[s.time], est = EXT_STYLES[s.style] || EXT_STYLES.modern, r = rng(s.seed);
+  const L = extLayout(s), { W, D, x0, x1, z0, z1, PWm, PLm } = L;
+  const cxp = (x0 + x1) / 2, czp = (z0 + z1) / 2, span = Math.max(PWm, PLm);
+  scene.background = new THREE.Color(T.bg); scene.fog = new THREE.Fog(T.bg, span + 40, span * 2 + 150);
+  const ctx = { lights: 0 };
+  world.add(new THREE.HemisphereLight(T.hemi[0], T.hemi[1], T.hemi[2]));
+  const sun = new THREE.DirectionalLight(T.sun[0], T.sun[1]), sk = Math.max(1, span / 28);
+  sun.position.set(cxp + T.sun[2][0] * sk, T.sun[2][1] * sk, czp + T.sun[2][2] * sk); sun.target.position.set(cxp, 0, czp);
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03;
+  const sb = Math.max(22, span * 0.75 + 4);
+  Object.assign(sun.shadow.camera, { left: -sb, right: sb, top: sb, bottom: -sb, near: 1, far: 120 * sk });
+  sun.shadow.camera.updateProjectionMatrix();
+  world.add(sun, sun.target);
+
+  const FH = 3.2, n = s.floors;
+  const wallM = M(s.wall, { r: 0.9 }), trimM = M(s.trim, { r: 0.6 }), woodM = M('#7a5230', { r: 0.6 });
+  const glassM = new THREE.MeshStandardMaterial({ color: '#5f7f98', roughness: 0.06, metalness: 0.75 });
+  const glassLit = T.night ? glow('#ffcf88', 1.1) : glassM;
+  const roofSolid = M(s.roofColor, { r: 0.75 });
+
+  // ground, road, garden surface
+  const G0 = Math.max(140, span * 4);
+  const grass = new THREE.MeshStandardMaterial({ map: useTex(tex('grass'), G0 / 4, G0 / 4), roughness: 1 });
+  mesh(world, new THREE.PlaneGeometry(G0, G0), grass, cxp, 0, czp, false).rotation.x = -Math.PI / 2;
+  const road = new THREE.MeshStandardMaterial({ map: useTex(tex('asphalt'), G0 / 6, 2), roughness: 0.95 });
+  box(world, G0, 0.02, 7, road, cxp, 0, z1 + 4.5, false);
+  box(world, G0, 0.12, 1.4, M('#b5b0a6'), cxp, 0, z1 + 0.7, false);
+  for (let x = cxp - G0 / 2; x < cxp + G0 / 2; x += 4) box(world, 2, 0.025, 0.15, M('#f2f2f2'), x, 0, z1 + 4.5, false);
+  if (s.garden !== 'lawn') {
+    const gm = new THREE.MeshStandardMaterial({ map: useTex(tex(s.garden === 'paved' ? 'paving' : 'gravel'), PWm / 3, PLm / 3), roughness: 0.95 });
+    box(world, PWm, 0.02, PLm, gm, cxp, 0, czp, false);
+  }
+  const pave = new THREE.MeshStandardMaterial({ map: useTex(tex('paving'), 1, 4), roughness: 0.9 });
+  box(world, 1.6, 0.04, z1 - D / 2, pave, 0, 0, (D / 2 + z1) / 2, false);
+  const concM = new THREE.MeshStandardMaterial({ map: useTex(tex('concrete', '#a9a6a0'), 2, 4) });
+  const porchX = -W / 2 - 2.05;
+  const carX = -Math.min(W / 2 - 1.3, 3.2), carZ = D / 2 + L.front / 2 + 0.3;
+  if (L.porch === 'side') box(world, 3.6, 0.035, z1 - (-D / 2 + 1), concM, porchX, 0, (z1 - D / 2 + 1) / 2, false);
+  if (L.porch === 'front') box(world, 3.0, 0.035, z1 - (carZ - 2.5), concM, carX, 0, (z1 + carZ - 2.5) / 2, false);
+
+  // house floors
+  const H = G(); world.add(H);
+  const bounds = [];
+  for (let i = 0; i < n; i++) {
+    let bw = W, bx = 0, bz = 0;
+    if (est.cantilever && i > 0) { bw = W * 0.78; bx = W * 0.11; bz = Math.min(0.9, L.front - 1.2); }
+    bounds.push({ bw, bx, bz, y: i * FH });
+    box(H, bw, FH, D, wallM, bx, i * FH, bz);
+    box(H, bw + 0.3, 0.22, D + 0.3, trimM, bx, i * FH + FH - 0.11, bz);
+  }
+  box(H, W + 0.6, 0.35, D + 0.6, M('#9c968c'), 0, -0.2, 0);
+  if (est.cladding) {
+    const cl = new THREE.MeshStandardMaterial({ map: useTex(tex('slats', '#8b5a2b'), 3, 3), roughness: 0.7 });
+    const b = bounds[n - 1], cw = Math.min(2.4, b.bw * 0.25);
+    box(H, cw, FH * n - 0.3, 0.06, cl, b.bx + b.bw / 2 - cw / 2 - 0.3, 0.05, b.bz + D / 2 + 0.03);
+  }
+  // Tudor half-timbering on upper floors (or the gable floor on a single storey)
+  if (est.timber) {
+    const beamM = M(s.trim, { r: 0.8 });
+    bounds.forEach((b, i) => {
+      if (i === 0 && n > 1) return;
+      const zf = b.bz + D / 2 + 0.04, bays = Math.max(2, Math.round(b.bw / 1.4)), sp = b.bw / bays;
+      box(H, b.bw, 0.14, 0.06, beamM, b.bx, b.y + 0.25, zf); box(H, b.bw, 0.14, 0.06, beamM, b.bx, b.y + FH - 0.45, zf);
+      for (let j = 0; j <= bays; j++) box(H, 0.14, FH - 0.6, 0.06, beamM, b.bx - b.bw / 2 + sp * j, b.y + 0.3, zf);
+    });
+  }
+  const archGeo = (rad, depth) => { const g = new THREE.CylinderGeometry(rad, rad, depth, 24, 1, false, -Math.PI / 2, Math.PI); g.rotateX(-Math.PI / 2); return g; };
+  function win(x, y, z, rot, ww, wh, lit, front) {
+    const g = G(); g.position.set(x, y, z); g.rotation.y = rot;
+    box(g, ww + 0.16, wh + 0.16, 0.1, trimM, 0, -0.08, 0.02);
+    box(g, ww, wh, 0.1, lit ? glassLit : glassM, 0, 0, 0.04);
+    box(g, 0.05, wh, 0.12, trimM, 0, 0, 0.05);
+    box(g, ww + 0.3, 0.06, 0.25, trimM, 0, -0.12, 0.1);
+    if (est.arches && front) {
+      mesh(g, archGeo(ww / 2 + 0.08, 0.1), trimM, 0, wh, 0.02);
+      mesh(g, archGeo(ww / 2, 0.1), lit ? glassLit : glassM, 0, wh, 0.045);
+    }
+    if (est.shutters) for (const sx of [-1, 1]) box(g, ww * 0.5, wh + 0.1, 0.04, trimM, sx * (ww * 0.75 + 0.12), -0.05, 0.05);
+    H.add(g);
+  }
+  bounds.forEach((b, i) => {
+    const cnt = Math.max(2, Math.round(b.bw / 2.8)), sp = b.bw / cnt;
+    for (let j = 0; j < cnt; j++) {
+      const x = b.bx - b.bw / 2 + sp * (j + 0.5);
+      if (i === 0 && Math.abs(x) < sp / 2) continue;
+      const ww = est.bigGlass ? sp * 0.72 : Math.min(1.5, sp * 0.5), wh = est.bigGlass ? 2.1 : est.arches ? 1.3 : 1.5;
+      const wy = b.y + (est.bigGlass ? 0.55 : 0.95);
+      win(x, wy, b.bz + D / 2, 0, ww, wh, r() < 0.7, true);
+      if (est.jharokha && i > 0) {
+        box(H, ww + 0.5, 0.14, 0.6, trimM, x, wy - 0.2, b.bz + D / 2 + 0.3);
+        for (const sx of [-1, 1]) cyl(H, 0.04, 0.04, wh + 0.4, trimM, x + sx * (ww / 2 + 0.18), wy - 0.06, b.bz + D / 2 + 0.52, 8);
+        const jr = mesh(H, archGeo(ww / 2 + 0.3, 0.7), roofSolid, x, wy + wh + 0.4, b.bz + D / 2 + 0.3);
+        jr.rotation.x = 0; jr.scale.y = 0.6;
+      }
+    }
+    for (const sx of [-1, 1]) for (const zz of [-D / 4, D / 4]) win(b.bx + sx * b.bw / 2, b.y + 0.95, b.bz + zz, sx * Math.PI / 2, 1.2, 1.4, r() < 0.5, false);
+  });
+  // door + steps
+  box(H, 1.4, 2.5, 0.12, trimM, 0, 0.1, D / 2 + 0.02);
+  box(H, 1.2, 2.35, 0.12, woodM, 0, 0.12, D / 2 + 0.06);
+  if (est.arches) mesh(H, archGeo(0.7, 0.12), trimM, 0, 2.6, D / 2 + 0.02);
+  box(H, 0.04, 0.5, 0.06, M('#d4af37', { m: 0.9, r: 0.3 }), 0.4, 1.1, D / 2 + 0.14);
+  box(H, 2.2, 0.15, 1.2, M('#bdb7ad'), 0, 0, D / 2 + 0.6);
+  box(H, 2.2, 0.15, 0.6, M('#bdb7ad'), 0, -0.05, D / 2 + 1.4);
+  if (s.columns && L.front >= 3) {
+    const pw = Math.min(W * 0.6, W - 0.6);
+    box(H, pw, 0.22, 2.4, trimM, 0, FH - 0.22, D / 2 + 1.2);
+    for (const sx of [-1, 1]) { cyl(H, 0.14, 0.16, FH - 0.22, M('#ffffff', { r: 0.5 }), sx * (pw / 2 - 0.2), 0, D / 2 + 2.2); box(H, 0.42, 0.2, 0.42, M('#ffffff'), sx * (pw / 2 - 0.2), 0, D / 2 + 2.2); }
+  }
+  const railM = new THREE.MeshStandardMaterial({ color: '#bcd7e6', transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.3 });
+  if (s.balcony && n > 1) for (let i = 1; i < n; i++) {
+    const b = bounds[i], bw = b.bw * 0.5, cz = b.bz + D / 2 + 0.65;
+    box(H, bw, 0.16, 1.3, trimM, b.bx, b.y - 0.02, cz);
+    box(H, bw, 1.0, 0.04, railM, b.bx, b.y + 0.14, cz + 0.63, false);
+    for (const sx of [-1, 1]) box(H, 0.04, 1.0, 1.3, railM, b.bx + sx * bw / 2, b.y + 0.14, cz, false);
+    box(H, bw, 0.05, 0.06, M('#333', { m: 0.8, r: 0.3 }), b.bx, b.y + 1.14, cz + 0.63);
+    plantPot(H, b.bx + bw / 2 - 0.3, b.y + 0.14, cz + 0.4, 0.6);
+  }
+  // roof
+  const top = bounds[n - 1], ty = n * FH, rW = top.bw, rx = top.bx, rz = top.bz;
+  const roofM = new THREE.MeshStandardMaterial({ map: useTex(tex('roof', s.roofColor), (rW + 1) / 2, 3), roughness: 0.8 });
+  if (s.roof === 'flat') {
+    box(H, rW + 0.5, 0.28, D + 0.5, trimM, rx, ty, rz);
+    for (const sz of [-1, 1]) box(H, rW + 0.5, 0.7, 0.15, wallM, rx, ty + 0.28, rz + sz * (D / 2 + 0.17));
+    for (const sx of [-1, 1]) box(H, 0.15, 0.7, D + 0.5, wallM, rx + sx * (rW / 2 + 0.17), ty + 0.28, rz);
+    if (est.crenel) for (let x = -rW / 2; x <= rW / 2; x += 0.7) box(H, 0.35, 0.3, 0.17, wallM, rx + x, ty + 0.98, rz + D / 2 + 0.17);
+    box(H, 2.2, 2.4, 2.2, wallM, rx - rW / 4, ty + 0.28, rz - 1);
+    box(H, 2.4, 0.15, 2.4, trimM, rx - rW / 4, ty + 2.68, rz - 1);
+    const domeM = M(est.domes ? (s.style === 'mediterranean' ? s.trim : s.roofColor) : s.trim, { r: 0.5 });
+    if (est.domes === 'one') {
+      const d = mesh(H, new THREE.SphereGeometry(1.15, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), domeM, rx - rW / 4, ty + 2.83, rz - 1);
+      cyl(H, 0.03, 0.03, 0.6, M('#d4af37', { m: 0.8 }), rx - rW / 4, ty + 3.95, rz - 1, 8);
+    } else if (est.domes === 'corners') {
+      for (const sx of [-1, 1]) chhatri(H, rx + sx * (rW / 2 - 0.9), ty + 0.28, rz + D / 2 - 0.9, 1, wallM, domeM);
+    } else {
+      for (let k = 0; k < 3; k++) { const p = box(H, 1.0, 0.05, 1.6, M('#1b2a4a', { r: 0.2, m: 0.6 }), rx + rW / 6 + k * 1.1, ty + 0.6, rz + 1); p.rotation.x = -0.3; }
+    }
+  } else if (s.roof === 'gable') {
+    const pitch = est.pitch || 0.4, over = est.eaves ? 1.2 : 0.6, half = D / 2 + over, rh = (D / 2 + 0.6) * pitch * 1.6;
+    const shape = new THREE.Shape(); shape.moveTo(-D / 2, 0); shape.lineTo(D / 2, 0); shape.lineTo(0, rh * (D / 2) / half); shape.closePath();
+    const gm = mesh(H, new THREE.ExtrudeGeometry(shape, { depth: rW, bevelEnabled: false }), wallM, rx - rW / 2, ty, rz); gm.rotation.y = Math.PI / 2;
+    const Ls = Math.hypot(half, rh), a = Math.atan2(rh, half), len = rW + (est.eaves ? 1.8 : 0.9);
+    for (const sz of [-1, 1]) { const sl = box(H, len, 0.16, Ls + 0.1, roofM, rx, 0, rz + sz * half / 2); sl.position.y = ty + rh / 2 + 0.05; sl.rotation.x = sz * a; }
+    const ridge = cyl(H, 0.1, 0.1, len, M(shade(s.roofColor, -0.1)), rx, 0, rz); ridge.rotation.z = Math.PI / 2; ridge.position.set(rx, ty + rh + 0.08, rz);
+    box(H, rW + 0.4, 0.2, D + 0.4, trimM, rx, ty, rz);
+  } else {
+    const rh = 2.4 * (est.hipH || 1), geo = new THREE.ConeGeometry(1, rh, 4, 1); geo.rotateY(Math.PI / 4);
+    const hip = mesh(H, geo, new THREE.MeshStandardMaterial({ color: s.roofColor, roughness: 0.75, flatShading: true }), rx, ty + rh / 2 + 0.15, rz);
+    hip.scale.set((rW + 1.2) / 2 / 0.7071, 1, (D + 1.2) / 2 / 0.7071);
+    box(H, rW + 0.4, 0.2, D + 0.4, trimM, rx, ty, rz);
+  }
+  if (W / 2 - 1.6 > 0.6) for (const sx of [-1, 1]) rbox(H, W / 2 - 1.6, 0.6, 0.6, M('#3f6b35', { r: 1 }), sx * (W / 4 + 0.6), 0, D / 2 + 0.6, 0.25);
+
+  // parking
+  const carColor = pick(r, ['#b23a48', '#f1f1f1', '#1d3557', '#2b2d42', '#e9c46a']);
+  if (L.porch === 'side') {
+    const cz = D >= 6 ? -D / 2 + 3.5 : 0;
+    box(world, 3.6, 0.18, 5.4, trimM, porchX, 2.6, cz);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(world, 0.16, 2.6, 0.16, M('#555', { m: 0.7, r: 0.4 }), porchX + sx * 1.6, 0, cz + sz * 2.5);
+    car(world, porchX, cz, carColor);
+  } else if (L.porch === 'front') {
+    const pm = M('#4a3a2a', { r: 0.7 });
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(world, 0.14, 2.5, 0.14, pm, carX + sx * 1.35, 0, carZ + sz * 2.2);
+    for (let k = -2.3; k <= 2.3; k += 0.4) box(world, 3.0, 0.08, 0.12, pm, carX, 2.5, carZ + k);
+    car(world, carX, carZ, carColor);
+  }
+  if (L.pool) {
+    const p = L.pool;
+    box(world, p.sx + 0.6, 0.12, p.sz + 0.6, M('#f1efe9', { r: 0.5 }), p.cx, 0, p.cz);
+    const water = new THREE.MeshStandardMaterial({ color: '#3fb8d8', roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.85, emissive: '#0f6c8a', emissiveIntensity: T.night ? 0.8 : 0.15 });
+    box(world, p.sx, 0.06, p.sz, water, p.cx, 0.08, p.cz, false);
+  }
+  // boundary: compound wall with gate, or just a low kerb so the plot edge stays visible
+  const gateL = L.porch === 'side' ? porchX - 1.9 : L.porch === 'front' ? carX - 1.6 : -1.6, gateR = 1.6;
+  const h = s.fence ? 1.3 : 0.15, fm = M(s.trim === '#ffffff' ? '#e8e4dc' : s.wall, { r: 0.9 });
+  const seg = (x, z, w, d) => { if (w <= 0 || d <= 0) return; box(world, w, h, d, s.fence ? fm : M('#cfc9be'), x, 0, z); if (s.fence) box(world, w + 0.06, 0.08, d + 0.06, trimM, x, h, z); };
+  seg(cxp, z0, PWm, 0.2); seg(x0, czp, 0.2, PLm); seg(x1, czp, 0.2, PLm);
+  seg((x0 + gateL) / 2, z1, gateL - x0, 0.2); seg((gateR + x1) / 2, z1, x1 - gateR, 0.2);
+  if (s.fence) {
+    const gm = M('#2b2b2b', { m: 0.8, r: 0.35 });
+    for (let x = gateL; x < gateR; x += 0.18) box(world, 0.04, 1.4, 0.04, gm, x, 0, z1);
+    box(world, gateR - gateL, 0.06, 0.06, gm, (gateL + gateR) / 2, 1.3, z1);
+    box(world, gateR - gateL, 0.06, 0.06, gm, (gateL + gateR) / 2, 0.15, z1);
+  }
+  // trees inside the plot
+  const blocked = (x, z) =>
+    (Math.abs(x) < W / 2 + 1.6 && z > -D / 2 - 1.6 && z < D / 2 + 2.6) || (Math.abs(x) < 1.5 && z > 0) ||
+    (L.porch === 'side' && Math.abs(x - porchX) < 2.4 && z > -D / 2) || (L.porch === 'front' && Math.abs(x - carX) < 2.2 && z > D / 2) ||
+    (L.pool && Math.abs(x - L.pool.cx) < L.pool.sx / 2 + 1.5 && Math.abs(z - L.pool.cz) < L.pool.sz / 2 + 1.5);
+  const kinds = ['kerala', 'bali'].includes(s.style) ? ['palm', 'palm', 'round'] : ['farmhouse', 'swiss', 'nordic'].includes(s.style) ? ['pine', 'round'] : ['japanese', 'chinese'].includes(s.style) ? ['round', 'round', 'pine'] : ['round', 'pine', 'round', 'palm'];
+  let placed = 0, tries = 0;
+  while (placed < s.trees && tries++ < 600) {
+    const x = x0 + 1 + r() * (PWm - 2), z = z0 + 1 + r() * (PLm - 2);
+    if (blocked(x, z)) continue;
+    tree(world, x, z, pick(r, kinds), 0.7 + r() * 0.5, r); placed++;
+  }
+  for (let z = D / 2 + 2.5; z < z1 - 0.5; z += 3) for (const sx of [-1, 1]) {
+    cyl(world, 0.04, 0.05, 0.8, M('#2b2b2b', { m: 0.7 }), sx * 1.1, 0, z, 8);
+    sph(world, 0.1, T.night ? glow('#ffd28a', 2) : M('#f3f3f3', { r: 0.2 }), sx * 1.1, 0.88, z);
+    if (T.night && ctx.lights < 6) { const p = new THREE.PointLight('#ffc977', 3, 6, 2); p.position.set(sx * 1.1, 1, z); world.add(p); ctx.lights++; }
+  }
+  if (T.night) { const p = new THREE.PointLight('#ffcf88', 6, 8, 2); p.position.set(0, 2.6, D / 2 + 1.2); world.add(p); }
+  // plot dimension labels
+  const lk = Math.max(1, span / 22);
+  label3d(`${s.plotW} ft (${(PWm).toFixed(1)} m)`, cxp, 0.8 * lk, z1 + 1.2, lk);
+  label3d(`${s.plotL} ft (${(PLm).toFixed(1)} m)`, x0 - 1.4 * lk, 0.8 * lk, czp, lk);
+  renderer.toneMappingExposure = T.exp;
+  updateInfo();
+}
+function car(g, x, z, color) {
+  const c = G(); c.position.set(x, 0, z);
+  const body = M(color, { r: 0.25, m: 0.6 });
+  rbox(c, 1.8, 0.65, 4.3, body, 0, 0.3, 0, 0.12);
+  rbox(c, 1.6, 0.55, 2.2, M('#1e2a36', { r: 0.1, m: 0.6 }), 0, 0.9, -0.2, 0.12);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = cyl(c, 0.34, 0.34, 0.24, M('#151515', { r: 0.8 }), 0, 0, 0, 18); w.rotation.z = Math.PI / 2; w.position.set(sx * 0.82, 0.34, sz * 1.35); }
+  for (const sx of [-1, 1]) box(c, 0.3, 0.1, 0.02, glow('#fff6d8', 0.6), sx * 0.6, 0.62, 2.16, false);
+  g.add(c);
+}
+function plantPot(g, x, y, z, k = 1) {
+  cyl(g, 0.22 * k, 0.17 * k, 0.45 * k, M('#c06b3e'), x, y, z);
+  sph(g, 0.35 * k, M('#4f7942', { r: 0.9 }), x, y + 0.7 * k, z);
+}
+function tree(g, x, z, kind, k, r) {
+  const trunkM = M('#6b4a2f', { r: 0.9 });
+  if (kind === 'pine') {
+    cyl(g, 0.14 * k, 0.2 * k, 1.2 * k, trunkM, x, 0, z, 8);
+    for (let i = 0; i < 3; i++) mesh(g, new THREE.ConeGeometry((1.6 - i * 0.4) * k, 1.9 * k, 10), M(shade('#2f5d3a', (r() - 0.5) * 0.06), { r: 0.9 }), x, (1.9 + i * 1.0) * k, z);
+  } else if (kind === 'palm') {
+    const h = 4.5 * k; const t = cyl(g, 0.12, 0.2, h, trunkM, x, 0, z, 8); t.rotation.z = (r() - 0.5) * 0.15;
+    for (let i = 0; i < 7; i++) {
+      const a = i / 7 * Math.PI * 2, leaf = mesh(g, new THREE.ConeGeometry(0.28, 2.3 * k, 4), M('#4c8a3a', { r: 0.8 }), x + Math.cos(a) * 0.8 * k, h + 0.1, z + Math.sin(a) * 0.8 * k);
+      leaf.rotation.z = Math.PI / 2; leaf.rotation.y = -a; leaf.rotateZ(-0.5);
+    }
+  } else {
+    cyl(g, 0.15 * k, 0.22 * k, 1.8 * k, trunkM, x, 0, z, 8);
+    for (let i = 0; i < 5; i++) sph(g, (0.9 + r() * 0.5) * k, M(shade('#4f7d3a', (r() - 0.5) * 0.1), { r: 0.9 }), x + (r() - 0.5) * 1.2 * k, (2.4 + r() * 1.0) * k, z + (r() - 0.5) * 1.2 * k);
+  }
+}
+
+/* ---------------- Camera / views ---------------- */
+function extFrameInfo() {
+  const L = extLayout(state.exterior);
+  return { L, span: Math.max(L.PWm, L.PLm), cx: (L.x0 + L.x1) / 2, cz: (L.z0 + L.z1) / 2 };
+}
+function frame(cam, ctl) {
+  let pos, tgt;
+  if (state.mode === 'interior') {
+    const { W, D } = state.interior, dist = Math.max(W, D) * 1.25 + 2.2;
+    const a = 0.62, p = 0.95;
+    pos = new THREE.Vector3(dist * Math.sin(p) * Math.sin(a), dist * Math.cos(p) + 0.8, dist * Math.sin(p) * Math.cos(a)); tgt = new THREE.Vector3(0, 0.8, 0);
+  } else {
+    const { L, span, cx, cz } = extFrameInfo();
+    pos = new THREE.Vector3(cx - (span * 0.62 + 7), 7 + state.exterior.floors * 1.6 + span * 0.32, L.z1 + span * 0.45 + 8);
+    tgt = new THREE.Vector3(cx, 2.5, cz + 1);
+  }
+  cam.position.copy(pos); cam.lookAt(tgt); if (ctl) ctl.target.copy(tgt);
+}
+function setView(v) {
+  if (v === 'tour') { controls.autoRotate = !controls.autoRotate; controls.autoRotateSpeed = 1.2; syncViewbar(); return; }
+  view = v; controls.autoRotate = false;
+  const isInt = state.mode === 'interior', ef = isInt ? null : extFrameInfo();
+  controls.minDistance = 0.5; controls.maxDistance = isInt ? 60 : Math.max(90, ef.span * 3); controls.enablePan = true; controls.maxPolarAngle = Math.PI * 0.495; controls.minPolarAngle = 0;
+  if (v === 'orbit') frame(camera, controls);
+  else if (v === 'top') {
+    if (isInt) { const span = Math.max(state.interior.W, state.interior.D); camera.position.set(0, span * 1.7 + 2, 0.01); controls.target.set(0, 0, 0); }
+    else { camera.position.set(ef.cx, ef.span * 1.35 + 4, ef.cz + 0.01); controls.target.set(ef.cx, 0, ef.cz); }
+    controls.maxPolarAngle = 0.3;
+  } else if (v === 'walk') {
+    if (isInt) { const { D } = state.interior; camera.position.set(0, 1.6, D / 2 - 0.35); controls.target.set(0, 1.595, D / 2 - 0.4); }
+    else { const z = ef.L.z1 + 2; camera.position.set(0.6, 1.7, z); controls.target.set(0.6, 1.705, z - 0.05); }
+    controls.minDistance = controls.maxDistance = 0.05; controls.enablePan = false; controls.maxPolarAngle = Math.PI * 0.9; controls.minPolarAngle = Math.PI * 0.1;
+  }
+  if (walls.ceiling) walls.ceiling.visible = v === 'walk';
+  walls.forEach(w => (w.g.visible = true));
+  syncViewbar(); updateHint();
+}
+function syncViewbar() {
+  document.querySelectorAll('#viewbar button').forEach(b => b.classList.toggle('on', b.dataset.view === 'tour' ? controls.autoRotate : b.dataset.view === view));
+}
+function updateWalls(cam) {
+  const v = new THREE.Vector3();
+  for (const w of walls) { v.copy(cam.position).sub(w.g.position); w.g.visible = v.dot(w.n) > -0.05; }
+}
+function updateHint() {
+  const h = $('#hint');
+  if (view === 'walk') h.textContent = 'Walk: drag to look around · W A S D / arrow keys to move';
+  else if (state.mode === 'interior') h.textContent = 'Drag furniture to move · tap to select & recolour · drag empty space to rotate · scroll/pinch to zoom';
+  else h.textContent = 'Drag to rotate · right-drag / two fingers to pan · scroll/pinch to zoom';
+}
+document.querySelectorAll('#viewbar button').forEach(b => b.onclick = () => setView(b.dataset.view));
+
+const keys = {};
+addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; keys[e.key.toLowerCase()] = true; });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+function walkStep(dt) {
+  if (view !== 'walk') return;
+  const f = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0);
+  const sd = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
+  if (!f && !sd) return;
+  const dir = new THREE.Vector3().subVectors(controls.target, camera.position); dir.y = 0; dir.normalize();
+  const right = new THREE.Vector3(-dir.z, 0, dir.x);
+  const mv = dir.multiplyScalar(f).add(right.multiplyScalar(sd)).multiplyScalar(dt * 2.2);
+  const np = camera.position.clone().add(mv);
+  if (state.mode === 'interior') { const { W, D } = state.interior; np.x = THREE.MathUtils.clamp(np.x, -W / 2 + 0.3, W / 2 - 0.3); np.z = THREE.MathUtils.clamp(np.z, -D / 2 + 0.3, D / 2 - 0.3); }
+  mv.subVectors(np, camera.position); camera.position.add(mv); controls.target.add(mv);
+}
+
+/* ---------------- Selection & dragging ---------------- */
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+let drag = null, downAt = null;
+function setPtr(e) { const r = renderer.domElement.getBoundingClientRect(); ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ptr, camera); }
+function hitItem() {
+  const fg = world.userData.furn; if (!fg) return null;
+  const hits = ray.intersectObjects(fg.children, true);
+  for (const h of hits) { let o = h.object; while (o && !o.userData.isItem) o = o.parent; if (o && o.visible) return o; }
+  return null;
+}
+renderer.domElement.addEventListener('pointerdown', e => {
+  downAt = [e.clientX, e.clientY];
+  if (state.mode !== 'interior' || view === 'walk' || e.button !== 0) return;
+  setPtr(e); const o = hitItem(); if (!o) return;
+  controls.enabled = false;
+  const p = new THREE.Vector3(); ray.ray.intersectPlane(floorPlane, p);
+  drag = { o, off: o.position.clone().sub(p), id: e.pointerId };
+  select(o.userData.idx);
+}, true);
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  setPtr(e); const p = new THREE.Vector3(); if (!ray.ray.intersectPlane(floorPlane, p)) return;
+  const { W, D } = state.interior, it = state.interior.items[drag.o.userData.idx];
+  const x = THREE.MathUtils.clamp(p.x + drag.off.x, -W / 2 + 0.15, W / 2 - 0.15), z = THREE.MathUtils.clamp(p.z + drag.off.z, -D / 2 + 0.15, D / 2 - 0.15);
+  drag.o.position.x = it.x = Math.round(x * 20) / 20; drag.o.position.z = it.z = Math.round(z * 20) / 20;
+  if (selHelper) selHelper.update();
+});
+addEventListener('pointerup', e => {
+  if (drag) { drag = null; controls.enabled = true; return; }
+  if (downAt && state.mode === 'interior' && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 5 && e.target === renderer.domElement) { setPtr(e); if (!hitItem()) select(-1); }
+  downAt = null;
+});
+
+function select(i) {
+  selectedIdx = i;
+  if (selHelper) { world.remove(selHelper); selHelper.geometry.dispose(); selHelper = null; }
+  const box = $('#selBox');
+  if (i < 0 || !itemObjs[i]) { box.hidden = true; return; }
+  selHelper = new THREE.BoxHelper(itemObjs[i], 0xe07a4c); world.add(selHelper);
+  const it = state.interior.items[i], d = F[it.type];
+  box.hidden = false; box.innerHTML = '';
+  box.append(h('h5', {}, `${d.icon} ${d.name}`));
+  const sw = h('div', { class: 'sws' });
+  FURN_COLORS.forEach(c => sw.append(h('button', { class: 'sw' + (it.color === c ? ' on' : ''), style: `background:${c}`, title: c, onclick: () => { it.color = c; buildInterior(); } })));
+  sw.append(h('input', { type: 'color', value: it.color || '#888888', oninput: e => { it.color = e.target.value; buildInterior(); } }));
+  box.append(sw);
+  box.append(h('div', { class: 'btns' },
+    h('button', { title: 'Rotate left', onclick: () => { it.rot = (it.rot || 0) + Math.PI / 4; buildInterior(); } }, '⟲'),
+    h('button', { title: 'Rotate right', onclick: () => { it.rot = (it.rot || 0) - Math.PI / 4; buildInterior(); } }, '⟳'),
+    h('button', { title: 'Duplicate', onclick: () => { state.interior.items.push({ ...it, x: it.x + 0.4, z: it.z + 0.4 }); selectedIdx = state.interior.items.length - 1; buildInterior(); } }, '⧉'),
+    h('button', { title: 'Delete', onclick: () => { state.interior.items.splice(i, 1); selectedIdx = -1; buildInterior(); } }, '🗑'),
+  ));
+  if (it.color) box.append(h('button', { class: 'chip', style: 'margin-top:8px', onclick: () => { delete it.color; buildInterior(); } }, 'Reset to style colour'));
+}
+
+/* ---------------- UI ---------------- */
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v; else el.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null) el.append(k);
+  return el;
+}
+const sec = (title, ...kids) => h('div', { class: 'sec' }, h('h4', {}, title), ...kids);
+function chips(obj, key, opts, on) {
+  return h('div', { class: 'chips' }, opts.map(([v, l]) => h('button', { class: 'chip' + (obj[key] === v ? ' on' : ''), onclick: () => { obj[key] = v; on(v); } }, l)));
+}
+function swatches(obj, key, colors, on) {
+  const w = h('div', { class: 'sws' });
+  colors.forEach(c => w.append(h('button', { class: 'sw' + (obj[key] === c ? ' on' : ''), style: `background:${c}`, title: c, onclick: () => { obj[key] = c; on(); } })));
+  w.append(h('input', { type: 'color', value: obj[key], title: 'Custom colour', oninput: e => { obj[key] = e.target.value; on(true); } }));
+  return w;
+}
+function slider(label, obj, key, min, max, step, on, unit = '') {
+  const fmt = typeof unit === 'function' ? unit : v => v + unit;
+  const out = h('output', {}, fmt(obj[key]));
+  let raf = 0;
+  return h('label', { class: 'row' }, h('span', {}, label),
+    h('input', { type: 'range', min, max, step, value: obj[key], oninput: e => { obj[key] = +e.target.value; out.textContent = fmt(obj[key]); cancelAnimationFrame(raf); raf = requestAnimationFrame(on); } }), out);
+}
+function toggle(label, obj, key, on) {
+  return h('label', { class: 'tog' }, h('span', {}, label), h('input', Object.assign({ type: 'checkbox', onchange: e => { obj[key] = e.target.checked; on(); } }, obj[key] ? { checked: '' } : {})));
+}
+const mft = v => `${v.toFixed(1)} m · ${toFt(v)} ft`;
+function styleGroups(styles, obj, on) {
+  const wrap = h('div', { class: 'rgroups' });
+  for (const rg of REGIONS) {
+    const list = Object.entries(styles).filter(([, v]) => v.region === rg);
+    if (!list.length) continue;
+    wrap.append(h('div', { class: 'rg' }, rg), chips(obj, 'style', list.map(([k, v]) => [k, `${v.flag} ${v.name}`]), on));
+  }
+  return wrap;
+}
+const PLOTS = [[20, 40], [25, 40], [25, 50], [30, 40], [30, 50], [30, 60], [40, 60], [50, 80], [60, 90], [100, 100]];
+
+function rebuild() { state.mode === 'interior' ? buildInterior() : buildExterior(); }
+function renderPanel() {
+  const panel = $('#panel'), st = panel.scrollTop; panel.innerHTML = '';
+  const both = () => { rebuild(); renderPanel(); };
+  panel.append(photoSection());
+  if (state.mode === 'interior') {
+    const s = state.interior;
+    const typeOpts = Object.keys(ROOM_LABEL).map(k => h('option', { value: k }, `${ROOM_ICON[k]} ${ROOM_LABEL[k]}`));
+    panel.append(
+      sec('My home · rooms',
+        h('p', { class: 'note' }, 'Har room alag design karo. Room chuno, phir neeche uska style, size aur furniture badlo.'),
+        h('div', { class: 'chips' }, state.rooms.map((rm, i) => h('button', { class: 'chip' + (i === state.activeRoom ? ' on' : ''), onclick: () => setRoom(i) }, `${ROOM_ICON[rm.roomType]} ${rm.name}`))),
+        h('div', { class: 'roomrow' },
+          h('input', { id: 'roomName', type: 'text', value: s.name, 'aria-label': 'Room name', maxlength: '40', onchange: e => { s.name = e.target.value.trim() || s.name; renderPanel(); } }),
+          state.rooms.length > 1 ? h('button', { class: 'hbtn', onclick: deleteRoom }, '🗑 Delete') : null),
+        h('div', { class: 'roomrow' },
+          h('select', { id: 'newRoomType', 'aria-label': 'New room type' }, typeOpts),
+          h('button', { class: 'hbtn primary', onclick: () => addRoom($('#newRoomType').value) }, '+ Add room')),
+        h('button', { class: 'hbtn wide', onclick: copyStyleAll }, '🎨 Use this style in every room')),
+      sec('Room type', chips(s, 'roomType', Object.keys(ROOM_LABEL).map(k => [k, `${ROOM_ICON[k]} ${ROOM_LABEL[k].replace(' Room', '')}`]), v => {
+        if (Object.values(ROOM_LABEL).includes(s.name)) s.name = ROOM_LABEL[v];
+        s.items = generateLayout(s.roomType, s.W, s.D, s.seed); selectedIdx = -1; both(); frame(camera, controls);
+      })),
+      sec('Design style · around the world', styleGroups(STYLES, s, k => {
+        const v = STYLES[k]; Object.assign(s, { wall: v.wall, accent: v.accent, floor: v.floor, floorColor: v.floorColor }); both();
+      })),
+      sec('Room size',
+        slider('Width', s, 'W', 2.4, 9, 0.1, () => { clampItems(); buildInterior(); }, mft),
+        slider('Length', s, 'D', 2.4, 9, 0.1, () => { clampItems(); buildInterior(); }, mft),
+        slider('Height', s, 'H', 2.6, 3.8, 0.1, () => buildInterior(), mft),
+        h('div', { class: 'btnrow' }, h('button', { class: 'hbtn', onclick: () => { s.items = generateLayout(s.roomType, s.W, s.D, s.seed); selectedIdx = -1; buildInterior(); } }, '↺ Fit layout to size'))),
+      sec('Wall colour', swatches(s, 'wall', WALLS, c => c ? buildInterior() : both())),
+      sec('Feature wall', toggle('Accent / feature wall', s, 'accentWall', both), swatches(s, 'accent', ACCENTS, c => c ? buildInterior() : both())),
+      sec('Flooring', chips(s, 'floor', [['wood', 'Wood'], ['marble', 'Marble'], ['tile', 'Tiles'], ['carpet', 'Carpet'], ['concrete', 'Concrete']], k => { s.floorColor = FLOORS[k][0]; both(); }),
+        h('div', { style: 'height:8px' }), swatches(s, 'floorColor', FLOORS[s.floor], c => c ? buildInterior() : both())),
+      sec('Lighting mood', chips(s, 'lighting', [['day', '☀️ Daylight'], ['warm', '🕯️ Warm'], ['evening', '🌙 Evening'], ['cool', '❄️ Cool']], both)),
+      sec('Layout', h('div', { class: 'btnrow' },
+        h('button', { class: 'hbtn primary', onclick: () => { s.seed = Math.floor(Math.random() * 1e6); s.items = generateLayout(s.roomType, s.W, s.D, s.seed); selectedIdx = -1; buildInterior(); } }, '🔀 New layout'),
+        h('button', { class: 'hbtn', onclick: () => { s.items = []; selectedIdx = -1; buildInterior(); } }, 'Empty room'))),
+      sec('Add furniture', h('div', { class: 'grid' }, CATALOG[s.roomType].map(t => h('button', { onclick: () => addItem(t) }, h('span', {}, F[t].icon), F[t].name)))),
+    );
+  } else {
+    const s = state.exterior, ps = plotStats(s);
+    const num = (key, label) => h('input', { id: key, type: 'number', min: '10', max: '500', step: '1', value: s[key], 'aria-label': label,
+      onchange: e => { const v = Math.round(+e.target.value); if (v >= 10 && v <= 500) { s[key] = v; both(); setView(view === 'walk' ? 'orbit' : view); } else e.target.value = s[key]; } });
+    const notes = [];
+    if (s.porch && ps.L.porch === 'none') notes.push('Car porch is plot mein fit nahi hua (plot chhota hai).');
+    if (s.pool && !ps.L.pool) notes.push('Swimming pool ke liye jagah nahi bachi — plot bada karo.');
+    panel.append(
+      sec('Plot size · zameen',
+        h('div', { class: 'chips' }, PLOTS.map(([w, l]) => h('button', { class: 'chip' + (s.plotW === w && s.plotL === l ? ' on' : ''), onclick: () => { s.plotW = w; s.plotL = l; both(); setView('orbit'); } }, `${w}×${l} ft`))),
+        h('div', { class: 'plotin' }, num('plotW', 'Plot width in feet'), h('span', {}, '×'), num('plotL', 'Plot length in feet'), h('span', {}, 'feet')),
+        h('div', { class: 'stats' },
+          stat('Plot area', `${fmtN(ps.plotGaj, 1)} gaj`, `${fmtN(ps.plotSqft)} sq ft · ${fmtN(ps.plotSqm, 1)} m²`),
+          stat('Built-up / floor', `${fmtN(ps.floorSqft)} sq ft`, `${fmtN(ps.floorSqft / 9, 1)} gaj · house ${toFt(ps.L.W)}×${toFt(ps.L.D)} ft`),
+          stat('Total built-up', `${fmtN(ps.totalSqft)} sq ft`, `${s.floors} floor${s.floors > 1 ? 's' : ''}`),
+          stat('Open space (setback)', `${toFt(ps.L.front)} ft front`, `${toFt(ps.L.side)} ft sides · ${toFt(ps.L.rear)} ft back`)),
+        h('p', { class: 'note' }, '1 gaj = 1 sq yard = 9 sq ft. Setbacks are typical values; check your local building rules.'),
+        notes.length ? h('p', { class: 'warn' }, notes.join(' ')) : null),
+      sec('House style · around the world', styleGroups(EXT_STYLES, s, k => {
+        const v = EXT_STYLES[k]; Object.assign(s, { roof: v.roof, wall: v.wall, trim: v.trim, roofColor: v.roofColor, columns: !!v.columns }); both();
+      })),
+      sec('Floors', chips(s, 'floors', [[1, 'Ground (G)'], [2, 'G + 1'], [3, 'G + 2']], () => { both(); frame(camera, controls); })),
+      sec('Roof', chips(s, 'roof', [['flat', 'Flat terrace'], ['gable', 'Sloped (gable)'], ['hip', 'Hip roof']], both), h('div', { style: 'height:8px' }), swatches(s, 'roofColor', ROOFS, c => c ? buildExterior() : both())),
+      sec('Wall colour', swatches(s, 'wall', EXT_WALLS, c => c ? buildExterior() : both())),
+      sec('Trim & frames', swatches(s, 'trim', EXT_TRIMS, c => c ? buildExterior() : both())),
+      sec('Features',
+        toggle('Balcony (upper floors)', s, 'balcony', both), toggle('Car parking + car', s, 'porch', both), toggle('Swimming pool', s, 'pool', both),
+        toggle('Boundary wall + gate', s, 'fence', both), toggle('Verandah columns', s, 'columns', both)),
+      sec('Garden', chips(s, 'garden', [['lawn', '🌿 Lawn'], ['paved', '🧱 Paved'], ['zen', '🪨 Zen gravel']], both),
+        slider('Trees', s, 'trees', 0, 24, 1, () => buildExterior()),
+        h('div', { class: 'btnrow' }, h('button', { class: 'hbtn', onclick: () => { s.seed = Math.floor(Math.random() * 1e6); buildExterior(); } }, '🌳 Rearrange garden'))),
+      sec('Time of day', chips(s, 'time', [['day', '☀️ Day'], ['sunset', '🌇 Sunset'], ['night', '🌙 Night']], both)),
+    );
+  }
+  panel.append(savedSection());
+  panel.scrollTop = st;
+}
+const stat = (k, v, sub) => h('div', { class: 'stat' }, h('span', {}, k), h('b', {}, v), h('small', {}, sub));
+
+function updateInfo() {
+  const el = $('#info');
+  if (state.mode === 'interior') {
+    const s = state.interior, sqft = s.W * s.D * SQM_TO_SQFT;
+    el.textContent = `${ROOM_ICON[s.roomType]} ${s.name} · ${toFt(s.W)} × ${toFt(s.D)} ft · ${fmtN(sqft)} sq ft · ${STYLES[s.style].flag} ${STYLES[s.style].name}`;
+  } else {
+    const s = state.exterior, ps = plotStats(s);
+    el.textContent = `Plot ${s.plotW} × ${s.plotL} ft · ${fmtN(ps.plotGaj, 1)} gaj · built-up ${fmtN(ps.totalSqft)} sq ft · ${EXT_STYLES[s.style].flag} ${EXT_STYLES[s.style].name}`;
+  }
+}
+
+/* ---------------- Rooms ---------------- */
+function setRoom(i) {
+  state.activeRoom = i; state.interior = state.rooms[i]; selectedIdx = -1;
+  buildInterior(); renderPanel(); if (view !== 'walk') frame(camera, controls); else setView('walk');
+  $('#ideaGrid').innerHTML = '<div class="empty">Tap “Show new options” to see fresh ideas for ' + escapeText(state.interior.name) + '.</div>';
+}
+function addRoom(type) {
+  const count = state.rooms.filter(rm => rm.roomType === type).length;
+  const rm = newInterior(type, state.interior.style, count ? `${ROOM_LABEL[type]} ${count + 1}` : ROOM_LABEL[type]);
+  if (type !== 'bathroom') Object.assign(rm, { wall: state.interior.wall, accent: state.interior.accent, floor: state.interior.floor, floorColor: state.interior.floorColor });
+  state.rooms.push(rm); setRoom(state.rooms.length - 1);
+}
+function deleteRoom() {
+  if (state.rooms.length < 2) return;
+  state.rooms.splice(state.activeRoom, 1);
+  setRoom(Math.max(0, state.activeRoom - 1));
+}
+function copyStyleAll() {
+  const s = state.interior;
+  for (const rm of state.rooms) if (rm !== s) {
+    Object.assign(rm, { style: s.style, lighting: s.lighting, accent: s.accent, accentWall: rm.roomType === 'bathroom' ? rm.accentWall : s.accentWall });
+    if (rm.roomType !== 'bathroom') Object.assign(rm, { wall: s.wall, floor: s.floor, floorColor: s.floorColor });
+  }
+  $('#hint').textContent = `${STYLES[s.style].name} style ab har room mein lag gaya.`;
+}
+function escapeText(t) { return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+
+function clampItems() {
+  const { W, D, items } = state.interior;
+  items.forEach(it => { it.x = THREE.MathUtils.clamp(it.x, -W / 2 + 0.2, W / 2 - 0.2); it.z = THREE.MathUtils.clamp(it.z, -D / 2 + 0.2, D / 2 - 0.2); });
+}
+function addItem(t) {
+  const s = state.interior; s.items.push({ type: t, x: 0, z: 0, rot: 0, seed: Math.floor(Math.random() * 1e6) });
+  selectedIdx = s.items.length - 1; buildInterior();
+}
+
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  state.mode = b.dataset.mode; selectedIdx = -1;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  renderer.toneMappingExposure = 1;
+  rebuild(); renderPanel(); setView('orbit'); updateRefCard();
+  $('#ideaGrid').innerHTML = '<div class="empty">Tap “Show new options” to see fresh ideas for this ' + (state.mode === 'interior' ? 'room' : 'house') + '.</div>';
+});
+
+/* ---------------- Ideas (variations) ---------------- */
+function randomInterior(r) {
+  const cur = state.interior, styleKey = pick(r, Object.keys(STYLES)), st = STYLES[styleKey];
+  const floor = cur.roomType === 'bathroom' ? pick(r, ['tile', 'marble']) : r() < 0.6 ? st.floor : pick(r, Object.keys(FLOORS));
+  const s = {
+    ...cur, style: styleKey, wall: r() < 0.5 ? st.wall : pick(r, WALLS), accent: r() < 0.5 ? st.accent : pick(r, ACCENTS),
+    accentWall: r() < 0.75, floor, floorColor: floor === st.floor && r() < 0.6 ? st.floorColor : pick(r, FLOORS[floor]),
+    lighting: pick(r, ['day', 'warm', 'warm', 'evening', 'cool']), seed: Math.floor(r() * 1e6),
+  };
+  s.items = generateLayout(s.roomType, s.W, s.D, s.seed);
+  if (r() < 0.35) { const sofa = s.items.find(i => ['sofa', 'lsofa', 'bed', 'armchair'].includes(i.type)); if (sofa) sofa.color = pick(r, FURN_COLORS); }
+  return { s, label: `${st.flag} ${st.name}`, sub: `${floor[0].toUpperCase() + floor.slice(1)} floor · ${s.lighting} light` };
+}
+function randomExterior(r) {
+  const k = pick(r, Object.keys(EXT_STYLES)), v = EXT_STYLES[k];
+  const s = {
+    ...state.exterior, style: k, roof: r() < 0.75 ? v.roof : pick(r, ['flat', 'gable', 'hip']),
+    wall: r() < 0.6 ? v.wall : pick(r, EXT_WALLS), trim: r() < 0.6 ? v.trim : pick(r, EXT_TRIMS), roofColor: r() < 0.6 ? v.roofColor : pick(r, ROOFS),
+    floors: pick(r, [1, 2, 2, 3]), balcony: r() < 0.7, porch: r() < 0.7, pool: r() < 0.35, fence: r() < 0.8,
+    columns: !!v.columns && r() < 0.8, garden: pick(r, ['lawn', 'lawn', 'paved', 'zen']), trees: Math.floor(3 + r() * 10), time: pick(r, ['day', 'day', 'sunset', 'night']), seed: Math.floor(r() * 1e6),
+  };
+  const fl = ['Single storey', 'G+1', 'G+2'][s.floors - 1];
+  return { s, label: `${v.flag} ${v.name}`, sub: `${fl} · ${s.roof} roof${s.pool ? ' · pool' : ''}` };
+}
+function thumbOf(buildFn, s) {
+  if (state.mode === 'interior') { const old = state.interior; state.interior = s; buildFn(s); frame(thumbCam); state.interior = old; updateWalls(thumbCam); }
+  else { const old = state.exterior; state.exterior = s; buildFn(s); frame(thumbCam); state.exterior = old; }
+  thumbR.toneMappingExposure = renderer.toneMappingExposure;
+  thumbR.render(scene, thumbCam);
+  return thumbR.domElement.toDataURL('image/jpeg', 0.85);
+}
+function showIdeas() {
+  select(-1);
+  const grid = $('#ideaGrid'); grid.innerHTML = '<div class="empty">Designing new options…</div>';
+  setTimeout(() => {
+    const r = rng(Date.now() & 0xffffffff), ideas = [];
+    for (let i = 0; i < 8; i++) {
+      const idea = state.mode === 'interior' ? randomInterior(r) : randomExterior(r);
+      idea.img = thumbOf(state.mode === 'interior' ? buildInterior : buildExterior, idea.s);
+      ideas.push(idea);
+    }
+    rebuild();
+    grid.innerHTML = '';
+    ideas.forEach(idea => grid.append(h('button', { class: 'idea', onclick: () => applyIdea(idea) },
+      h('img', { src: idea.img, alt: idea.label }), h('div', {}, h('b', {}, idea.label), idea.sub))));
+  }, 30);
+}
+function applyIdea(idea) {
+  const copy = JSON.parse(JSON.stringify(idea.s));
+  if (state.mode === 'interior') replaceInterior(copy); else state.exterior = copy;
+  selectedIdx = -1; rebuild(); renderPanel();
+  if (view !== 'walk') frame(camera, controls);
+}
+$('#btnIdeas').onclick = showIdeas;
+
+/* ---------------- Save / photo ---------------- */
+const STORE = 'ghar-design-studio-v1';
+function loadSaved() { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch { return []; } }
+function writeSaved(list) { try { localStorage.setItem(STORE, JSON.stringify(list)); return true; } catch { return false; } }
+function smallShot() {
+  const c = document.createElement('canvas'); c.width = 160; c.height = 100;
+  c.getContext('2d').drawImage(renderer.domElement, 0, 0, 160, 100); return c.toDataURL('image/jpeg', 0.7);
+}
+$('#btnSave').onclick = () => {
+  const list = loadSaved(), ex = state.exterior;
+  const name = `${EXT_STYLES[ex.style].name} · ${ex.plotW}×${ex.plotL} ft · ${state.rooms.length} rooms`;
+  list.unshift({ id: Date.now(), v: 2, name, mode: state.mode, project: JSON.parse(JSON.stringify({ rooms: state.rooms, activeRoom: state.activeRoom, exterior: ex })), img: smallShot() });
+  if (!writeSaved(list.slice(0, 20))) { $('#hint').textContent = 'Could not save: this browser is blocking storage (private window?).'; return; }
+  $('#hint').textContent = `Saved “${name}” (poora ghar: saare rooms + exterior).`;
+  renderPanel();
+};
+function openSaved(d) {
+  if (d.v === 2) {
+    state.rooms = JSON.parse(JSON.stringify(d.project.rooms));
+    state.activeRoom = Math.min(d.project.activeRoom || 0, state.rooms.length - 1);
+    state.interior = state.rooms[state.activeRoom];
+    state.exterior = { ...EXT_DEFAULT, ...d.project.exterior };
+  } else if (d.mode === 'interior') {
+    replaceInterior({ ...JSON.parse(JSON.stringify(d.s)) });
+  } else {
+    const { width, ...rest } = d.s; state.exterior = { ...EXT_DEFAULT, ...rest };
+  }
+  state.mode = d.mode;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.mode === d.mode));
+  selectedIdx = -1; rebuild(); renderPanel(); setView('orbit');
+}
+function savedSection() {
+  const list = loadSaved();
+  return sec('My saved designs', list.length ? list.map(d => h('div', { class: 'saved' },
+    h('img', { src: d.img, alt: '' }), h('span', { class: 'nm' }, d.name),
+    h('button', { onclick: () => openSaved(d) }, 'Open'),
+    h('button', { onclick: () => { writeSaved(loadSaved().filter(x => x.id !== d.id)); renderPanel(); } }, '✕'))) : h('div', { class: 'empty' }, 'Nothing saved yet — press 💾 Save.'));
+}
+/* ---------------- Design from a photo ---------------- */
+// In the hosted Claude viewer the page can ask Claude to look at the photo; everywhere else
+// (or if the viewer says no) it falls back to reading the photo's colours in the browser.
+const samplePromise = (window.claude && typeof window.claude.use === 'function') ? window.claude.use('sample').catch(() => null) : Promise.resolve(null);
+const photo = { interior: { ref: null, msg: '' }, exterior: { ref: null, msg: '' }, busy: false };
+
+function photoSection() {
+  const p = photo[state.mode], isInt = state.mode === 'interior';
+  const status = h('p', { class: 'note', id: 'photoMsg', 'aria-live': 'polite' }, p.msg || '');
+  return sec(isInt ? '📷 Design from a photo' : '📷 House from a photo',
+    h('p', { class: 'note' }, isInt
+      ? 'Kisi bhi room ki photo daalo (Pinterest, magazine, ya apna ghar). Is room ka style, colours, floor aur furniture usi jaisa ban jayega.'
+      : 'Kisi bhi ghar ki photo daalo. Style, roof, colours, floors aur garden usi jaise ban jayenge.'),
+    h('div', { class: 'btnrow' },
+      h('label', { class: 'hbtn primary upl' + (photo.busy ? ' dis' : ''), for: 'photoIn' }, photo.busy ? '⏳ Working…' : '📷 Upload photo'),
+      p.ref ? h('button', { class: 'hbtn', onclick: () => { p.ref = null; p.msg = ''; updateRefCard(); renderPanel(); } }, 'Remove photo') : null),
+    h('input', { type: 'file', id: 'photoIn', accept: 'image/*', class: 'vh', onchange: e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f && !photo.busy) onPhoto(f); } }),
+    status,
+    p.ref ? h('img', { class: 'refimg', src: p.ref, alt: 'Your reference photo' }) : null);
+}
+function setPhotoMsg(t) { photo[state.mode].msg = t; const el = $('#photoMsg'); if (el) el.textContent = t; }
+function updateRefCard() {
+  const card = $('#refCard'), p = photo[state.mode];
+  if (!p.ref || card.dataset.closed === state.mode) { card.hidden = true; return; }
+  card.hidden = false; $('#refImg').src = p.ref;
+}
+$('#refClose').onclick = () => { $('#refCard').dataset.closed = state.mode; $('#refCard').hidden = true; };
+
+function loadImage(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); res(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('decode')); };
+    im.src = url;
+  });
+}
+function drawScaled(img, max) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const k = Math.min(1, max / Math.max(iw, ih));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(iw * k)); c.height = Math.max(1, Math.round(ih * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
+}
+const toBlob = (c, q) => new Promise(res => c.toBlob(res, 'image/jpeg', q));
+
+/* Colour reading: k-means over a 64px thumbnail, then each colour cluster is scored by
+   where it sits in the frame (walls high, floor low, sky at the very top, etc.). */
+function clusters(canvas, k = 6) {
+  const c = drawScaled(canvas, 64), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data, px = [];
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) { const i = (y * c.width + x) * 4; px.push([d[i] / 255, d[i + 1] / 255, d[i + 2] / 255, y / (c.height - 1)]); }
+  const lum = p => 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
+  const sorted = [...px].sort((a, b) => lum(a) - lum(b));
+  let cent = Array.from({ length: k }, (_, i) => sorted[Math.floor((i + 0.5) / k * sorted.length)].slice(0, 3));
+  const lab = new Array(px.length);
+  for (let it = 0; it < 10; it++) {
+    const sum = cent.map(() => [0, 0, 0, 0]);
+    px.forEach((p, i) => {
+      let best = 0, bd = 1e9;
+      cent.forEach((c2, j) => { const dd = (p[0] - c2[0]) ** 2 + (p[1] - c2[1]) ** 2 + (p[2] - c2[2]) ** 2; if (dd < bd) { bd = dd; best = j; } });
+      lab[i] = best; const s = sum[best]; s[0] += p[0]; s[1] += p[1]; s[2] += p[2]; s[3]++;
+    });
+    cent = cent.map((c2, j) => sum[j][3] ? [sum[j][0] / sum[j][3], sum[j][1] / sum[j][3], sum[j][2] / sum[j][3]] : c2);
+  }
+  const out = cent.map(rgb => { const col = new THREE.Color(rgb[0], rgb[1], rgb[2]), hsl = {}; col.getHSL(hsl); return { rgb, hex: '#' + col.getHexString(), h: hsl.h * 360, s: hsl.s, l: hsl.l, n: 0, top: 0, mid: 0, bot: 0, vtop: 0 }; });
+  px.forEach((p, i) => { const c2 = out[lab[i]]; c2.n++; if (p[3] < 0.45) c2.top++; else if (p[3] > 0.7) c2.bot++; else c2.mid++; if (p[3] < 0.2) c2.vtop++; });
+  return out.filter(c2 => c2.n > px.length * 0.01);
+}
+const cdist = (a, b) => { const x = new THREE.Color(a), y = new THREE.Color(b); return Math.hypot(x.r - y.r, x.g - y.g, x.b - y.b); };
+const argmax = (arr, f) => arr.reduce((best, c) => (best === null || f(c) > f(best) ? c : best), null);
+
+function localInterior(canvas) {
+  const cl = clusters(canvas);
+  const wall = argmax(cl, c => c.top * (c.l > 0.25 ? 1 : 0.3));
+  const rest = cl.filter(c => c !== wall);
+  const floorC = argmax(rest, c => c.bot) || wall;
+  const rest2 = rest.filter(c => c !== floorC);
+  const accentC = argmax(rest2, c => c.s * Math.pow(c.n, 0.3)) || floorC;
+  const fabricC = argmax(rest2.filter(c => c !== accentC), c => c.mid) || accentC;
+  const f = floorC;
+  const floor = f.l > 0.78 && f.s < 0.18 ? 'marble' : (f.h >= 12 && f.h <= 48 && f.s > 0.2 && f.l < 0.72) ? 'wood' : (f.s < 0.08 && f.l < 0.65) ? 'concrete' : 'tile';
+  let R = 0, B = 0, Lm = 0, N = 0; cl.forEach(c => { R += c.rgb[0] * c.n; B += c.rgb[2] * c.n; Lm += (0.3 * c.rgb[0] + 0.59 * c.rgb[1] + 0.11 * c.rgb[2]) * c.n; N += c.n; }); R /= N; B /= N; Lm /= N;
+  const lighting = Lm < 0.28 ? 'evening' : R - B > 0.08 ? 'warm' : Lm > 0.62 ? 'day' : B > R ? 'cool' : 'warm';
+  let style = 'modern', bd = 1e9;
+  for (const [k, st] of Object.entries(STYLES)) {
+    const d = cdist(wall.hex, st.wall) * 1.2 + cdist(f.hex, st.floorColor) + cdist(accentC.hex, st.accent) * 0.6 + cdist(fabricC.hex, st.fabric) * 0.7 + (st.floor === floor ? 0 : 0.25);
+    if (d < bd) { bd = d; style = k; }
+  }
+  return { style, wall: wall.hex, accent: accentC.hex, accentWall: accentC.s > 0.25 && accentC.top > accentC.n * 0.3, floor, floorColor: f.hex, fabric: fabricC.hex, lighting };
+}
+function localExterior(canvas) {
+  const cl = clusters(canvas, 7);
+  const sky = c => (c.h >= 180 && c.h <= 250 && c.s > 0.15 && c.l > 0.45 && c.top > c.n * 0.5) || (c.l > 0.88 && c.vtop > c.n * 0.5);
+  const green = c => c.h >= 65 && c.h <= 170 && c.s > 0.15 && c.l < 0.75;
+  const cand = cl.filter(c => !sky(c) && !green(c));
+  const pool = cand.length ? cand : cl;
+  const wall = argmax(pool, c => (c.mid + 0.6 * c.top) * (c.l > 0.35 ? 1 : 0.35));
+  const roof = argmax(pool.filter(c => c !== wall), c => c.top * (1 + c.s)) || { hex: shade(wall.hex, -0.35) };
+  const trim = argmax(pool.filter(c => c !== wall && c !== roof && c.n > 0), c => 1 - c.l) || { hex: shade(wall.hex, -0.45) };
+  let style = 'modern', bd = 1e9;
+  for (const [k, st] of Object.entries(EXT_STYLES)) {
+    const d = cdist(wall.hex, st.wall) * 1.3 + cdist(roof.hex, st.roofColor) + cdist(trim.hex, st.trim) * 0.6;
+    if (d < bd) { bd = d; style = k; }
+  }
+  return { style, wall: wall.hex, trim: trim.hex, roofColor: roof.hex, roof: EXT_STYLES[style].roof };
+}
+
+const isHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+const oneOf = (v, list, fb) => (list.includes(v) ? v : fb);
+
+async function askClaude(blob, isInt) {
+  const sample = await samplePromise;
+  if (!sample) return { why: 'none' };
+  const lim = await sample.limits().catch(() => null);
+  if (!lim || !lim.images) return { why: 'none' };
+  const prompt = isInt
+    ? `The image is a photo of a room. Map what you see to the settings of a 3D room designer so the 3D room looks as close to the photo as possible.
+Reply with only a JSON object with exactly these keys:
+"roomType": one of ${Object.keys(ROOM_LABEL).join(', ')}
+"style": the closest of these style ids: ${Object.entries(STYLES).map(([k, v]) => `${k} (${v.name})`).join(', ')}
+"wall": hex colour of the main walls, like "#e9e6e1"
+"accentWall": true if one wall clearly has a different colour or material, else false
+"accent": hex colour of that feature wall, or of the strongest accent colour
+"floor": one of wood, marble, tile, carpet, concrete
+"floorColor": hex colour of the floor
+"fabric": hex colour of the main sofa, bed or upholstery
+"lighting": one of day, warm, evening, cool
+"furniture": array of the items visible, using only these ids: ${Object.keys(F).join(', ')}
+"summary": one short sentence in simple Hinglish (Hindi written in Latin letters, mixed with English) describing the look.
+If the photo is not a room, pick the closest values anyway and say so in the summary.`
+    : `The image is a photo of a house or building from outside. Map what you see to the settings of a 3D house designer so the 3D house looks as close to the photo as possible.
+Reply with only a JSON object with exactly these keys:
+"style": the closest of these style ids: ${Object.entries(EXT_STYLES).map(([k, v]) => `${k} (${v.name})`).join(', ')}
+"floors": number of storeys, 1, 2 or 3
+"roof": one of flat, gable, hip
+"wall": hex colour of the main outside walls
+"trim": hex colour of window frames, railings or trim
+"roofColor": hex colour of the roof (or parapet for a flat roof)
+"balcony": true or false
+"porch": true if there is a car porch, garage or parked car area
+"pool": true or false
+"fence": true if there is a boundary wall or fence
+"columns": true if there are verandah or porch columns
+"garden": one of lawn, paved, zen
+"time": one of day, sunset, night
+"summary": one short sentence in simple Hinglish (Hindi written in Latin letters, mixed with English) describing the house.
+If the photo is not a house, pick the closest values anyway and say so in the summary.`;
+  try {
+    const res = await sample.json(prompt, { images: blob });
+    return res && typeof res === 'object' ? { res } : { why: 'bad' };
+  } catch (e) {
+    return { why: e && e.code || 'error' };
+  }
+}
+
+async function onPhoto(file) {
+  const mode = state.mode, isInt = mode === 'interior', p = photo[mode];
+  photo.busy = true; renderPanel(); setPhotoMsg('Photo khol raha hoon…');
+  try {
+    const img = await loadImage(file);
+    const big = drawScaled(img, 1400);
+    p.ref = big.toDataURL('image/jpeg', 0.8); $('#refCard').dataset.closed = ''; updateRefCard();
+    const local = isInt ? localInterior(big) : localExterior(big);
+    setPhotoMsg('Claude photo dekh raha hai… (30–60 second lag sakte hain)');
+    const blob = await toBlob(big, 0.88);
+    const ai = blob ? await askClaude(blob, isInt) : { why: 'none' };
+    if (state.mode !== mode) return;
+    const res = ai.res || {};
+    const via = ai.res ? 'claude' : 'colours';
+    if (isInt) applyInteriorPhoto(res, local); else applyExteriorPhoto(res, local);
+    const why = { not_granted: ' (Claude ki permission nahi mili, isliye sirf colours se match kiya.)', rate_limited: ' (Claude abhi busy hai, isliye colours se match kiya. Thodi der baad dobara try karo.)', none: '', bad: ' (Claude ka jawab samajh nahi aaya, colours se match kiya.)' }[ai.why] ?? (ai.why ? ' (Claude se jawab nahi mila, colours se match kiya.)' : '');
+    const s = isInt ? state.interior : state.exterior, st = isInt ? STYLES[s.style] : EXT_STYLES[s.style];
+    const summary = typeof res.summary === 'string' ? ' ' + res.summary.slice(0, 220) : '';
+    p.msg = (via === 'claude' ? '✅ Claude ne photo dekh ke design banaya: ' : '✅ Photo ke colours se design banaya: ') + `${st.flag} ${st.name}.` + summary + why +
+      (ai.why === 'none' ? ' (Ye sirf colours ka match hai. Furniture aur shape bhi photo jaisa chahiye to hosted app mein photo upload karo, wahan Claude photo dekhta hai.)' : '');
+  } catch (e) {
+    console.error('photo', e);
+    p.msg = 'Ye photo khul nahi payi. JPG ya PNG photo try karo.';
+  } finally {
+    photo.busy = false; if (state.mode === mode) { renderPanel(); if (view !== 'walk') frame(camera, controls); }
+  }
+}
+function applyInteriorPhoto(res, local) {
+  const cur = state.interior;
+  const roomType = oneOf(res.roomType, Object.keys(ROOM_LABEL), cur.roomType);
+  const style = oneOf(res.style, Object.keys(STYLES), local.style);
+  const floor = oneOf(res.floor, Object.keys(FLOORS), local.floor);
+  const s = {
+    ...cur, roomType, style,
+    wall: isHex(res.wall) ? res.wall : local.wall,
+    accent: isHex(res.accent) ? res.accent : local.accent,
+    accentWall: typeof res.accentWall === 'boolean' ? res.accentWall : local.accentWall,
+    floor, floorColor: isHex(res.floorColor) ? res.floorColor : (floor === local.floor ? local.floorColor : FLOORS[floor][0]),
+    lighting: oneOf(res.lighting, Object.keys(LIGHT), local.lighting), seed: Math.floor(Math.random() * 1e6),
+  };
+  if (roomType !== cur.roomType && Object.values(ROOM_LABEL).includes(cur.name)) { const [W, D] = ROOM_DEFAULTS[roomType]; s.W = Math.max(s.W, W * 0.8); s.D = Math.max(s.D, D * 0.8); }
+  let items = generateLayout(roomType, s.W, s.D, s.seed);
+  const seen = Array.isArray(res.furniture) ? [...new Set(res.furniture.filter(t => typeof t === 'string' && F[t]))] : [];
+  if (seen.length >= 2) {
+    const keep = items.filter(it => seen.includes(it.type) || it.type === 'wallArt');
+    const missing = seen.filter(t => !keep.some(it => it.type === t));
+    let k = 0;
+    for (const t of missing.slice(0, 6)) { keep.push({ type: t, x: THREE.MathUtils.clamp(-0.8 + (k % 3) * 0.8, -s.W / 2 + 0.5, s.W / 2 - 0.5), z: THREE.MathUtils.clamp(-0.3 + Math.floor(k / 3) * 0.9, -s.D / 2 + 0.5, s.D / 2 - 0.5), rot: 0, seed: Math.floor(Math.random() * 1e6) }); k++; }
+    if (keep.length >= 2) items = keep;
+  }
+  const fabric = isHex(res.fabric) ? res.fabric : local.fabric;
+  items.forEach(it => { if (['sofa', 'lsofa', 'armchair', 'bed'].includes(it.type)) it.color = fabric; });
+  s.items = items;
+  selectedIdx = -1; replaceInterior(s); buildInterior();
+}
+function applyExteriorPhoto(res, local) {
+  const cur = state.exterior;
+  const style = oneOf(res.style, Object.keys(EXT_STYLES), local.style), v = EXT_STYLES[style];
+  const b = (key, fb) => (typeof res[key] === 'boolean' ? res[key] : fb);
+  state.exterior = {
+    ...cur, style,
+    floors: oneOf(Number(res.floors), [1, 2, 3], cur.floors),
+    roof: oneOf(res.roof, ['flat', 'gable', 'hip'], local.roof || v.roof),
+    wall: isHex(res.wall) ? res.wall : local.wall, trim: isHex(res.trim) ? res.trim : local.trim, roofColor: isHex(res.roofColor) ? res.roofColor : local.roofColor,
+    balcony: b('balcony', cur.balcony), porch: b('porch', cur.porch), pool: b('pool', cur.pool), fence: b('fence', cur.fence), columns: b('columns', !!v.columns),
+    garden: oneOf(res.garden, ['lawn', 'paved', 'zen'], cur.garden), time: oneOf(res.time, ['day', 'sunset', 'night'], 'day'),
+  };
+  buildExterior();
+}
+$('#btnShot').onclick = () => {
+  if (selHelper) selHelper.visible = false;
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/png');
+  if (selHelper) selHelper.visible = true;
+  const sh = $('#shot'); sh.innerHTML = '';
+  sh.append(h('div', { class: 'card' }, h('img', { src: url, alt: 'Design photo' }),
+    h('div', { class: 'row2' }, h('span', {}, 'Right-click or long-press the image to save or share it.'),
+      h('a', { class: 'hbtn primary', href: url, download: `ghar-design-${state.mode}.png`, style: 'text-decoration:none' }, 'Download'),
+      h('button', { class: 'hbtn', onclick: () => (sh.hidden = true) }, 'Close'))));
+  sh.hidden = false;
+};
+
+/* ---------------- Loop ---------------- */
+const clock = new THREE.Clock();
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  walkStep(dt);
+  controls.update();
+  if (state.mode === 'interior' && view !== 'walk') updateWalls(camera);
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+resize(); buildInterior(); renderPanel(); setView('orbit'); loop();
+</script>
+</body>
+</html>
