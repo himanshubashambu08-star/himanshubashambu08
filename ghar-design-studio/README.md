@@ -7,7 +7,7 @@ No install and no account needed. Open `index.html` in a browser, or host the fo
 ## Design from a photo
 Upload a photo of any room or house (Pinterest, a magazine, your own home) and the 3D design changes to match it. Your photo stays on screen beside the 3D view so you can compare.
 - **In the hosted app (claude.ai):** Claude looks at the photo. It picks the room type, style, wall, floor and fabric colours, lighting and the furniture it can see. For a house it picks the style, roof, floors, colours, balcony, parking, pool and garden. The first time, the viewer is asked to allow this, and it uses their own Claude usage.
-- **Opened as a plain file:** the app reads the photo's colours (walls, floor, accents, roof) and matches the closest style. Furniture and shape are not read in this mode.
+- **Opened as a plain file:** the app cuts away phone-screenshot bars, then reads the photo's colours (walls, floor, accents, roof) and matches the closest style. Furniture and shape are not read in this mode.
 
 ## Interior designer
 - **Every room designed separately:** the home starts with a Living Room, Master Bedroom, Kitchen and Pooja Room. Add more rooms (Bedroom 2, Bathroom...), rename or delete them, and give each its own style, size, colours and furniture. "Use this style in every room" copies one look to the whole home.
@@ -21,14 +21,15 @@ Upload a photo of any room or house (Pinterest, a magazine, your own home) and t
 - **🔀 New layout:** gives you a different furniture arrangement each time you tap it.
 
 ## Exterior designer
+- **Facade details:** straight or **curved sculptural** facade (flowing slabs, a sweeping side wing), normal, large or floor-to-ceiling glass, wooden fins/louvers, jaali screen, hanging planters, cove/facade lighting, stone cladding and wood colour.
 - **Plot size:** choose a common plot (20×40, 25×50, 30×40, 30×50, 30×60, 40×60, 50×80, 60×90, 100×100 ft) or type any size in feet. The app shows the plot area in **gaj** (1 gaj = 9 sq ft), sq ft and m², plus the built-up area per floor, the total, and the open space left at the front, sides and back. The house, parking, pool and garden are fitted inside the plot, and the plot's sides are labelled in the 3D view.
-- **18 house styles from around the world:** Global (Modern Box, Contemporary), India (Kerala Sloped, Indian Villa, Rajasthani Haveli with chhatris and jharokhas), Asia (Japanese, Chinese Courtyard, Bali Villa), Europe (English Tudor, Greek Santorini with a blue dome, Spanish Villa, Swiss Chalet, Nordic Red House), Middle East & Africa (Arabian, Dubai Modern), Americas (Colonial, American Suburban, Farmhouse).
+- **20 house styles from around the world:** Global (Sculptural Modern, Modern Box, Contemporary), India (Indian Contemporary with jaali, Kerala Sloped, Indian Villa, Rajasthani Haveli with chhatris and jharokhas), Asia (Japanese, Chinese Courtyard, Bali Villa), Europe (English Tudor, Greek Santorini with a blue dome, Spanish Villa, Swiss Chalet, Nordic Red House), Middle East & Africa (Arabian, Dubai Modern), Americas (Colonial, American Suburban, Farmhouse).
 - **Floors:** G, G+1 or G+2.
 - **Roof:** flat terrace (with water tank and solar panels), sloped gable or hip, in any colour.
 - **Colours:** walls, plus trim and window frames.
 - **Features:** balcony with glass railing, car parking (a side porch on wide plots, a front pergola on narrow ones), swimming pool, boundary wall with gate, verandah columns. If something does not fit on the plot, the app says so.
 - **Garden:** lawn, paved or zen gravel, a tree count, and a "rearrange" button.
-- **Time of day:** day, sunset or night. At night the windows and garden lamps light up.
+- **Time of day:** day, sunset, dusk (blue sky with the lights on) or night. At night the windows and garden lamps light up.
 
 ## For both
 - **✨ Show new options:** renders 8 fresh design variations as preview cards. Tap a card to apply it, then keep editing.
