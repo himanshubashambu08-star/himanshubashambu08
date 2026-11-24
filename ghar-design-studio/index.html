@@ -95,7 +95,8 @@ input[type=color]{width:30px;height:30px;border:0;padding:0;background:none;curs
 #shot .row2 span{color:var(--muted);font-size:12px;flex:1;min-width:160px}
 #info{position:absolute;top:60px;left:12px;font-size:12px;background:var(--panel);color:var(--ink);padding:6px 10px;border-radius:10px;box-shadow:var(--shadow);max-width:calc(100% - 260px);z-index:2}
 #refCard{position:absolute;right:12px;bottom:44px;width:180px;background:var(--panel);border-radius:12px;box-shadow:var(--shadow);padding:6px;z-index:2}
-#refCard img{display:block;width:100%;border-radius:8px}
+#refCard img{display:block;width:100%;max-height:150px;object-fit:cover;border-radius:8px}
+#viewer,#info,#hint,#refCard,.viewbar,#selBox{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 #refCard span{font-size:11px;color:var(--muted);display:block;padding:4px 2px 0}
 #refCard button{position:absolute;top:10px;right:10px;border:0;background:var(--panel);border-radius:50%;width:24px;height:24px;font-size:12px}
 .note{color:var(--muted);font-size:12px;margin:0 0 8px;line-height:1.45}
@@ -127,7 +128,8 @@ input[type=color]{width:30px;height:30px;border:0;padding:0;background:none;curs
   #viewer{height:58vh;flex:none}
   #selBox{top:auto;bottom:44px;right:8px;width:200px}
   #info{top:52px;left:8px;max-width:calc(100% - 16px);font-size:11px}
-  #refCard{width:110px;bottom:auto;top:92px;right:8px}
+  #refCard{width:96px;bottom:auto;top:92px;right:8px}
+  #refCard img{max-height:96px}
   .ideas-head span{display:none}
   .viewbar{top:8px}
   .viewbar button{padding:6px 8px;font-size:12px}
@@ -330,6 +332,25 @@ const DRAW = {
       ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(x, r * rh + rh - 4, 31, 4);
     }
   },
+  stone: c => (ctx, n) => {
+    ctx.fillStyle = shade(c, -0.25); ctx.fillRect(0, 0, n, n);
+    for (let y = 0; y < n; y += 40 + Math.random() * 20) for (let x = -20; x < n; x += 50 + Math.random() * 40) {
+      ctx.fillStyle = shade(c, (Math.random() - 0.5) * 0.16); ctx.beginPath();
+      const w = 45 + Math.random() * 40, hh = 34 + Math.random() * 18;
+      ctx.moveTo(x + 4, y + 3); ctx.lineTo(x + w - 3, y + 5 + Math.random() * 4); ctx.lineTo(x + w, y + hh - 4); ctx.lineTo(x + 6, y + hh - 2 - Math.random() * 4); ctx.closePath(); ctx.fill();
+    }
+    noise(ctx, n, 6000, 0.12);
+  },
+  jaali: c => (ctx, n) => {
+    ctx.fillStyle = c; ctx.fillRect(0, 0, n, n); ctx.globalCompositeOperation = 'destination-out';
+    const st = n / 8;
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+      const cx = i * st + st / 2, cy = j * st + st / 2; ctx.beginPath();
+      ctx.moveTo(cx, cy - st * 0.4); ctx.quadraticCurveTo(cx + st * 0.05, cy - st * 0.05, cx + st * 0.4, cy); ctx.quadraticCurveTo(cx + st * 0.05, cy + st * 0.05, cx, cy + st * 0.4);
+      ctx.quadraticCurveTo(cx - st * 0.05, cy + st * 0.05, cx - st * 0.4, cy); ctx.quadraticCurveTo(cx - st * 0.05, cy - st * 0.05, cx, cy - st * 0.4); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  },
   slats: c => (ctx, n) => {
     for (let x = 0; x < n; x += 32) { ctx.fillStyle = shade(c, (Math.random() - 0.5) * 0.08); ctx.fillRect(x, 0, 28, n); ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(x + 28, 0, 4, n); }
   },
@@ -382,10 +403,12 @@ const FLOORS = { wood: ['#a47551', '#d9c3a0', '#6f4e37', '#b88b5a', '#c8b08a'], 
 const FURN_COLORS = ['#5c6b73', '#d6d3cd', '#ae2012', '#14213d', '#d4a373', '#a3b18a', '#457b9d', '#e9c46a', '#3b2f2f', '#f1faee', '#6d597a', '#2a9d8f'];
 
 const EXT_STYLES = {
+  sculptural:   { name: 'Sculptural Modern', flag: '🌐', region: 'Global', roof: 'flat', facade: 'curved', wall: '#ebe4d8', trim: '#d9cfbf', roofColor: '#d9cfbf', glass: 'full', fins: true, planters: true, cove: true, stone: true, wood: '#7a4e2d' },
   modern:       { name: 'Modern Box',       flag: '🌐', region: 'Global',   roof: 'flat',  wall: '#f5f5f2', trim: '#2b2b2b', roofColor: '#4a4a4a', cladding: true, bigGlass: true },
   contemporary: { name: 'Contemporary',     flag: '🌐', region: 'Global',   roof: 'flat',  wall: '#e8e4dc', trim: '#3d405b', roofColor: '#3d405b', cladding: true, cantilever: true, bigGlass: true },
   kerala:       { name: 'Kerala Sloped',    flag: '🇮🇳', region: 'India',    roof: 'gable', wall: '#f2e8cf', trim: '#6b3e26', roofColor: '#9c3a1c', columns: true, pitch: 0.5 },
   villa:        { name: 'Indian Villa',     flag: '🇮🇳', region: 'India',    roof: 'hip',   wall: '#f6e7d8', trim: '#ffffff', roofColor: '#6b3e26', columns: true },
+  jaaliHouse:   { name: 'Indian Contemporary (Jaali)', flag: '🇮🇳', region: 'India', roof: 'flat', wall: '#f1ece4', trim: '#3a3a3a', roofColor: '#3a3a3a', glass: 'large', jaali: true, fins: true, cove: true, planters: true, wood: '#8a5a32' },
   haveli:       { name: 'Rajasthani Haveli', flag: '🇮🇳', region: 'India',   roof: 'flat',  wall: '#d9a066', trim: '#8b4a2b', roofColor: '#8b4a2b', arches: true, domes: 'corners', crenel: true, jharokha: true },
   japanese:     { name: 'Japanese',         flag: '🇯🇵', region: 'Asia',     roof: 'gable', wall: '#f4f1ea', trim: '#3a2e25', roofColor: '#2f3337', cladding: true, eaves: true, pitch: 0.3 },
   chinese:      { name: 'Chinese Courtyard', flag: '🇨🇳', region: 'Asia',    roof: 'hip',   wall: '#f1e6d2', trim: '#8b1e1e', roofColor: '#2f3e3a', columns: true, hipH: 1.6 },
@@ -396,13 +419,14 @@ const EXT_STYLES = {
   swiss:        { name: 'Swiss Chalet',     flag: '🇨🇭', region: 'Europe',   roof: 'gable', wall: '#e8dcc6', trim: '#5a3b22', roofColor: '#4a4a4a', cladding: true, eaves: true, pitch: 0.45 },
   nordic:       { name: 'Nordic Red House', flag: '🇳🇴', region: 'Europe',   roof: 'gable', wall: '#8b2e23', trim: '#ffffff', roofColor: '#2b2b2b', pitch: 0.6 },
   arabic:       { name: 'Arabian',          flag: '🇦🇪', region: 'Middle East & Africa', roof: 'flat', wall: '#e6cfa7', trim: '#8b6b47', roofColor: '#8b6b47', arches: true, crenel: true },
-  dubai:        { name: 'Dubai Modern',     flag: '🇦🇪', region: 'Middle East & Africa', roof: 'flat', wall: '#f3f1ec', trim: '#1f1f1f', roofColor: '#1f1f1f', bigGlass: true, cantilever: true, cladding: true },
+  dubai:        { name: 'Dubai Modern',     flag: '🇦🇪', region: 'Middle East & Africa', roof: 'flat', wall: '#f3f1ec', trim: '#1f1f1f', roofColor: '#1f1f1f', glass: 'full', cove: true, cantilever: true, cladding: true },
   colonial:     { name: 'Colonial',         flag: '🇺🇸', region: 'Americas', roof: 'gable', wall: '#ffffff', trim: '#2f3e46', roofColor: '#2f3e46', columns: true, shutters: true, pitch: 0.38 },
   suburban:     { name: 'American Suburban', flag: '🇺🇸', region: 'Americas', roof: 'gable', wall: '#c9d6df', trim: '#ffffff', roofColor: '#4a4a4a', shutters: true, pitch: 0.42 },
   farmhouse:    { name: 'Farmhouse',        flag: '🇺🇸', region: 'Americas', roof: 'gable', wall: '#e7d3c1', trim: '#5c4033', roofColor: '#4a4a4a', cladding: true, pitch: 0.42 },
 };
 const EXT_WALLS = ['#ffffff', '#f5f0e6', '#e8dcc8', '#d9d4cc', '#c9b79c', '#f2e8cf', '#b8c4bb', '#e7d3c1', '#dcdcdc', '#f6e7d8', '#cfd8dc', '#efd9c3'];
 const EXT_TRIMS = ['#2b2b2b', '#ffffff', '#8b5e3c', '#5c4033', '#2f3e46', '#b08968', '#3d405b', '#6b705c'];
+const WOODS = ['#7a4e2d', '#a0703f', '#c8a06a', '#4a2f1c', '#2b2b2b', '#d9c2a0'];
 const ROOFS = ['#9c3a1c', '#4a4a4a', '#2f3e46', '#6b3e26', '#3d405b', '#7f5539', '#264653'];
 
 const ROOM_TYPES = [['living', '🛋️ Living'], ['bedroom', '🛏️ Bedroom'], ['kitchen', '🍳 Kitchen'], ['dining', '🍽️ Dining'], ['office', '💻 Office']];
@@ -790,7 +814,16 @@ const fmtN = (n, d = 0) => Number(n).toLocaleString('en-IN', { maximumFractionDi
 const ROOM_DEFAULTS = { living: [5.5, 4.6], bedroom: [4.6, 4.2], kitchen: [4.4, 4.0], dining: [4.4, 3.8], office: [3.8, 3.4], bathroom: [3.0, 2.6], pooja: [3.0, 2.8] };
 const ROOM_LABEL = { living: 'Living Room', bedroom: 'Bedroom', kitchen: 'Kitchen', dining: 'Dining Room', office: 'Home Office', bathroom: 'Bathroom', pooja: 'Pooja Room' };
 const ROOM_ICON = { living: '🛋️', bedroom: '🛏️', kitchen: '🍳', dining: '🍽️', office: '💻', bathroom: '🛁', pooja: '🪔' };
-const EXT_DEFAULT = { style: 'modern', floors: 2, plotW: 40, plotL: 60, roof: 'flat', wall: '#f5f5f2', trim: '#2b2b2b', roofColor: '#4a4a4a', balcony: true, porch: true, pool: false, fence: true, columns: false, garden: 'lawn', trees: 7, time: 'day', seed: 11 };
+function applyExtStyle(s, k) {
+  const v = EXT_STYLES[k] || EXT_STYLES.modern;
+  return Object.assign(s, {
+    style: k in EXT_STYLES ? k : 'modern', roof: v.roof, wall: v.wall, trim: v.trim, roofColor: v.roofColor, columns: !!v.columns,
+    facade: v.facade || 'box', glass: v.glass || (v.bigGlass ? 'large' : 'normal'), fins: !!v.fins, jaali: !!v.jaali, planters: !!v.planters,
+    coveLights: !!v.cove, stone: !!v.stone, wood: v.wood || '#7a4e2d',
+  });
+}
+const EXT_DEFAULT = applyExtStyle({ floors: 2, plotW: 40, plotL: 60, balcony: true, porch: true, pool: false, fence: true, garden: 'lawn', trees: 7, time: 'day', seed: 11 }, 'modern');
+const withStyleDefaults = ex => ({ ...applyExtStyle({ ...EXT_DEFAULT }, ex && ex.style), ...ex });
 const state = { mode: 'interior', rooms: [], activeRoom: 0, interior: null, exterior: { ...EXT_DEFAULT } };
 let roomSeq = 0;
 function newInterior(roomType = 'living', styleKey = 'modern', name) {
@@ -942,9 +975,10 @@ function buildWindow(g, P, L, w, s) {
 
 /* ---------------- Build: exterior ---------------- */
 const TIME = {
-  day:    { bg: '#a9d3ff', hemi: ['#dbeeff', '#6b8e4e', 1.3], sun: ['#fff4e0', 3.0, [18, 28, 14]], night: false, exp: 1.0 },
-  sunset: { bg: '#f2a97a', hemi: ['#ffd7b0', '#5a4a3a', 0.9], sun: ['#ff9a4d', 2.6, [-28, 9, 16]], night: false, exp: 1.05 },
-  night:  { bg: '#0c1830', hemi: ['#3a4a6c', '#121212', 0.45], sun: ['#9fb4ff', 0.5, [-12, 22, 10]], night: true, exp: 1.15 },
+  day:    { bg: '#a9d3ff', hemi: ['#dbeeff', '#6b8e4e', 1.3], sun: ['#fff4e0', 3.0, [18, 28, 14]], night: false, exp: 1.0, glow: 0.08 },
+  sunset: { bg: '#f4b48c', hemi: ['#ffe9d6', '#6a5a4a', 1.25], sun: ['#ffbf8a', 1.7, [-28, 9, 16]], night: false, exp: 1.0, glow: 0.45 },
+  dusk:   { bg: '#4a5f8a', hemi: ['#b4c4e4', '#4a4034', 1.15], sun: ['#ffd7a8', 0.45, [-20, 12, 18]], night: true, exp: 1.15, glow: 1 },
+  night:  { bg: '#0c1830', hemi: ['#3a4a6c', '#121212', 0.45], sun: ['#9fb4ff', 0.5, [-12, 22, 10]], night: true, exp: 1.15, glow: 1.1 },
 };
 
 /* Plot → house footprint. Plot sizes are in feet (Indian style 30×50 etc.), the 3D world is in metres. */
@@ -1010,6 +1044,11 @@ function buildExterior(s = state.exterior) {
 
   const FH = 3.2, n = s.floors;
   const wallM = M(s.wall, { r: 0.9 }), trimM = M(s.trim, { r: 0.6 }), woodM = M('#7a5230', { r: 0.6 });
+  const woodM2 = M(s.wood || '#7a4e2d', { r: 0.55 });
+  const soffitM = new THREE.MeshStandardMaterial({ color: s.wood || '#7a4e2d', roughness: 0.6, emissive: '#ffb866', emissiveIntensity: s.coveLights ? (T.glow ?? 0.1) * 0.9 : 0 });
+  const coveM = glow('#ffc27a', (T.glow ?? 0.1) * 2.4);
+  const stoneM = new THREE.MeshStandardMaterial({ map: useTex(tex('stone', shade(s.wall, -0.12)), 6, 1), roughness: 0.95 });
+  const bigGlass = s.glass ? s.glass !== 'normal' : !!est.bigGlass, fullGlass = s.glass === 'full';
   const glassM = new THREE.MeshStandardMaterial({ color: '#5f7f98', roughness: 0.06, metalness: 0.75 });
   const glassLit = T.night ? glow('#ffcf88', 1.1) : glassM;
   const roofSolid = M(s.roofColor, { r: 0.75 });
@@ -1034,8 +1073,82 @@ function buildExterior(s = state.exterior) {
   if (L.porch === 'side') box(world, 3.6, 0.035, z1 - (-D / 2 + 1), concM, porchX, 0, (z1 - D / 2 + 1) / 2, false);
   if (L.porch === 'front') box(world, 3.0, 0.035, z1 - (carZ - 2.5), concM, carX, 0, (z1 + carZ - 2.5) / 2, false);
 
+  // Sculptural / curved facade: flowing slabs, a glass curtain wall, a sweeping side wing.
+  function flowShape(x0, x1, zb, zf, rL, rR, wave) {
+    const sh = new THREE.Shape(), yb = -zb, yf = -zf, xa = x1 - rR, xb = x0 + rL, k = (xa - xb) * 0.42;
+    sh.moveTo(x0 + 0.6, yb); sh.lineTo(x1 - 0.6, yb); sh.quadraticCurveTo(x1, yb, x1, yb - 0.6);
+    sh.lineTo(x1, yf + rR); sh.quadraticCurveTo(x1, yf, xa, yf);
+    sh.bezierCurveTo(xa - k, yf, xb + k, yf + wave, xb, yf + wave);
+    sh.quadraticCurveTo(x0, yf + wave, x0, yf + wave + rL);
+    sh.lineTo(x0, yb - 0.6); sh.quadraticCurveTo(x0, yb, x0 + 0.6, yb);
+    return sh;
+  }
+  function flowSlab(shape, y, th, mat, k = 1) {
+    const g = new THREE.ExtrudeGeometry(shape, { depth: th, bevelEnabled: false, curveSegments: 28 });
+    g.rotateX(-Math.PI / 2);
+    const m = mesh(H, g, mat, 0, y, 0); if (k !== 1) m.scale.set(k, 1, k); return m;
+  }
+  function sculpt() {
+    const frameM = M('#2a2a2a', { r: 0.4, m: 0.6 }), leafM = M('#4f7d3a', { r: 0.9 }), leaf2 = M('#6a994e', { r: 0.9 });
+    const planterM = M(shade(s.wall, -0.08), { r: 0.8 });
+    const railM = new THREE.MeshStandardMaterial({ color: '#bcd7e6', transparent: true, opacity: 0.3, roughness: 0.05, metalness: 0.3 });
+    const wingW = Math.min(3.2, Math.max(1.6, W * 0.26)), wx0 = W / 2 - wingW, faceZ = D / 2 - 0.7, zb = -D / 2 - 0.3;
+    box(H, W + 0.6, 0.3, D + 0.6, s.stone ? stoneM : M('#bdb3a3'), 0, -0.2, 0);
+    for (let i = 0; i < n; i++) {
+      const y = i * FH, top = i === n - 1;
+      box(H, wx0 + W / 2 + 0.2, FH, D - 0.7, wallM, (-W / 2 + wx0) / 2 + 0.1, y, -0.35);
+      const gx0 = -W / 2 + 0.25, gx1 = wx0 - 0.1, cnt = Math.max(2, Math.floor((gx1 - gx0) / 1.25)), sp = (gx1 - gx0) / cnt;
+      for (let j = 0; j < cnt; j++) {
+        box(H, sp - 0.05, FH - 0.5, 0.05, r() < 0.8 ? glassLit : glassM, gx0 + sp * (j + 0.5), y + 0.12, faceZ + 0.03, false);
+        box(H, 0.05, FH - 0.5, 0.08, frameM, gx0 + sp * j, y + 0.12, faceZ + 0.04);
+      }
+      const over = top ? 0.9 : 1.7, wave = top ? 0.5 : 0.95;
+      const shp = flowShape(-W / 2 - 0.5 - (i % 2) * 0.35, wx0 + 0.6, zb, faceZ + over, 1.3, 2.4, wave);
+      flowSlab(shp, y + FH - 0.32, 0.36, wallM);
+      flowSlab(shp, y + FH - 0.35, 0.03, soffitM, 0.985);
+      const yTop = y + FH + 0.04, pts = shp.getPoints(14).map(p => new THREE.Vector3(p.x, 0, -p.y));
+      for (let k = 0; k < pts.length - 1; k++) {
+        const a = pts[k], b2 = pts[k + 1];
+        if (a.z < faceZ + 0.35 || b2.z < faceZ + 0.35) continue;
+        const len = a.distanceTo(b2); if (len < 0.05) continue;
+        const mx = (a.x + b2.x) / 2, mz = (a.z + b2.z) / 2, rot = -Math.atan2(b2.z - a.z, b2.x - a.x);
+        if (!top) { const rl = box(H, len, 1.0, 0.03, railM, mx, yTop, mz, false); rl.rotation.y = rot; }
+        if (s.planters && (!top || k % 2 === 0)) {
+          const pl = box(H, len * 0.95, 0.32, 0.3, planterM, mx, yTop, mz); pl.rotation.y = rot;
+          sph(H, 0.22, leaf2, mx, yTop + 0.38, mz);
+          if (len > 0.3) for (const t of [0.25, 0.75]) {
+            const c = mesh(H, new THREE.ConeGeometry(0.2, 0.7 + r() * 0.6, 6), leafM, a.x + (b2.x - a.x) * t, yTop - 0.55, a.z + (b2.z - a.z) * t + 0.05);
+            c.rotation.x = Math.PI;
+          }
+        }
+      }
+    }
+    // entrance: tall wooden pivot door + steps
+    const dx = -W * 0.12;
+    box(H, 1.5, 2.8, 0.1, woodM2, dx, 0.1, faceZ + 0.09);
+    box(H, 0.05, 1.3, 0.06, M('#d4af37', { m: 0.9, r: 0.3 }), dx + 0.55, 0.8, faceZ + 0.17);
+    box(H, 3.0, 0.15, 1.4, M('#cfc6b8'), dx, 0, faceZ + 0.8);
+    // sweeping wing with a curved top edge
+    const Ht = n * FH + 0.7, ws = new THREE.Shape();
+    ws.moveTo(0, 0); ws.lineTo(wingW, 0); ws.lineTo(wingW, Ht);
+    ws.bezierCurveTo(wingW * 0.5, Ht, wingW * 0.4, Ht * 0.6, 0, Ht * 0.48); ws.lineTo(0, 0);
+    const wg = new THREE.ExtrudeGeometry(ws, { depth: D + 0.4, bevelEnabled: true, bevelSize: 0.08, bevelThickness: 0.08, bevelSegments: 3, curveSegments: 24 });
+    mesh(H, wg, wallM, wx0, 0, -D / 2 - 0.2);
+    if (s.fins) {
+      for (let x = 0.15; x < wingW - 0.05; x += 0.22) {
+        const t = x / wingW, hgt = Ht * (0.48 + 0.52 * Math.pow(t, 1.6));
+        box(H, 0.06, hgt - 0.5, 0.12, woodM2, wx0 + x, 0.2, D / 2 + 0.34);
+      }
+      for (let x = -W / 2 - 0.1; x < -W / 2 + 1.4; x += 0.26) box(H, 0.07, FH - 0.45, 0.26, woodM2, x, 0.12, faceZ + 1.25);
+    }
+    if (s.coveLights) {
+      box(H, wingW, 0.05, 0.12, coveM, wx0 + wingW / 2, 0.12, D / 2 + 0.42, false);
+      box(H, 1.5, 0.05, 0.12, coveM, dx, 2.92, faceZ + 0.15, false);
+    }
+  }
   // house floors
   const H = G(); world.add(H);
+  if (s.facade === 'curved') sculpt(); else {
   const bounds = [];
   for (let i = 0; i < n; i++) {
     let bw = W, bx = 0, bz = 0;
@@ -1079,8 +1192,8 @@ function buildExterior(s = state.exterior) {
     for (let j = 0; j < cnt; j++) {
       const x = b.bx - b.bw / 2 + sp * (j + 0.5);
       if (i === 0 && Math.abs(x) < sp / 2) continue;
-      const ww = est.bigGlass ? sp * 0.72 : Math.min(1.5, sp * 0.5), wh = est.bigGlass ? 2.1 : est.arches ? 1.3 : 1.5;
-      const wy = b.y + (est.bigGlass ? 0.55 : 0.95);
+      const ww = fullGlass ? sp * 0.86 : bigGlass ? sp * 0.72 : Math.min(1.5, sp * 0.5), wh = fullGlass ? FH - 0.55 : bigGlass ? 2.1 : est.arches ? 1.3 : 1.5;
+      const wy = b.y + (fullGlass ? 0.15 : bigGlass ? 0.55 : 0.95);
       win(x, wy, b.bz + D / 2, 0, ww, wh, r() < 0.7, true);
       if (est.jharokha && i > 0) {
         box(H, ww + 0.5, 0.14, 0.6, trimM, x, wy - 0.2, b.bz + D / 2 + 0.3);
@@ -1111,6 +1224,7 @@ function buildExterior(s = state.exterior) {
     for (const sx of [-1, 1]) box(H, 0.04, 1.0, 1.3, railM, b.bx + sx * bw / 2, b.y + 0.14, cz, false);
     box(H, bw, 0.05, 0.06, M('#333', { m: 0.8, r: 0.3 }), b.bx, b.y + 1.14, cz + 0.63);
     plantPot(H, b.bx + bw / 2 - 0.3, b.y + 0.14, cz + 0.4, 0.6);
+    if (s.planters) for (let k = -bw / 2 + 0.3; k < bw / 2; k += 0.55) { const c = mesh(H, new THREE.ConeGeometry(0.2, 0.7 + r() * 0.5, 6), M('#4f7d3a', { r: 0.9 }), b.bx + k, b.y - 0.35, cz + 0.62); c.rotation.x = Math.PI; }
   }
   // roof
   const top = bounds[n - 1], ty = n * FH, rW = top.bw, rx = top.bx, rz = top.bz;
@@ -1145,6 +1259,15 @@ function buildExterior(s = state.exterior) {
     hip.scale.set((rW + 1.2) / 2 / 0.7071, 1, (D + 1.2) / 2 / 0.7071);
     box(H, rW + 0.4, 0.2, D + 0.4, trimM, rx, ty, rz);
   }
+    if (s.fins) { const fw = Math.min(2.2, W * 0.22); for (let x = -W / 2 + 0.15; x < -W / 2 + fw; x += 0.28) box(H, 0.08, n * FH - 0.3, 0.3, woodM2, x, 0.05, D / 2 + 0.22); }
+    if (s.jaali) {
+      const b = bounds[n - 1], jw = Math.min(3.2, b.bw * 0.34), jx = b.bx + b.bw / 2 - jw / 2 - 0.3, jz = b.bz + D / 2 + 0.5;
+      const jm = new THREE.MeshStandardMaterial({ map: useTex(tex('jaali', shade(s.wall, -0.05)), jw / 1.2, (FH - 0.4) / 1.2), transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.8 });
+      box(H, jw, FH - 0.4, 0.05, jm, jx, b.y + 0.15, jz, false);
+      for (const yy of [b.y + 0.07, b.y + FH - 0.27]) box(H, jw + 0.1, 0.08, 0.55, trimM, jx, yy, jz - 0.25);
+    }
+    if (s.coveLights) bounds.forEach(b => box(H, b.bw + 0.2, 0.04, 0.08, coveM, b.bx, b.y + FH - 0.27, b.bz + D / 2 + 0.17, false));
+  }
   if (W / 2 - 1.6 > 0.6) for (const sx of [-1, 1]) rbox(H, W / 2 - 1.6, 0.6, 0.6, M('#3f6b35', { r: 1 }), sx * (W / 4 + 0.6), 0, D / 2 + 0.6, 0.25);
 
   // parking
@@ -1168,7 +1291,7 @@ function buildExterior(s = state.exterior) {
   }
   // boundary: compound wall with gate, or just a low kerb so the plot edge stays visible
   const gateL = L.porch === 'side' ? porchX - 1.9 : L.porch === 'front' ? carX - 1.6 : -1.6, gateR = 1.6;
-  const h = s.fence ? 1.3 : 0.15, fm = M(s.trim === '#ffffff' ? '#e8e4dc' : s.wall, { r: 0.9 });
+  const h = s.fence ? 1.3 : 0.15, fm = s.stone ? stoneM : M(s.trim === '#ffffff' ? '#e8e4dc' : s.wall, { r: 0.9 });
   const seg = (x, z, w, d) => { if (w <= 0 || d <= 0) return; box(world, w, h, d, s.fence ? fm : M('#cfc9be'), x, 0, z); if (s.fence) box(world, w + 0.06, 0.08, d + 0.06, trimM, x, h, z); };
   seg(cxp, z0, PWm, 0.2); seg(x0, czp, 0.2, PLm); seg(x1, czp, 0.2, PLm);
   seg((x0 + gateL) / 2, z1, gateL - x0, 0.2); seg((gateR + x1) / 2, z1, x1 - gateR, 0.2);
@@ -1196,6 +1319,7 @@ function buildExterior(s = state.exterior) {
     if (T.night && ctx.lights < 6) { const p = new THREE.PointLight('#ffc977', 3, 6, 2); p.position.set(sx * 1.1, 1, z); world.add(p); ctx.lights++; }
   }
   if (T.night) { const p = new THREE.PointLight('#ffcf88', 6, 8, 2); p.position.set(0, 2.6, D / 2 + 1.2); world.add(p); }
+  if (T.night && s.coveLights) for (const fx of [-W / 3, W / 3]) { const p = new THREE.PointLight('#ffc98a', 10, 12, 1.6); p.position.set(fx, 0.6, D / 2 + 2.2); world.add(p); }
   // plot dimension labels
   const lk = Math.max(1, span / 22);
   label3d(`${s.plotW} ft (${(PWm).toFixed(1)} m)`, cxp, 0.8 * lk, z1 + 1.2, lk);
@@ -1246,8 +1370,9 @@ function frame(cam, ctl) {
     pos = new THREE.Vector3(dist * Math.sin(p) * Math.sin(a), dist * Math.cos(p) + 0.8, dist * Math.sin(p) * Math.cos(a)); tgt = new THREE.Vector3(0, 0.8, 0);
   } else {
     const { L, span, cx, cz } = extFrameInfo();
-    pos = new THREE.Vector3(cx - (span * 0.62 + 7), 7 + state.exterior.floors * 1.6 + span * 0.32, L.z1 + span * 0.45 + 8);
-    tgt = new THREE.Vector3(cx, 2.5, cz + 1);
+    // a front three-quarter view, so the facade (what photos show) faces the camera
+    pos = new THREE.Vector3(-(span * 0.28 + 5), 5.5 + state.exterior.floors * 1.7 + span * 0.24, L.z1 + span * 0.38 + 9);
+    tgt = new THREE.Vector3(0, 1.2 + state.exterior.floors * 1.1, L.D / 2 * 0.4);
   }
   cam.position.copy(pos); cam.lookAt(tgt); if (ctl) ctl.target.copy(tgt);
 }
@@ -1458,7 +1583,7 @@ function renderPanel() {
         h('p', { class: 'note' }, '1 gaj = 1 sq yard = 9 sq ft. Setbacks are typical values; check your local building rules.'),
         notes.length ? h('p', { class: 'warn' }, notes.join(' ')) : null),
       sec('House style · around the world', styleGroups(EXT_STYLES, s, k => {
-        const v = EXT_STYLES[k]; Object.assign(s, { roof: v.roof, wall: v.wall, trim: v.trim, roofColor: v.roofColor, columns: !!v.columns }); both();
+        applyExtStyle(s, k); both();
       })),
       sec('Floors', chips(s, 'floors', [[1, 'Ground (G)'], [2, 'G + 1'], [3, 'G + 2']], () => { both(); frame(camera, controls); })),
       sec('Roof', chips(s, 'roof', [['flat', 'Flat terrace'], ['gable', 'Sloped (gable)'], ['hip', 'Hip roof']], both), h('div', { style: 'height:8px' }), swatches(s, 'roofColor', ROOFS, c => c ? buildExterior() : both())),
@@ -1470,7 +1595,13 @@ function renderPanel() {
       sec('Garden', chips(s, 'garden', [['lawn', '🌿 Lawn'], ['paved', '🧱 Paved'], ['zen', '🪨 Zen gravel']], both),
         slider('Trees', s, 'trees', 0, 24, 1, () => buildExterior()),
         h('div', { class: 'btnrow' }, h('button', { class: 'hbtn', onclick: () => { s.seed = Math.floor(Math.random() * 1e6); buildExterior(); } }, '🌳 Rearrange garden'))),
-      sec('Time of day', chips(s, 'time', [['day', '☀️ Day'], ['sunset', '🌇 Sunset'], ['night', '🌙 Night']], both)),
+      sec('Facade details',
+        chips(s, 'facade', [['box', '▭ Straight'], ['curved', '〰️ Curved sculptural']], both), h('div', { style: 'height:8px' }),
+        chips(s, 'glass', [['normal', 'Windows'], ['large', 'Large glass'], ['full', 'Floor-to-ceiling glass']], both),
+        toggle('Wooden fins / louvers', s, 'fins', both), toggle('Jaali screen', s, 'jaali', both), toggle('Hanging planters', s, 'planters', both),
+        toggle('Cove / facade lighting', s, 'coveLights', both), toggle('Stone cladding', s, 'stone', both),
+        h('div', { class: 'rg' }, 'Wood colour'), swatches(s, 'wood', WOODS, c => c ? buildExterior() : both())),
+      sec('Time of day', chips(s, 'time', [['day', '☀️ Day'], ['sunset', '🌇 Sunset'], ['dusk', '🌆 Dusk'], ['night', '🌙 Night']], both)),
     );
   }
   panel.append(savedSection());
@@ -1549,10 +1680,10 @@ function randomInterior(r) {
 function randomExterior(r) {
   const k = pick(r, Object.keys(EXT_STYLES)), v = EXT_STYLES[k];
   const s = {
-    ...state.exterior, style: k, roof: r() < 0.75 ? v.roof : pick(r, ['flat', 'gable', 'hip']),
+    ...applyExtStyle({ ...state.exterior }, k), roof: r() < 0.75 ? v.roof : pick(r, ['flat', 'gable', 'hip']),
     wall: r() < 0.6 ? v.wall : pick(r, EXT_WALLS), trim: r() < 0.6 ? v.trim : pick(r, EXT_TRIMS), roofColor: r() < 0.6 ? v.roofColor : pick(r, ROOFS),
     floors: pick(r, [1, 2, 2, 3]), balcony: r() < 0.7, porch: r() < 0.7, pool: r() < 0.35, fence: r() < 0.8,
-    columns: !!v.columns && r() < 0.8, garden: pick(r, ['lawn', 'lawn', 'paved', 'zen']), trees: Math.floor(3 + r() * 10), time: pick(r, ['day', 'day', 'sunset', 'night']), seed: Math.floor(r() * 1e6),
+    columns: !!v.columns && r() < 0.8, garden: pick(r, ['lawn', 'lawn', 'paved', 'zen']), trees: Math.floor(3 + r() * 10), time: pick(r, ['day', 'day', 'sunset', 'dusk', 'night']), seed: Math.floor(r() * 1e6),
   };
   const fl = ['Single storey', 'G+1', 'G+2'][s.floors - 1];
   return { s, label: `${v.flag} ${v.name}`, sub: `${fl} · ${s.roof} roof${s.pool ? ' · pool' : ''}` };
@@ -1609,11 +1740,11 @@ function openSaved(d) {
     state.rooms = JSON.parse(JSON.stringify(d.project.rooms));
     state.activeRoom = Math.min(d.project.activeRoom || 0, state.rooms.length - 1);
     state.interior = state.rooms[state.activeRoom];
-    state.exterior = { ...EXT_DEFAULT, ...d.project.exterior };
+    state.exterior = withStyleDefaults(d.project.exterior);
   } else if (d.mode === 'interior') {
     replaceInterior({ ...JSON.parse(JSON.stringify(d.s)) });
   } else {
-    const { width, ...rest } = d.s; state.exterior = { ...EXT_DEFAULT, ...rest };
+    const { width, ...rest } = d.s; state.exterior = withStyleDefaults(rest);
   }
   state.mode = d.mode;
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.mode === d.mode));
@@ -1667,6 +1798,23 @@ function drawScaled(img, max) {
   const k = Math.min(1, max / Math.max(iw, ih));
   const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(iw * k)); c.height = Math.max(1, Math.round(ih * k));
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
+}
+/* Phone screenshots (Instagram, Pinterest) put the picture between black app bars and
+   stickers. Keep the largest band of rows that are mostly not black; leave normal photos alone. */
+function cropScreenshot(c) {
+  const sm = drawScaled(c, 160), d = sm.getContext('2d').getImageData(0, 0, sm.width, sm.height).data, rows = [];
+  for (let y = 0; y < sm.height; y++) {
+    let dark = 0;
+    for (let x = 0; x < sm.width; x++) { const i = (y * sm.width + x) * 4; if (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2] < 22) dark++; }
+    rows.push(dark / sm.width < 0.45);
+  }
+  let best = [0, 0], st = -1;
+  rows.concat([false]).forEach((ok, y) => { if (ok && st < 0) st = y; if (!ok && st >= 0) { if (y - st > best[1] - best[0]) best = [st, y]; st = -1; } });
+  const frac = (best[1] - best[0]) / sm.height;
+  if (frac < 0.2 || frac > 0.9) return c;
+  const k = c.height / sm.height, y0 = Math.round(best[0] * k), hh = Math.round((best[1] - best[0]) * k);
+  const out = document.createElement('canvas'); out.width = c.width; out.height = hh;
+  out.getContext('2d').drawImage(c, 0, y0, c.width, hh, 0, 0, c.width, hh); return out;
 }
 const toBlob = (c, q) => new Promise(res => c.toBlob(res, 'image/jpeg', q));
 
@@ -1740,7 +1888,7 @@ async function askClaude(blob, isInt) {
   const lim = await sample.limits().catch(() => null);
   if (!lim || !lim.images) return { why: 'none' };
   const prompt = isInt
-    ? `The image is a photo of a room. Map what you see to the settings of a 3D room designer so the 3D room looks as close to the photo as possible.
+    ? `The image is a photo of a room. It may be a phone screenshot: ignore app buttons, captions, stickers and text overlays and look only at the room. Give colours as the materials look in normal daylight. Map what you see to the settings of a 3D room designer so the 3D room looks as close to the photo as possible.
 Reply with only a JSON object with exactly these keys:
 "roomType": one of ${Object.keys(ROOM_LABEL).join(', ')}
 "style": the closest of these style ids: ${Object.entries(STYLES).map(([k, v]) => `${k} (${v.name})`).join(', ')}
@@ -1754,7 +1902,7 @@ Reply with only a JSON object with exactly these keys:
 "furniture": array of the items visible, using only these ids: ${Object.keys(F).join(', ')}
 "summary": one short sentence in simple Hinglish (Hindi written in Latin letters, mixed with English) describing the look.
 If the photo is not a room, pick the closest values anyway and say so in the summary.`
-    : `The image is a photo of a house or building from outside. Map what you see to the settings of a 3D house designer so the 3D house looks as close to the photo as possible.
+    : `The image is a photo of a house or building from outside. It may be a phone screenshot: ignore app buttons, captions, stickers and text overlays and look only at the building. Give colours as the materials look in normal daylight, not tinted by sunset or lamps. Map what you see to the settings of a 3D house designer so the 3D house looks as close to the photo as possible.
 Reply with only a JSON object with exactly these keys:
 "style": the closest of these style ids: ${Object.entries(EXT_STYLES).map(([k, v]) => `${k} (${v.name})`).join(', ')}
 "floors": number of storeys, 1, 2 or 3
@@ -1768,7 +1916,15 @@ Reply with only a JSON object with exactly these keys:
 "fence": true if there is a boundary wall or fence
 "columns": true if there are verandah or porch columns
 "garden": one of lawn, paved, zen
-"time": one of day, sunset, night
+"facade": "curved" if the slabs or walls are flowing, rounded or sculptural, else "box"
+"glass": one of normal, large, full (full = floor-to-ceiling glass walls)
+"fins": true if there are vertical wooden or metal fins / louvers
+"jaali": true if there is a perforated or patterned screen (jaali)
+"planters": true if plants hang or grow from balconies or planter boxes
+"coveLights": true if slab edges, soffits or the facade are lit with glowing strips or warm lights
+"stone": true if there is stone or textured stone cladding
+"woodColor": hex colour of the wood (door, fins, soffits), or "#7a4e2d" if there is none
+"time": one of day, sunset, dusk, night (dusk = sky still blue but lights are on)
 "summary": one short sentence in simple Hinglish (Hindi written in Latin letters, mixed with English) describing the house.
 If the photo is not a house, pick the closest values anyway and say so in the summary.`;
   try {
@@ -1784,7 +1940,7 @@ async function onPhoto(file) {
   photo.busy = true; renderPanel(); setPhotoMsg('Photo khol raha hoon…');
   try {
     const img = await loadImage(file);
-    const big = drawScaled(img, 1400);
+    const big = cropScreenshot(drawScaled(img, 1400));
     p.ref = big.toDataURL('image/jpeg', 0.8); $('#refCard').dataset.closed = ''; updateRefCard();
     const local = isInt ? localInterior(big) : localExterior(big);
     setPhotoMsg('Claude photo dekh raha hai… (30–60 second lag sakte hain)');
@@ -1838,13 +1994,17 @@ function applyExteriorPhoto(res, local) {
   const cur = state.exterior;
   const style = oneOf(res.style, Object.keys(EXT_STYLES), local.style), v = EXT_STYLES[style];
   const b = (key, fb) => (typeof res[key] === 'boolean' ? res[key] : fb);
+  const base = applyExtStyle({ ...cur }, style);
   state.exterior = {
-    ...cur, style,
+    ...base,
+    facade: oneOf(res.facade, ['box', 'curved'], base.facade), glass: oneOf(res.glass, ['normal', 'large', 'full'], base.glass),
+    fins: b('fins', base.fins), jaali: b('jaali', base.jaali), planters: b('planters', base.planters), coveLights: b('coveLights', base.coveLights), stone: b('stone', base.stone),
+    wood: isHex(res.woodColor) ? res.woodColor : base.wood,
     floors: oneOf(Number(res.floors), [1, 2, 3], cur.floors),
     roof: oneOf(res.roof, ['flat', 'gable', 'hip'], local.roof || v.roof),
     wall: isHex(res.wall) ? res.wall : local.wall, trim: isHex(res.trim) ? res.trim : local.trim, roofColor: isHex(res.roofColor) ? res.roofColor : local.roofColor,
     balcony: b('balcony', cur.balcony), porch: b('porch', cur.porch), pool: b('pool', cur.pool), fence: b('fence', cur.fence), columns: b('columns', !!v.columns),
-    garden: oneOf(res.garden, ['lawn', 'paved', 'zen'], cur.garden), time: oneOf(res.time, ['day', 'sunset', 'night'], 'day'),
+    garden: oneOf(res.garden, ['lawn', 'paved', 'zen'], cur.garden), time: oneOf(res.time, ['day', 'sunset', 'dusk', 'night'], 'day'),
   };
   buildExterior();
 }
