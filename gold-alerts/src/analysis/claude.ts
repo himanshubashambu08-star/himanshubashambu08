@@ -48,6 +48,7 @@ Impact scale:
 - low: routine, already priced in, opinion/explainer pieces, price-recap articles ("gold rises as..."), single-company news, sports/lifestyle, non-US local politics with no market link.
 Price recaps that only describe what gold already did are relevant=true but impact=low.
 Anything with no plausible gold link -> relevant=false, impact=low, gold_bias=neutral.
+gold_bias must match the explanation's conclusion. If the effect on gold is mixed or unclear, use gold_bias=neutral and say why, rather than picking a side with low confidence.
 
 Writing style for headline_hinglish and explanation: simple Hinglish (Hindi in Roman script mixed with everyday English words), like a trader friend texting on WhatsApp. Keep market terms in English (Fed, rate cut, dollar, yields, safe haven, risk-on). No Devanagari. Short and direct.
 Example:
