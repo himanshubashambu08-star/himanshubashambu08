@@ -1,0 +1,39 @@
+{
+  "_comment": "CME gold (COMEX GC on Globex) hours. All times are US Eastern (same clock as Toronto). Normal week: opens Sunday 18:00, trades nearly 24h with a daily break 17:00-18:00, closes Friday 17:00. 'closed' = no trading that calendar day (reopens at 'reopen'). 'early_close' = trading halts at 'close' and reopens at 'reopen'. CME changes these every year: check https://www.cmegroup.com/trading-hours.html#holidayCalendar before each year and update this file. Entries marked verify=true are my best estimate and need checking.",
+  "timezone": "America/New_York",
+  "regular": {
+    "dailyClose": "17:00",
+    "dailyReopen": "18:00",
+    "sundayOpen": "18:00",
+    "fridayClose": "17:00"
+  },
+  "days": [
+    { "date": "2026-01-01", "name": "New Year's Day", "type": "closed", "reopen": "2026-01-01T18:00" },
+    { "date": "2026-01-19", "name": "Martin Luther King Jr. Day", "type": "early_close", "close": "13:30", "reopen": "2026-01-19T18:00" },
+    { "date": "2026-02-16", "name": "Presidents' Day", "type": "early_close", "close": "13:30", "reopen": "2026-02-16T18:00" },
+    { "date": "2026-04-03", "name": "Good Friday", "type": "closed", "reopen": "2026-04-05T18:00" },
+    { "date": "2026-05-25", "name": "Memorial Day", "type": "early_close", "close": "13:30", "reopen": "2026-05-25T18:00" },
+    { "date": "2026-06-19", "name": "Juneteenth", "type": "early_close", "close": "13:30", "reopen": "2026-06-21T18:00" },
+    { "date": "2026-07-03", "name": "Independence Day (observed)", "type": "early_close", "close": "13:30", "reopen": "2026-07-05T18:00" },
+    { "date": "2026-09-07", "name": "Labor Day", "type": "early_close", "close": "13:30", "reopen": "2026-09-07T18:00" },
+    { "date": "2026-11-26", "name": "Thanksgiving", "type": "early_close", "close": "13:30", "reopen": "2026-11-26T18:00" },
+    { "date": "2026-11-27", "name": "Day after Thanksgiving", "type": "early_close", "close": "13:45", "reopen": "2026-11-29T18:00" },
+    { "date": "2026-12-24", "name": "Christmas Eve", "type": "early_close", "close": "13:45", "reopen": "2026-12-27T18:00" },
+    { "date": "2026-12-25", "name": "Christmas Day", "type": "closed", "reopen": "2026-12-27T18:00" },
+    { "date": "2026-12-31", "name": "New Year's Eve", "type": "early_close", "close": "13:45", "reopen": "2027-01-03T18:00", "verify": true },
+
+    { "date": "2027-01-01", "name": "New Year's Day", "type": "closed", "reopen": "2027-01-03T18:00" },
+    { "date": "2027-01-18", "name": "Martin Luther King Jr. Day", "type": "early_close", "close": "13:30", "reopen": "2027-01-18T18:00" },
+    { "date": "2027-02-15", "name": "Presidents' Day", "type": "early_close", "close": "13:30", "reopen": "2027-02-15T18:00" },
+    { "date": "2027-03-26", "name": "Good Friday", "type": "closed", "reopen": "2027-03-28T18:00" },
+    { "date": "2027-05-31", "name": "Memorial Day", "type": "early_close", "close": "13:30", "reopen": "2027-05-31T18:00" },
+    { "date": "2027-06-18", "name": "Juneteenth (observed)", "type": "early_close", "close": "13:30", "reopen": "2027-06-20T18:00", "verify": true },
+    { "date": "2027-07-05", "name": "Independence Day (observed)", "type": "early_close", "close": "13:30", "reopen": "2027-07-05T18:00", "verify": true },
+    { "date": "2027-09-06", "name": "Labor Day", "type": "early_close", "close": "13:30", "reopen": "2027-09-06T18:00" },
+    { "date": "2027-11-25", "name": "Thanksgiving", "type": "early_close", "close": "13:30", "reopen": "2027-11-25T18:00" },
+    { "date": "2027-11-26", "name": "Day after Thanksgiving", "type": "early_close", "close": "13:45", "reopen": "2027-11-28T18:00" },
+    { "date": "2027-12-23", "name": "Christmas (early close)", "type": "early_close", "close": "13:45", "reopen": "2027-12-26T18:00", "verify": true },
+    { "date": "2027-12-24", "name": "Christmas (observed)", "type": "closed", "reopen": "2027-12-26T18:00", "verify": true },
+    { "date": "2027-12-31", "name": "New Year's Day (observed)", "type": "closed", "reopen": "2028-01-02T18:00", "verify": true }
+  ]
+}

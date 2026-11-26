@@ -1,0 +1,21 @@
+{
+  "_comment": "Market-mover social accounts. Truth Social uses a public RSS mirror (no login). X accounts only run when ENABLE_X=true in .env, because the official X API is paid. For X, give each account an 'rssUrl' (e.g. from a self-hosted Nitter or RSSHub), or set X_RSS_URL_TEMPLATE in .env (e.g. https://nitter.example.com/{handle}/rss) and leave rssUrl out.",
+  "truthSocial": [
+    {
+      "handle": "realDonaldTrump",
+      "name": "Donald Trump",
+      "enabled": true,
+      "rssUrl": "https://www.trumpstruth.org/feed"
+    }
+  ],
+  "x": [
+    { "handle": "realDonaldTrump", "name": "Donald Trump", "enabled": true },
+    { "handle": "elonmusk", "name": "Elon Musk", "enabled": true },
+    { "handle": "WhiteHouse", "name": "The White House", "enabled": true },
+    { "handle": "federalreserve", "name": "Federal Reserve", "enabled": true },
+    { "handle": "USTreasury", "name": "US Treasury", "enabled": true },
+    { "handle": "NickTimiraos", "name": "Nick Timiraos (WSJ Fed reporter)", "enabled": true },
+    { "handle": "KobeissiLetter", "name": "The Kobeissi Letter", "enabled": false },
+    { "handle": "DeItaone", "name": "Walter Bloomberg (headline wire)", "enabled": false }
+  ]
+}

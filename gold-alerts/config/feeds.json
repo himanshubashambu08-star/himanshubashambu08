@@ -1,0 +1,91 @@
+{
+  "_comment": "RSS news feeds. Set enabled=false to turn one off. 'source' is the name shown in alerts. Reuters and AP have no public RSS any more, so they come through Google News search feeds (when:2h keeps them fresh). Several sites block datacenter IPs (CNBC, FXStreet); their Google News versions are on as a backup. 'filter' (optional) = keep only items whose title/summary contains one of these words; leave it out to send every item to the AI.",
+  "feeds": [
+    {
+      "id": "reuters-gnews",
+      "source": "Reuters",
+      "enabled": true,
+      "url": "https://news.google.com/rss/search?q=site:reuters.com+(gold+OR+Fed+OR+dollar+OR+inflation+OR+Treasury+OR+tariff+OR+sanctions+OR+missile+OR+strike+OR+war+OR+Iran+OR+Russia+OR+China+OR+Israel)+when:2h&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "id": "ap-gnews",
+      "source": "AP",
+      "enabled": true,
+      "url": "https://news.google.com/rss/search?q=site:apnews.com+(Fed+OR+economy+OR+inflation+OR+tariff+OR+sanctions+OR+missile+OR+attack+OR+war+OR+Trump)+when:2h&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "id": "kitco-gnews",
+      "source": "Kitco",
+      "enabled": true,
+      "url": "https://news.google.com/rss/search?q=site:kitco.com+when:6h&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "id": "fxstreet-gnews",
+      "source": "FXStreet",
+      "enabled": true,
+      "url": "https://news.google.com/rss/search?q=site:fxstreet.com+(gold+OR+XAU+OR+Fed+OR+dollar+OR+DXY)+when:2h&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "id": "fxstreet-direct",
+      "source": "FXStreet",
+      "enabled": false,
+      "url": "https://www.fxstreet.com/rss/news",
+      "_note": "Behind Cloudflare; often 403 from servers. Try enabling on your VPS."
+    },
+    {
+      "id": "cnbc-economy",
+      "source": "CNBC",
+      "enabled": true,
+      "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+      "_note": "CNBC blocks many datacenter IPs. If it keeps failing, the Google News version below covers it."
+    },
+    {
+      "id": "cnbc-world",
+      "source": "CNBC",
+      "enabled": true,
+      "url": "https://www.cnbc.com/id/100727362/device/rss/rss.html"
+    },
+    {
+      "id": "cnbc-gnews",
+      "source": "CNBC",
+      "enabled": true,
+      "url": "https://news.google.com/rss/search?q=site:cnbc.com+(Fed+OR+dollar+OR+inflation+OR+gold+OR+tariffs+OR+Treasury)+when:3h&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "id": "investing-forex",
+      "source": "Investing.com",
+      "enabled": true,
+      "url": "https://www.investing.com/rss/news_1.rss"
+    },
+    {
+      "id": "investing-commodities",
+      "source": "Investing.com",
+      "enabled": true,
+      "url": "https://www.investing.com/rss/news_11.rss"
+    },
+    {
+      "id": "investing-economy",
+      "source": "Investing.com",
+      "enabled": true,
+      "url": "https://www.investing.com/rss/news_14.rss"
+    },
+    {
+      "id": "bloomberg-markets",
+      "source": "Bloomberg",
+      "enabled": true,
+      "url": "https://feeds.bloomberg.com/markets/news.rss"
+    },
+    {
+      "id": "bloomberg-economics",
+      "source": "Bloomberg",
+      "enabled": true,
+      "url": "https://feeds.bloomberg.com/economics/news.rss"
+    },
+    {
+      "id": "bloomberg-politics",
+      "source": "Bloomberg",
+      "enabled": true,
+      "url": "https://feeds.bloomberg.com/politics/news.rss"
+    }
+  ]
+}
