@@ -1,0 +1,10 @@
+services:
+  gold-alerts:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data          # DB + WhatsApp session (keep this!)
+      - ./config:/app/config      # edit feeds/accounts/holidays without rebuilding
+    # First run: `docker compose run --rm gold-alerts` to see the QR, scan it, then Ctrl+C
+    # and `docker compose up -d`.
